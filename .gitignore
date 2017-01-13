@@ -1,0 +1,17 @@
+
+# third party binaries
+bin/cloud_sql_proxy
+
+# environment files
+etc/env/*.env.json
+!etc/env/blank.env.json
+
+# operator keys
+etc/keys/*.json
+
+# node
+npm-debug.log
+node_modules/
+
+# os x
+*.DS_Store
