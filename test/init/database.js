@@ -7,7 +7,7 @@ var {expect} = require('chai')
 
 describe('database initialisation', function() {
 
-  describe.skip('envfile', function() {
+  describe('envfile', function() {
     // remove env var temporarily for this test case
     var tmp
     before(function() {
