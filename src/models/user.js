@@ -3,7 +3,7 @@ module.exports = function(instance, sqlize) {
   return instance.define('user', {
     did: {
       type: sqlize.STRING,
-      unique: true,
+      // unique: true,
       allowNull: true
     },
     first_name: {
