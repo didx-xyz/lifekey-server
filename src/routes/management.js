@@ -279,15 +279,6 @@ module.exports = [
           body: null
         })
       }
-      // if (!(email && document && reqtoken) || !(email && requesting_id && reqtoken)) {
-      //   res.status(400)
-      //   return res.json({
-      //     error: true,
-      //     status: 400,
-      //     message: 'missing request body parameters',
-      //     body: null
-      //   })
-      // }
 
       var {user, token, user_connection_request} = this.get('models')
 
