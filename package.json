@@ -21,7 +21,6 @@
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
     "mysql": "^2.12.0",
-    "node-pushnotifications": "^1.0.14",
     "scrypt": "^6.0.3",
     "sequelize": "^3.28.0"
   },
