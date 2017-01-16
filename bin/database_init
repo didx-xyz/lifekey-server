@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-require('../src/init/database')().then(function(db) {
-  Object.keys(db.models).forEach(function(model) {
-    db.models[model].sync()
+require('../src/init/database')(
+  false // disable logging
+).then(function(database) {
+  Object.keys(database.models).forEach(function(model) {
+    database.models[model].sync()
   })
 }).catch(function(err) {
   console.log('unable to initialise database', err)
