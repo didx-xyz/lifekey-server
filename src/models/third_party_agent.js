@@ -17,6 +17,7 @@ module.exports = function(instance, sqlize) {
     },
     // TODO
     // email: {}
+    // verified: {}
   }, {
     timestamps: true,
     paranoid: true,
