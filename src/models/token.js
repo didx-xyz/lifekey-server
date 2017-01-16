@@ -3,6 +3,7 @@ module.exports = function(instance, sqlize) {
   return instance.define('token', {
     owner_id: {
       type: sqlize.INTEGER,
+      unique: true,
       allowNull: false
     },
     value: {
