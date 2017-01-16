@@ -17,6 +17,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
+    document: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
