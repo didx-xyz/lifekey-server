@@ -59,7 +59,8 @@ require('./database')(
 
   // 404 route
   server.use(function(err, req, res, next) {
-    return res.status(404).json({
+    res.status(404)
+    return res.json({
       status: 404,
       error: true,
       message: 'not found'
