@@ -5,10 +5,29 @@
 // TODO
 // add flags for control over token generation
 
+// TODO
+// resolve this data structure dynamically (over the network)
+
+var CNSNT_SCHEMA_HOST = 'http://schema.cnsnt.io/'
+var CONNECTION_REQUEST_CTX = {
+  '@context': {
+    id: '@id',
+    type: '@type',
+    cn: 'http://schema.cnsnt.io/',
+    from: 'cn:from',
+    to: 'cn:to',
+    resolution: 'cn:resolution',
+    resolverSignature: 'cn:resolverSignature',
+    dateAcknowledged: 'cn:dateAcknowledged',
+    dateResolved: 'cn:dateResolved'
+  }
+}
+
 var crypto = require('crypto')
 
 require('an.hour.ago')
-
+var jsonld = require('jsonld')
+var query = require('ld-query')
 var scrypt = require('scrypt')
 
 module.exports = [
@@ -59,6 +78,7 @@ module.exports = [
           body: {id: created.id}
         })
       }).catch(function(err) {
+        
         res.status(err.status || 500)
         return res.json({
           error: err.error || true,
@@ -75,6 +95,9 @@ module.exports = [
     uri: '/management/token',
     method: 'post',
     callback: function(req, res) {
+      
+      var newtoken, newexpiry = 1..day.from_now
+      
       // TODO
       // enumerate existing tokens for user if password verified
       // and don't issue new token unless current token has expired
@@ -109,10 +132,11 @@ module.exports = [
         })
       }).then(function(verified) {
         if (verified) {
-          return token.create({
+          newtoken = crypto.randomBytes(32)
+          return token.upsert({
             owner_id: userid,
-            value: crypto.randomBytes(32).toString('hex'), // how sophisticaed :/
-            expires_at: 1..day.from_now
+            value: newtoken.toString('hex'), // how sophisticated :/
+            expires_at: newexpiry
           })
         }
         return Promise.reject({
@@ -121,20 +145,21 @@ module.exports = [
           message: 'hash verification failure',
           body: null
         })
-      }).then(function(created) {
-        if (created) {
+      }).then(function(upserted) {
+        if (upserted) {
           res.status(200)
           return res.json({
             error: false,
             status: 200,
             message: 'token created',
             body: {
-              token: created.value,
-              expires_at: created.expires_at.getTime()
+              token: newtoken.toString('hex'),
+              expires_at: newexpiry.getTime()
             }
           })
         }
       }).catch(function(err) {
+        
         res.status(err.status || 500)
         return res.json({
           error: err.error,
@@ -241,10 +266,11 @@ module.exports = [
       // send a connection request
 
       var email = req.body.email, requester_id
+      var document = req.body.document
       var requesting_id = req.body.target
       var reqtoken = req.body.token
 
-      if (!(email && requesting_id && reqtoken)) {
+      if (!(email && reqtoken)) {
         res.status(400)
         return res.json({
           error: true,
@@ -253,10 +279,63 @@ module.exports = [
           body: null
         })
       }
+      // if (!(email && document && reqtoken) || !(email && requesting_id && reqtoken)) {
+      //   res.status(400)
+      //   return res.json({
+      //     error: true,
+      //     status: 400,
+      //     message: 'missing request body parameters',
+      //     body: null
+      //   })
+      // }
 
       var {user, token, user_connection_request} = this.get('models')
 
-      user.findOne({where: {email: email}}).then(function(found) {
+      // intersperse the OPTIONAL jsonld document
+      // querying with the existing promise composition
+      ;(function() {
+        if (document) {
+          try {
+            document = JSON.parse(document)
+          } catch (e) {
+            return Promise.reject({
+              error: true,
+              status: 400,
+              message: 'expected well-formed and validatable json string',
+              body: null
+            })
+          }
+          return jsonld.promises.compact(
+            document, CONNECTION_REQUEST_CTX
+          ).then(function(compacted) {
+            return jsonld.promises.expand(compacted)
+          }).then(function(expanded) {
+            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
+            requesting_id = q.query('cn:to @value')
+            var vartype = typeof requesting_id
+            if (vartype !== 'number') {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: `expected 'number' type for 'to' field but got ${vartype}`,
+                body: null
+              })
+            }
+            return Promise.resolve()
+          })
+        } else if (!requesting_id) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: `expected 'number' type for 'to' field but got ${vartype}`,
+            body: null
+          })
+        } else {
+          return Promise.resolve()
+        }
+      })(document).then(function() {
+        return user.findOne({where: {email: email}})
+      }).then(function(found) {
         if (found) {
           
           if (found.id === requesting_id) {
@@ -305,7 +384,8 @@ module.exports = [
         if (found) {
           return user_connection_request.create({
             to_id: found.id,
-            from_id: requester_id
+            from_id: requester_id,
+            document: req.body.document
           })
         }
         return Promise.reject({
@@ -412,6 +492,7 @@ module.exports = [
           body: ret_body
         })
       }).catch(function(err) {
+        
         res.status(err.status || 500)
         return res.json({
           error: err.error || true,
@@ -431,13 +512,48 @@ module.exports = [
 
       var connection_request_id = req.params.id
 
-      var {email, accepted} = req.body
+      var {email, accepted, document} = req.body
       var reqtoken = req.body.token
       var requested_id // user id of target
       
       var {user, user_connection, token, user_connection_request} = this.get('models')
 
-      user.findOne({where: {email: email}}).then(function(found) {
+      ;(function() {
+        if (document) {
+          try {
+            document = JSON.parse(document)
+          } catch (e) {
+            return Promise.reject({
+              error: true,
+              status: 400,
+              message: 'expected well-formed and validatable json string',
+              body: null
+            })
+          }
+          return jsonld.promises.compact(
+            document, CONNECTION_REQUEST_CTX
+          ).then(function(compacted) {
+            return jsonld.promises.expand(compacted)
+          }).then(function(expanded) {
+            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
+            requested_id = q.query('cn:from @value')
+            accepted = q.query('cn:resolution @value') || false
+            var vartype = typeof requested_id
+            if (vartype !== 'number') {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: `expected 'number' type for 'from' field but got ${vartype}`,
+                body: null
+              })
+            }
+            return Promise.resolve()
+          })
+        }
+        return Promise.resolve()
+      })(document).then(function() {
+        return user.findOne({where: {email: email}})
+      }).then(function(found) {
         if (found) {
           // save target user id
           requested_id = found.id
@@ -528,6 +644,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        
         res.status(err.status || 500)
         return res.json({
           error: err.error || true,
