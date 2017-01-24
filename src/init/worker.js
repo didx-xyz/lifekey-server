@@ -4,7 +4,8 @@
 process.on('message', function(message) {})
 
 var fs = require('fs')
-var env, NODE_ENV = process.env.NODE_ENV || 'development'
+var NODE_ENV = process.env.NODE_ENV || 'development'
+var env
 
 try {
   env = require(`../../etc/env/${NODE_ENV}.env.json`)

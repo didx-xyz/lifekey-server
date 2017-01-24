@@ -3,13 +3,14 @@
 
 var http = require('https')
 
+var NODE_ENV = process.env.NODE_ENV || 'development'
 var env
 
 try {
-  env = require(`../../etc/env/${process.env.NODE_ENV}.env.json`)
+  env = require(`../../etc/env/${NODE_ENV}.env.json`)
 } catch (e) {
   // ENOENT
-  throw new Error(`unable to find matching env file for ${process.env.NODE_ENV}`)
+  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
 }
 
 
