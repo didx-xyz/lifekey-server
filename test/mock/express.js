@@ -3,21 +3,28 @@
 
 module.exports = {
   express: {
-    // vessel for database models (used within route callbacks)
     get: function(prop) {
-      return this[prop] || null
+      if (!this[prop]) {
+        throw new Error(
+          `expected mock.express['${prop}'] to be truthy. ${JSON.stringify(this)}`
+        )
+      }
+      return this[prop]
     }
   },
-  res: function(respond) {
-    // route callback response stream
-    var mock
-    mock = {
-      status: function(s) {
-        return mock
-      },
-      json: function(j) {
-        return respond(j)
-      }
+  res: function(onend) {
+    var mock = {}
+    mock.write = function(w) {
+      return mock
+    }
+    mock.end = function(e) {
+      return mock
+    }
+    mock.status = function(s) {
+      return mock
+    }
+    mock.json = function(j) {
+      return onend(j)
     }
     return mock
   }
