@@ -25,31 +25,34 @@ describe('management endpoints', function() {
                       // increase the timeout to cover for this
   
   // user record fixtures
-  var respondid
+
+  var now = Date.now()
+
+  var respondid // sender of connection request
   var test_user = {
-    email: `u_1${Date.now()}@example.com`,
+    email: `u_1${now}@example.com`,
     password: 'user',
     token: null,
     id: null
   }
 
   var test_user2 = {
-    email: `u_2${Date.now()}@example.com`,
+    email: `u_2${now}@example.com`,
     password: 'user',
     token: null,
     id: null
   }
 
-  var respondid2
+  var respondid2 // sender of connection requests
   var test_user3 = {
-    email: `u_3${Date.now()}@example.com`,
+    email: `u_3${now}@example.com`,
     password: 'user',
     token: null,
     id: null
   }
 
   var test_user4 = {
-    email: `u_4${Date.now()}@example.com`,
+    email: `u_4${now}@example.com`,
     password: 'user',
     token: null,
     id: null
