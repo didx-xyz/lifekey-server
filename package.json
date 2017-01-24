@@ -15,7 +15,7 @@
     "body-parser": "^1.15.2",
     "cors": "^2.8.1",
     "express": "^4.14.0",
-    "fluster": "0.0.14",
+    "fluster": "0.0.15",
     "google-cloud": "^0.45.1",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
