@@ -4,6 +4,7 @@ module.exports = function(instance, sqlize) {
     did: {
       type: sqlize.STRING,
       // unique: true,
+      // allowNull: false,
       allowNull: true
     },
     first_name: {
