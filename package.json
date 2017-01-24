@@ -5,7 +5,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "test": "NODE_ENV=development istanbul test _mocha -- --recursive -R spec"
+    "test": "NODE_ENV=development istanbul test _mocha -- --recursive -R spec",
+    "start": "node src/init/index.js"
   },
   "keywords": [],
   "author": "",
