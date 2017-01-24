@@ -24,7 +24,16 @@ module.exports = [
     callback: function(req, res) {
       // ensure calling agent is authorised
       // --
-      // return attribute
+      // return aliases under attribute
+    }
+  },
+  {
+    uri: '/resource/:entity/:attribute/:alias',
+    method: 'get',
+    callback: function(req, res) {
+      // ensure calling agent is authorised
+      // --
+      // return value associated with entity/attribute/alias
     }
   },
   {
