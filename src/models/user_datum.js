@@ -9,9 +9,25 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: false
     },
+    entity: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
+    attribute: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
     value: {
       type: sqlize.BLOB,
       allowNull: true
+    },
+    default: {
+      type: sqlize.BOOLEAN,
+      allowNull: false
+    },
+    archived: {
+      type: sqlize.BOOLEAN,
+      allowNull: false
     },
     secure_mode: {
       type: sqlize.INTEGER,
