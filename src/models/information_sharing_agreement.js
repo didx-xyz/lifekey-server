@@ -25,8 +25,20 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    agreed: {
+    resolution: {
       type: sqlize.BOOLEAN,
+      allowNull: true
+    },
+    resolverSignature: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
+    dateAcknowledged: {
+      type: sqlize.DATE,
+      allowNull: true
+    },
+    dateResolved: {
+      type: sqlize.DATE,
       allowNull: true
     }
   }, {
