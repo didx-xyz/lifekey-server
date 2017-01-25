@@ -13,7 +13,6 @@ try {
   throw new Error(`unable to find matching env file for ${NODE_ENV}`)
 }
 
-
 function message(recipient, notification, data) {
   // TODO
   // expand with more options (platforms, design, topics)
@@ -65,7 +64,6 @@ module.exports = function(recipient, notification, data, sent) {
 
   // 
   // attach listeners
-  request.on('error', sent)
   request.on('response', function(res) {
     // 
     // 
@@ -106,7 +104,7 @@ module.exports = function(recipient, notification, data, sent) {
         // If it is `NotRegistered`, you should remove the `registration ID` from your server database because the application was uninstalled from the device, or the client app isn't configured to receive messages.
         // Otherwise, there is something wrong in the registration token passed in the request; it is probably a non-recoverable error that will also require removing the registration from the server database.
     })
-  })
+  }).on('error', sent)
 
   // 
   // and send
