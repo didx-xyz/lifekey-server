@@ -1,7 +1,16 @@
 
 'use strict'
 
-process.on('message', function(message) {})
+process.on('message', function(message) {
+  if (typeof message.did_service_ready === 'boolean') {
+    console.log('SLAVE updating DID service availability to', (
+      message.did_service_ready ?
+      'AVAILABLE' :
+      'UNAVAILABLE'
+    ))
+    server.set('did_service_ready', message.did_service_ready)
+  }
+})
 
 var fs = require('fs')
 var NODE_ENV = process.env.NODE_ENV || 'development'
@@ -69,7 +78,9 @@ require('./database')(
   })
 
   // and finally, attach
-  server.listen(env.WEB_PORT)
+  server.listen(env.WEB_PORT, function() {
+    process.send({ready: true})
+  })
 }).catch(function(err) {
   console.log('db init error', err)
   process.exit(1)
