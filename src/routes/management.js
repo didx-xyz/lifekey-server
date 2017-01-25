@@ -8,6 +8,9 @@
 // TODO
 // resolve this data structure dynamically (over the network)
 
+// TODO
+// add a separate worker for DID allocations
+
 var CNSNT_SCHEMA_HOST = 'http://schema.cnsnt.io/'
 var CONNECTION_REQUEST_CTX = {
   '@context': {
@@ -25,7 +28,10 @@ var CONNECTION_REQUEST_CTX = {
 
 var crypto = require('crypto')
 
+// NOTE
+// modifies `Date.prototype`
 require('an.hour.ago')
+
 var jsonld = require('jsonld')
 var query = require('ld-query')
 var scrypt = require('scrypt')
@@ -37,6 +43,11 @@ module.exports = [
     uri: '/management/register',
     method: 'post',
     callback: function(req, res) {
+
+      // TODO
+      // require a deviceid from firebase service
+      // to allow DID allocation to registering user
+
       var {email, password} = req.body
       if (!(email && password)) {
         res.status(400)
@@ -63,13 +74,19 @@ module.exports = [
         return scrypt.kdf(password, params)
       }).then(function(hashed) {
         return user.create({
-          // did: did,
-          // first_name: firstName,
-          // last_name: lastName,
           email: email,
           password: hashed
         })
       }).then(function(created) {
+
+        // TODO
+        // call DID service asynchronously and use
+        // push notifications to report success/failure
+        // did_service.send({
+        //   userid: created.id,
+        //   deviceid: created.device_id
+        // })
+
         res.status(201)
         return res.json({
           error: false,
@@ -193,7 +210,9 @@ module.exports = [
         })
       }
 
-      user.findOne({where: {email: email}}).then(function(found) {
+      user.findOne({
+        where: {email: email}
+      }).then(function(found) {
         if (found) {
           return token.findOne({
             where: {
