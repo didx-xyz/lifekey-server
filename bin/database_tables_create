@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+
+require('../src/init/database')(
+  false // disable logging
+).then(function(database) {
+  return Promise.all(
+    Object.keys(database.models).map(function(model) {
+      return database.models[model].sync()
+    })
+  )
+}).then(function() {
+  console.log('SUCCESS, all tables created!')
+}).catch(function(err) {
+  console.log('FAILURE, unable to create tables!', err)
+  process.exit(1)
+})
