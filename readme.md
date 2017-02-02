@@ -1,16 +1,23 @@
 
 # lifekey
 
-- [cloud_sql_proxy](https://cloud.google.com/sql/docs/mysql-connect-proxy)
+## unavoidable overhead
 
-> If FCM is critical to the Android app's function, be sure to set minSdkVersion 8 or higher in the app's build.gradle. This ensures that the Android app cannot be installed in an environment in which it could not run properly.(https://firebase.google.com/docs/cloud-messaging/android/client)
-
-- restructure models to have associations
+- `JSON.parse` large documents (switch to streaming parser eventually?)
 
 ## running
 
-- get a `keyfile` from ant
-- `./bin/cloud_sql_proxy -credential_file=$YOUR_KEYFILE -instances=vivid-case-125013:europe-west1:lifekey=tcp:3306`
-- `npm start`
+- get a `keyfile` from ant and store in `etc/keys`
+- download `cloud_sql_proxy` (vendored by google)
+- `./bin/cloud_sql_proxy -credential_file=etc/keys/$YOUR_KEYFILE -instances=vivid-case-125013:europe-west1:lifekey=tcp:3306`
+- `npm install`
+- `git status` to ensure you've not modified the index, otherwise bail out and tell ant what isn't ignored by git that should be
+- `npm run db:drop && npm run db:create`
+- `npm test && NODE_ENV=development npm start`
 
-testing
+## todos
+
+- change push_notification worker to query user device id itself
+- memoise app activation check results per user and worker
+- remove `to_id` fallbacks once eis service calls are in place
+- see source files for more todos
