@@ -3,7 +3,7 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('user_device', {
-    user_id: {
+    owner_id: {
       type: sqlize.INTEGER,
       allowNull: false,
       unique: true

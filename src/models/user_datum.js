@@ -21,6 +21,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BLOB,
       allowNull: true
     },
+    alias: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
     default: {
       type: sqlize.BOOLEAN,
       allowNull: false
@@ -28,11 +32,6 @@ module.exports = function(instance, sqlize) {
     archived: {
       type: sqlize.BOOLEAN,
       allowNull: false
-    },
-    secure_mode: {
-      type: sqlize.INTEGER,
-      allowNull: true,
-      defaultValue: 3
     }
   }, {
     timestamps: true,

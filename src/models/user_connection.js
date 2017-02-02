@@ -9,6 +9,14 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER, 
       allowNull: true
     },
+    from_did: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    to_did: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
     to_url: {
       type: sqlize.STRING,
       allowNull: true
