@@ -9,16 +9,20 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement', {
-    from_id: {
-      type: sqlize.INTEGER,
+    from_did: {
+      type: sqlize.STRING,
       allowNull: false
     },
-    to_id: {
-      type: sqlize.INTEGER,
+    to_did: {
+      type: sqlize.STRING,
       allowNull: false
     },
     document: {
       type: sqlize.TEXT,
+      allowNull: false
+    },
+    verifiable_claim: {
+      type: sqlize.BOOLEAN,
       allowNull: false
     },
     acknowledged: {
@@ -29,15 +33,15 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    resolverSignature: {
+    resolver_signature: {
       type: sqlize.TEXT,
       allowNull: true
     },
-    dateAcknowledged: {
+    acknowledged_at: {
       type: sqlize.DATE,
       allowNull: true
     },
-    dateResolved: {
+    resolved_at: {
       type: sqlize.DATE,
       allowNull: true
     }

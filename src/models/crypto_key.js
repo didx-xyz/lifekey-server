@@ -7,8 +7,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER,
       allowNull: false
     },
-    // TODO
-    // algorithm: {},
+    algorithm: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
     purpose: {
       type: sqlize.STRING,
       allowNull: false
@@ -19,11 +21,11 @@ module.exports = function(instance, sqlize) {
     },
     private_key: {
       type: sqlize.BLOB,
-      allowNull: false
+      allowNull: true
     },
     public_key: {
       type: sqlize.BLOB,
-      allowNull: false
+      allowNull: true
     }
   }, {
     timestamps: true,
