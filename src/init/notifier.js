@@ -1,12 +1,15 @@
 
 'use strict'
 
+var fcm = require('../messaging/fcm')
+
 process.on('message', function(msg) {
-  if (msg.did_allocation_request) {
-    // inspect the envelope
-    // call a smart contract
-    // reply to requesting client
-    // via firebase push
+  if (msg.push_notification_request) {
+
+    // send the message
+    // fcm(blah, blah...)
+  } else {
+    // otherwise, nothing doing
   }
 })
 
