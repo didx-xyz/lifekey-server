@@ -14,11 +14,14 @@ module.exports = {
   },
   res: function(onend) {
     var mock = {}
+    mock.set = function(k, v) {
+      return mock
+    }
     mock.write = function(w) {
       return mock
     }
     mock.end = function(e) {
-      return mock
+      return onend(e)
     }
     mock.status = function(s) {
       return mock
