@@ -12,3 +12,5 @@
 - get a `keyfile` from ant
 - `./bin/cloud_sql_proxy -credential_file=$YOUR_KEYFILE -instances=vivid-case-125013:europe-west1:lifekey=tcp:3306`
 - `npm start`
+
+testing
