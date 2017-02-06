@@ -112,6 +112,15 @@ require('./database')(
   // and finally, attach
   server.listen(env.WEB_PORT, function() {
     process.send({ready: true})
+    
+    
+    if (env.DEBUG_BLOCKING) {
+      var blocked = require('blocked')
+      blocked(function(ms) {
+        console.log('blocked for', ms)
+      })
+    }
+
   })
 }).catch(function(err) {
   console.log('db init error', err)
