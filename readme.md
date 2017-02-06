@@ -20,3 +20,4 @@
 - change push_notification worker to query user device id itself
 - memoise app activation check results per user and worker
 - remove `to_id` fallbacks once eis service calls are in place
+- see source files for more todos
