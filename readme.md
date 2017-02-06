@@ -14,3 +14,9 @@
 - `git status` to ensure you've not modified the index, otherwise bail out and tell ant what isn't ignored by git that should be
 - `npm run db:drop && npm run db:create`
 - `npm test && NODE_ENV=development npm start`
+
+## todos
+
+- change push_notification worker to query user device id itself
+- memoise app activation check results per user and worker
+- remove `to_id` fallbacks once eis service calls are in place
