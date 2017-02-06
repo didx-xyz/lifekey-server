@@ -16,6 +16,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "an.hour.ago": "^0.3.0",
+    "blocked": "^1.2.1",
     "body-parser": "^1.15.2",
     "cors": "^2.8.1",
     "cuid": "^1.3.8",
