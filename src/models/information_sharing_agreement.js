@@ -9,46 +9,52 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement', {
+    information_sharing_agreement_request_id: {
+      type: sqlize.INTEGER,
+      allowNull: false,
+      unique: true
+    },
+    from_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
+    },
     from_did: {
       type: sqlize.STRING,
-      allowNull: false
+      allowNull: true
+    },
+    from_url: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
+    to_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
     },
     to_did: {
       type: sqlize.STRING,
-      allowNull: false
-    },
-    document: {
-      type: sqlize.TEXT,
-      allowNull: false
-    },
-    verifiable_claim: {
-      type: sqlize.BOOLEAN,
-      allowNull: false
-    },
-    acknowledged: {
-      type: sqlize.BOOLEAN,
       allowNull: true
     },
-    resolution: {
-      type: sqlize.BOOLEAN,
-      allowNull: true
-    },
-    resolver_signature: {
+    to_url: {
       type: sqlize.TEXT,
       allowNull: true
     },
-    acknowledged_at: {
-      type: sqlize.DATE,
-      allowNull: true
+    permitted_resource_uris: {
+      type: sqlize.TEXT,
+      allowNull: false
     },
-    resolved_at: {
-      type: sqlize.DATE,
-      allowNull: true
+    is_verifiable_claim: {
+      type: sqlize.BOOLEAN,
+      allowNull: false
+    },
+    expired: {
+      type: sqlize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false
     }
   }, {
     timestamps: true,
     paranoid: true,
     underscored: true,
-    comment: 'information sharing agreements in jsonld format'
+    comment: 'information sharing agreements'
   })
 }
