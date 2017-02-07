@@ -1365,10 +1365,11 @@ module.exports = [
         information_sharing_agreement,
         information_sharing_agreement_request
       } = this.get('models')
-      var isa, isar
+      var isa, isar, isps
 
       information_sharing_agreement.findOne({
         where: {
+          id: isa_id,
           $or: [
             {to_id: req.user.id},
             {to_did: req.user.did},
@@ -1392,12 +1393,27 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           isar = found
-          return Promise.resolve()
+          return information_sharing_permission.findAll({
+            where: {
+              information_sharing_agreement_id: isa_id
+            }
+          })
         }
         return Promise.reject({
           error: true,
           status: 404,
           message: 'information_sharing_agreement_request record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          isps = found
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_permission record(s) not found',
           body: null
         })
       }).then(function() {
@@ -1407,6 +1423,7 @@ module.exports = [
           message: 'ok',
           body: {
             information_sharing_agreement: isa,
+            information_sharing_permissions: isps,
             information_sharing_agreement_request: isar
           }
         })
@@ -1437,6 +1454,7 @@ module.exports = [
 
       information_sharing_agreement.findOne({
         where: {
+          id: isa_id,
           expired: false,
           $or: [
             {to_id: req.user.id},
