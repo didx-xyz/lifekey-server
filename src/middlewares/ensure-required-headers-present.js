@@ -5,7 +5,9 @@ module.exports = function(req, res, next) {
 
   // if the current route and method are
   // not a secured route, skip the middleware
-  if (!this.get(`secure_${req.method.toLowerCase()}_${req.route.path}`)) return next()
+  if (!this.get(`secure_${req.method.toLowerCase()}_${req.route.path}`)) {
+    return next()
+  }
 
   // otherwise, check the headers
   if (!('x-cnsnt-did' in req.headers &&
