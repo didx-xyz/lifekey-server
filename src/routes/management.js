@@ -32,6 +32,7 @@ var CONNECTION_REQUEST_CTX = {
     dateResolved: 'cn:dateResolved',
     dateExpires: 'cn:dateExpires',
     requestedResourceUris: 'cn:requestedResourceUris',
+    permittedResourceUris: 'cn:permittedResourceUris',
     purpose: 'cn:purpose',
     license: 'cn:license'
   }
@@ -569,7 +570,9 @@ module.exports = [
       }).then(function(user_connection_requests) {
         if (user_connection_requests) {
           // append to data structure
-          body.unacked = user_connection_requests.map(ucr => ucr.id)
+          body.unacked = user_connection_requests.map(
+            ucr => {id: ucr.id, document: ucr.document}
+          )
         }
 
         // respond!
@@ -938,7 +941,10 @@ module.exports = [
     callback: function(req, res) {
       
       var {document, to} = req.body
-      var {user, information_sharing_agreement_request} = this.get('models')
+      var {
+        user,
+        information_sharing_agreement_request
+      } = this.get('models')
 
       var to_user
 
@@ -980,7 +986,7 @@ module.exports = [
                 message: `expected truthy type for 'from' field but got '${from_vartype}'`,
                 body: null
               })
-            } else if ((''+from) !== (req.user.id || req.user.did)) {
+            } else if (('' + from) !== (req.user.id || req.user.did)) {
               return Promise.reject({
                 error: true,
                 status: 400,
@@ -998,7 +1004,8 @@ module.exports = [
               return Promise.reject({
                 error: true,
                 status: 400,
-                message: `expected lenghty array type for requestedResourceUris but got ${requested_resources}`
+                message: `expected lenghty array type for requestedResourceUris but got ${requested_resources}`,
+                body: null
               })
             }
             return Promise.resolve()
@@ -1068,9 +1075,9 @@ module.exports = [
     }
   },
 
-  // 8 POST /management/isa/:isa_id
+  // 8 POST /management/isa/:isar_id
   {
-    uri: '/management/isa/:isa_id',
+    uri: '/management/isa/:isar_id',
     method: 'post',
     secure: true,
     active: true,
@@ -1086,9 +1093,7 @@ module.exports = [
       // be made to be directly associated with the http request
       // verification
 
-      var {
-        isa_id
-      } = req.params
+      var {isar_id} = req.params
       
       var {
         document,
@@ -1100,8 +1105,9 @@ module.exports = [
 
       var {
         crypto_key,
-        information_sharing_agreement_request,
-        information_sharing_agreement
+        information_sharing_permission,
+        information_sharing_agreement,
+        information_sharing_agreement_request
       } = this.get('models')
 
       var requested_resources, resolution, sk, isar, isa
@@ -1164,12 +1170,8 @@ module.exports = [
                 body: null
               })
             }
-            requested_resources = JSON.stringify(
-              q.queryAll('cn:requestedResourceUris @value')
-            )
+            permitted_resources = q.queryAll('cn:permittedResourceUris @value')
             return Promise.resolve()
-          }).then(function() {
-            
           })
         })
       })(document, signature, signing_key_alias)
@@ -1177,7 +1179,7 @@ module.exports = [
       parse_json_doc_and_verify_doc_signature.then(function() {
         return information_sharing_agreement_request.findOne({
           where: {
-            id: isa_id,
+            id: isar_id,
             acknowledged: null,
             $and: [
               {
@@ -1216,26 +1218,40 @@ module.exports = [
             from_url: updated.from_url,
             to_id: updated.to_id,
             to_did: updated.to_did,
-            to_url: updated.to_url,
-            requested_resource_uris: JSON.stringify(requested_resources)
+            to_url: updated.to_url
           })
         }
         return Promise.reject({
           error: true,
           status: 500,
-          message: 'unable to update information_sharing_agreement_request record'
+          message: 'unable to update information_sharing_agreement_request record',
+          body: null
         })
       }).then(function(created) {
         if (created) {
-          // TODO webhook to notify `from` party
-
-          // ...
+          // TODO webhook to notify `from` party that the resources they requested are available
+          isa = created
+          return Promise.all(
+            permitted_resources.map(function(uri) {
+              return information_sharing_permission.create({
+                information_sharing_agreement_id: created.id,
+                resource_uri: uri
+              })
+            })
+          )
         }
         return Promise.reject({
           error: true,
           status: 500,
           message: 'unable to create information_sharing_agreement record',
           body: null
+        })
+      }).then(function(created) {
+        return res.status(201).json({
+          error: false,
+          status: 201,
+          message: 'created information_sharing_agreement record',
+          body: {id: isa.id}
         })
       }).catch(function(err) {
         return res.status(
@@ -1257,13 +1273,22 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {acknowledged, resolution, from} = req.query
+      var {
+        acknowledged,
+        resolution,
+        from
+      } = req.query
+
       var {
         information_sharing_agreement_request,
         information_sharing_agreement
       } = this.get('models')
       
-      var body = {unacked: [], enabled: []}
+      var body = {
+        unacked: [],
+        enabled: [],
+        disabled: []
+      }
       
       return information_sharing_agreement_request.findAll({
         where: {
@@ -1279,7 +1304,9 @@ module.exports = [
         }
       }).then(function(information_sharing_agreement_requests) {
         if (information_sharing_agreement_requests) {
-          body.unacked = information_sharing_agreement_requests.map(isar => isar.id)
+          body.unacked = information_sharing_agreement_requests.map(
+            isar => {id: isar.id, document: isar.document}
+          )
         }
         return information_sharing_agreement.findAll({
           where: {
@@ -1291,7 +1318,16 @@ module.exports = [
         })
       }).then(function(information_sharing_agreements) {
         if (information_sharing_agreements) {
-          body.enabled = information_sharing_agreements.map(isa => isa.id)
+          body.enabled = information_sharing_agreements.filter(
+            isa => !isa.expired
+          ).map(
+            isa => isa.id
+          )
+          body.disabled = information_sharing_agreements.filter(
+            isa => isa.expired
+          ).map(
+            isa => isa.id
+          )
         }
         return Promise.resolve()
       }).then(function() {
@@ -1321,8 +1357,69 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      // FROM or TO only
+      // FROM and TO only
       // respond with isar and isa record
+
+      var {isa_id} = req.params
+      var {
+        information_sharing_agreement,
+        information_sharing_agreement_request
+      } = this.get('models')
+      var isa, isar
+
+      information_sharing_agreement.findOne({
+        where: {
+          $or: [
+            {to_id: req.user.id},
+            {to_did: req.user.did},
+            {from_id: req.user.id},
+            {from_did: req.user.did}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          isa = found
+          return information_sharing_agreement_request.findOne({
+            where: {id: found.information_sharing_agreement_request_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          isar = found
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement_request record not found',
+          body: null
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {
+            information_sharing_agreement: isa,
+            information_sharing_agreement_request: isar
+          }
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   },
 
@@ -1333,8 +1430,57 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      // TO only
+      // FROM and TO only
       // deactivate isa record
+      var {isa_id} = req.params
+      var {information_sharing_agreement} = this.get('models')
+
+      information_sharing_agreement.findOne({
+        where: {
+          expired: false,
+          $or: [
+            {to_id: req.user.id},
+            {to_did: req.user.did},
+            {from_id: req.user.id},
+            {from_did: req.user.did}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          return found.update({expired: true})
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(updated) {
+        if (updated) {
+          // TODO webhook/pn to notify both parties?
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update information_sharing_agreement record',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   }
 ]
