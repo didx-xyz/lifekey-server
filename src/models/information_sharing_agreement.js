@@ -30,10 +30,6 @@ module.exports = function(instance, sqlize) {
       type: sqlize.TEXT,
       allowNull: true
     },
-    requested_resource_uris: {
-      type: sqlize.TEXT,
-      allowNull: false
-    },
     is_verifiable_claim: {
       type: sqlize.BOOLEAN,
       allowNull: true
