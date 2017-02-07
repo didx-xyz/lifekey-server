@@ -10,6 +10,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: false
     },
+    account_name: {
+      type: sqlize.STRING,
+      allowNull: false,
+      unique: true
+    },
     email: {
       type: sqlize.STRING,
       allowNull: false,
