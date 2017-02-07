@@ -25,8 +25,7 @@ var OUTER = this
 // once everyone's accounted for
 var worker_count = os.cpus().length, worker_ready = 0
 
-// service and cluster references
-var did_service, notifier_service, lifekey
+var services = {}
 
 function cluster_send(msg) {
   Object.keys(
@@ -36,55 +35,31 @@ function cluster_send(msg) {
   })
 }
 
-function init_did_service(then) {
-  did_service = cp.fork(
-    './src/init/did.js'
+function init_service(name, onmessage, then) {
+  services[name] = cp.fork(
+    `./src/init/${name}.js`
   ).on('error', function(err) {
-    console.log('DID service error', err)
+    console.log(`${name} service error`, err)
   }).on('close', function(code, signal) {
-    console.log('DID service exit', code, signal)
-    // notify all workers that did service is unavailable
-    cluster_send({did_service_ready: false})
-    // then attempt to restart the service
-    init_did_service.call(OUTER)
+    console.log(`${name} service exit`, code, signal)
+    var msg = {}
+    msg[`${name}_service_ready`] = false
+    cluster_send(msg)
+    init_service.apply(OUTER, arguments)
   }).on('message', function(msg) {
-    console.log('DID service message', msg)
     if (msg.ready) {
-      // notify all workers that did service is available
-      cluster_send({did_service_ready: true})
-    } else if (msg.push_notification_request) {
-      notifier_service.send(msg)
+      msg = {}
+      msg[`${name}_service_ready`] = true
+      cluster_send(msg)
     } else {
-      // otherwise, nothing doing
+      // nothin' doing...
     }
   })
+  if (onmessage) services[name].on('message', onmessage)
   if (typeof then === 'function') then()
 }
 
-function init_notifier_service(then) {
-  notifier_service = cp.fork(
-    './src/init/notifier.js'
-  ).on('error', function(err) {
-    console.log('notifier service error', err)
-  }).on('close', function(code, signal) {
-    console.log('notifier service exit', code, signal)
-    // notify all workers that did service is unavailable
-    cluster_send({notifier_service_ready: false})
-    // then attempt to restart the service
-    init_notifier_service.call(OUTER)
-  }).on('message', function(msg) {
-    console.log('notifier service message', msg)
-    if (msg.ready) {
-      // notify all workers that did service is available
-      cluster_send({notifier_service_ready: true})
-    } else {
-      // otherwise, nothing doing
-    }
-  })
-  if (typeof then === 'function') then()
-}
-
-lifekey = cluster({
+services.lifekey = cluster({
   workers: {
     exec: 'src/init/worker.js',
     respawn: true,
@@ -92,23 +67,24 @@ lifekey = cluster({
       error: function(err) {
         console.log(`SLAVE#${this.id} error`, err)
       },
-      message: function(message) {
-        console.log(`SLAVE#${this.id} message`, message)
-        if (message.ready) {
+      message: function(msg) {
+        // TODO it would be nice to allow the services (http workers included) to boot in any order
+        if (msg.ready) {
           worker_ready += 1
           if (worker_ready === worker_count) {
-            // once all http workers are ready,
-            // initialise the did service worker and notify
-            // all http workers
-            init_did_service.call(OUTER)
-            init_notifier_service.call(OUTER)
+            init_service.call(OUTER, 'did', function(msg) {
+              if (msg.push_notification_request || msg.webhook_notification_request) {
+                services.notifier_service.send(msg)
+              }
+            })
+            init_service.call(OUTER, 'notifier', function(msg) {})
           }
-        } else if (message.did_allocation_request) {
+        } else if (msg.did_allocation_request) {
           // proxy the message to the DID service
-          did_service.send(message)
-        } else if (message.push_notification_request || message.webhook_request) {
+          services.did.send(msg)
+        } else if (msg.push_notification_request || msg.webhook_notification_request) {
           // proxy the message to the notifier service
-          notifier_service.send(message)
+          notifier_service.send(msg)
         } else {
           // nothing doing, otherwise
         }
