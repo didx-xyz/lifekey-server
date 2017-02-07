@@ -7,7 +7,7 @@ var rsa = require('ursa')
 module.exports = function(req, res, next) {
 
   // if the current route and method are not a secured route, skip the middleware
-  if (!this.get(`secure_${req.method.toLowerCase()}_${req.route.path}`)) return next()
+  if (req.skip_secure_checks) return next()
 
   try {
     var b_signable = Buffer.from(req.headers['x-cnsnt-signable'], 'hex')
@@ -22,7 +22,7 @@ module.exports = function(req, res, next) {
   }
 
   try {
-    var b_plain = Buffer.from(req.headers['x-cnsnt-plain'], 'utf8')
+    var b_plain = Buffer.from(req.headers['x-cnsnt-plain'])
   } catch (e) {
     return res.status(400).json({
       error: true,
@@ -40,21 +40,37 @@ module.exports = function(req, res, next) {
       body: null
     })
   }
-
-  // TODO check which key algorithm and adjust verification operation accordingly
   
   // do the verification
-  secp.verify(
-    req.user.crypto.public_key, // attached in previous middleware
-    b_signable,
-    b_signed
-  ).catch(function() {
-    // verification failure
-    return res.status(401).json({
+  var {algorithm, public_key} = req.user.crypto
+  if (algorithm === 'secp256k1') {
+    secp.verify(
+      req.user.crypto.public_key,
+      b_signable,
+      b_signed
+    ).catch(function() {
+      // verification failure
+      return res.status(400).json({
+        error: true,
+        status: 400,
+        message: 'signature verification failure',
+        body: null
+      })
+    }).then(next) // all good, otherwise
+  } else if (algorithm === 'rsa') {
+    return res.status(400).json({
       error: true,
-      status: 401,
-      message: 'signature verification failure',
+      status: 500, // TODO can this ever happen?
+      message: 'rsa not yet implemented',
       body: null
     })
-  }).then(next) // all good, otherwise
+  } else {
+    return res.status(400).json({
+      error: true,
+      status: 500, // TODO can this ever happen?
+      message: `unsupported key algorithm ${algorithm}`,
+      body: null
+    })
+  }
+  
 }
