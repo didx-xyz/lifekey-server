@@ -1464,9 +1464,7 @@ module.exports = [
           ]
         }
       }).then(function(found) {
-        if (found) {
-          return found.update({expired: true})
-        }
+        if (found) return found.update({expired: true})
         return Promise.reject({
           error: true,
           status: 404,
@@ -1475,7 +1473,7 @@ module.exports = [
         })
       }).then(function(updated) {
         if (updated) {
-          // TODO webhook/pn to notify both parties?
+          // TODO webhooks to notify concerned parties
           return res.status(200).json({
             error: false,
             status: 200,
