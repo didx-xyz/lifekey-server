@@ -1,12 +1,4 @@
 
-// TODO
-// add more fields to fully record the
-// json ld document after parsing/normalising
-// to support more powerful queries
-
-// maybe look into more powerful database tools 
-// (json columns, altering onthefly w/ pg?)
-
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement', {
     information_sharing_agreement_request_id: {
@@ -38,13 +30,13 @@ module.exports = function(instance, sqlize) {
       type: sqlize.TEXT,
       allowNull: true
     },
-    permitted_resource_uris: {
+    requested_resource_uris: {
       type: sqlize.TEXT,
       allowNull: false
     },
     is_verifiable_claim: {
       type: sqlize.BOOLEAN,
-      allowNull: false
+      allowNull: true
     },
     expired: {
       type: sqlize.BOOLEAN,

@@ -1,16 +1,11 @@
 
 'use strict'
 
-// TODO
-// query string parameters
-// limit,offset, etc
+// TODO query string parameters (limit,offset, etc)
 
-// TODO
-// parse permissions in ISA docs associated
-// with owner and caller on the fly
+// TODO parse permissions in ISA docs associated with owner and caller on the fly
 
-// TODO
-// call webhooks for all permitted parties when data changes (PUT)
+// TODO call webhooks for all permitted parties when data changes (PUT)
 
 module.exports = [
   {

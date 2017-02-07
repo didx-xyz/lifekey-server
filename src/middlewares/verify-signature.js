@@ -41,9 +41,7 @@ module.exports = function(req, res, next) {
     })
   }
 
-  // TODO
-  // check which key algorithm and adjust
-  // verification operation accordingly
+  // TODO check which key algorithm and adjust verification operation accordingly
   
   // do the verification
   secp.verify(

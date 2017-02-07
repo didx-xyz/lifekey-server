@@ -1,12 +1,7 @@
 
-// TODO
-// check server.get('did_service_ready') before posting a message to the service
-
-// TODO
-// add retries if did service is unavailable
-
-// TODO
-// resolve this data structure dynamically (over the network)
+// TODO check server.get('did_service_ready') before posting a message to the service
+// TODO add retries if did service is unavailable
+// TODO resolve this data structure dynamically (over the network)
 
 var send_is_undefined = !process.send
 if (send_is_undefined) process.send = function() {}
@@ -33,7 +28,6 @@ var CONNECTION_REQUEST_CTX = {
     from: 'cn:from',
     to: 'cn:to',
     resolution: 'cn:resolution',
-    resolverSignature: 'cn:resolverSignature',
     dateAcknowledged: 'cn:dateAcknowledged',
     dateResolved: 'cn:dateResolved',
     dateExpires: 'cn:dateExpires',
@@ -48,22 +42,20 @@ var crypto = require('crypto')
 var cuid = require('cuid')
 var secp = require('eccrypto')
 var ursa = require('ursa')
-var sendmail = require('sendmail')({/* TODO - cfg */})
+var sendmail = require('sendmail')({/* TODO sendmail cfg */})
 var jsonld = require('jsonld')
 var query = require('ld-query')
 
 function sendActivationEmail(nickname, address, identifier) {
   if (send_is_undefined) return
-  // TODO
-  // mail configuration
+  // TODO mail configuration
   sendmail({
     from: 'no-reply@consent.global',
     to: address,
     subject: 'Consent account activation',
     html: `<p>Hi ${nickname}!</p><p>Please <a href="http://${CNSNT_SERVER_HOSTNAME}/management/activation/${identifier}">click here</a> to verify your email address and activate your account.</p>`,
   }, function(err, reply) {
-    // TODO
-    // handle email send retries
+    // TODO handle email send retries
     if (err) return console.log('sendmail failure', err)
   })
 }
@@ -283,7 +275,7 @@ module.exports = [
               did_allocation_request: {
                 user_id: created_user_id,
                 device_id: created.device_id
-                // TODO - add more message parameters
+                // TODO add more message parameters
               }
             })
           )
@@ -481,8 +473,7 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
-          // TODO
-          // webhook for programmatic user
+          // TODO webhook for programmatic user
           ucr = created
           return user_device.findOne({where: {owner_id: req.user.id}})
         }
@@ -497,13 +488,11 @@ module.exports = [
           return Promise.resolve(
             process.send({
               webhook_request: {
-                // TODO
-                // webhook url
+                // TODO webhook url
               },
               push_notification_request: {
                 device_id: found.device_id,
-                // TODO
-                // notification/data envelope
+                // TODO notification/data envelope
               }
             })
           )
@@ -664,9 +653,7 @@ module.exports = [
       })(document)
       
       parse_json_doc.then(function() {
-        // TODO
-        // ensure the calling agent is responding
-        // to a connection request targeted at them
+        // TODO ensure the calling agent is responding to a connection request targeted at them
         return user_connection_request.findOne({
           where: {
             id: user_connection_request_id,
@@ -749,13 +736,11 @@ module.exports = [
           return Promise.resolve(
             process.send({
               webhook_request: {
-                // TODO
-                // webhook url
+                // TODO webhook url
               },
               push_notification_request: {
                 recipient: found.device_id,
-                // TODO
-                // message args (notification/data)
+                // TODO message args (notification/data)
               }
             })
           )
@@ -985,6 +970,7 @@ module.exports = [
             var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
             to = q.query('cn:to @value')
             var from = q.query('cn:from @value')
+            var requested_resources = q.queryAll('cn:requestedResourceUris @value')
             var from_vartype = typeof from
             var to_vartype = typeof to
             if (from_vartype === 'undefined') {
@@ -1007,6 +993,12 @@ module.exports = [
                 status: 400,
                 message: `expected truthy type for 'to' field but got '${to_vartype}'`,
                 body: null
+              })
+            } else if (!(Array.isArray(requested_resources) && requested_resources.length)) {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: `expected lenghty array type for requestedResourceUris but got ${requested_resources}`
               })
             }
             return Promise.resolve()
@@ -1104,8 +1096,7 @@ module.exports = [
         signing_key_alias
       } = req.body
 
-      // TODO
-      // verify singature with specified signing key
+      // TODO verify singature with specified signing key
 
       var {
         crypto_key,
@@ -1113,7 +1104,7 @@ module.exports = [
         information_sharing_agreement
       } = this.get('models')
 
-      var sk, isar, isa
+      var requested_resources, resolution, sk, isar, isa
 
       var parse_json_doc_and_verify_doc_signature = (function(document, signature, signing_key_alias) {
         if (!(document && signature && signing_key_alias)) {
@@ -1124,7 +1115,7 @@ module.exports = [
             body: null
           })
         }
-        return signing_key_alias !== req.user.crypto.alias ? (
+        return (signing_key_alias !== req.user.crypto.alias ? (
           crypto_key.findOne({
             where: {
               owner_id: req.user.id,
@@ -1133,7 +1124,7 @@ module.exports = [
           })
         ) : (
           Promise.resolve(req.user.crypto)
-        ).then(function(found) {
+        )).then(function(found) {
           if (found) {
             sk = found
             return Promise.resolve()
@@ -1163,7 +1154,22 @@ module.exports = [
           }).then(function(expanded) {
             var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
             // ensure doc is the same as original from request
+            resolution = q.query('cn:resolution @value')
+            var resolution_vartype = typeof resolution
+            if (resolution_vartype !== 'boolean') {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: `expected boolean type for field resolution but got ${resolution_vartype}`,
+                body: null
+              })
+            }
+            requested_resources = JSON.stringify(
+              q.queryAll('cn:requestedResourceUris @value')
+            )
             return Promise.resolve()
+          }).then(function() {
+            
           })
         })
       })(document, signature, signing_key_alias)
@@ -1201,8 +1207,36 @@ module.exports = [
           message: 'information_sharing_agreement_request record not found',
           body: null
         })
-      }).then(function() {
+      }).then(function(updated) {
+        if (updated) {
+          return information_sharing_agreement.create({
+            information_sharing_agreement_request_id: updated.id,
+            from_id: updated.from_id,
+            from_did: updated.from_did,
+            from_url: updated.from_url,
+            to_id: updated.to_id,
+            to_did: updated.to_did,
+            to_url: updated.to_url,
+            requested_resource_uris: JSON.stringify(requested_resources)
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update information_sharing_agreement_request record'
+        })
+      }).then(function(created) {
+        if (created) {
+          // TODO webhook to notify `from` party
 
+          // ...
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create information_sharing_agreement record',
+          body: null
+        })
       }).catch(function(err) {
         return res.status(
           err.status || 500

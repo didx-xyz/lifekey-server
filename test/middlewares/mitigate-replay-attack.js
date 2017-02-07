@@ -13,8 +13,7 @@ var mock = require('../mock/express')
 var subject = require('../../src/middlewares/mitigate-replay-attack')
 
 before(function(done) {
-  // TODO
-  // create fixtures for each test case
+  // TODO create fixtures for each test case
   done(new Error('not implemented'))
 })
 

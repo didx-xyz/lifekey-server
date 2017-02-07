@@ -2,8 +2,7 @@
 'use strict'
 
 module.exports = function(err, req, res, next) {
-  // TODO
-  // content negotiation for this response content-type type
+  // TODO content negotiation for this response content-type type
 
   return res.status(404).json({
     status: 404,

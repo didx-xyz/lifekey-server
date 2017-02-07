@@ -14,8 +14,7 @@ try {
 }
 
 function message(recipient, notification, data) {
-  // TODO
-  // expand with more options (platforms, design, topics)
+  // TODO expand with more options (platforms, design, topics)
 
   // guard message construction according to fcm messaging conventions
   // notification and data are optional
@@ -40,16 +39,12 @@ function message(recipient, notification, data) {
 }
 
 module.exports = function(recipient, notification, data, sent) {
-  
-  // 
   // serialise the given message parameters
   try {
     var envelope = message(recipient, notification, data)
   } catch (e) {
     return sent(e)
   }
-
-  // 
   // construct the fcm request
   var request = http.request({
     method: 'POST',
@@ -62,37 +57,28 @@ module.exports = function(recipient, notification, data, sent) {
     }
   })
 
-  // 
   // attach listeners
   request.on('response', function(res) {
-    // 
-    // 
     if (res.statusCode !== 200) {
       return sent(new Error(res.statusCode))
     }
     
-    // 
-    // 
     var response = ''
     res.on('data', function(d) {
       response += d
     }).on('end', function() {
-      // 
-      // 
       try {
         response = JSON.parse(response)
       } catch (e) {
         return sent(e)
       }
       
-      // 
-      // 
       if (response.failure === 0 || response.canonical_ids === 0) {
         // success, message sent
         return sent(null, response)
       }
       
-      // FIXME
+      // FIXME see below
       // otherwise, inspect message further
       // if `message_id` is set, check for `registration_id`:
         // if `registration_id` is set, replace the original ID with the new value (canonical ID) in your server database
@@ -106,7 +92,6 @@ module.exports = function(recipient, notification, data, sent) {
     })
   }).on('error', sent)
 
-  // 
   // and send
   request.end(JSON.stringify(envelope))
 }
