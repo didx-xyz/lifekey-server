@@ -70,13 +70,13 @@ require('./database')(
   server.set('db', db)
   server.set('models', models)
   
-  // attach app activation middleware
-  server.use(ensureAppActivationLinkClicked.bind(server))
-
   // attach authentication middleware
   server.use(ensureRequiredHeadersPresent.bind(server))
   server.use(mitigateReplayAttack.bind(server))
   server.use(verifySignature.bind(server))
+  
+  // attach app activation middleware
+  server.use(ensureAppActivationLinkClicked.bind(server))
 
   // enumerate all routes
   fs.readdir(`${__dirname}/../routes`, function(err, files) {
