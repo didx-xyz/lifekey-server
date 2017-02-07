@@ -46,9 +46,10 @@ var morgan = require('morgan')
 var bodyParser = require('body-parser')
 var express = require('express')
 
-var ensureAppActivationLinkClicked = require('../middleware/ensure-app-activation-link-clicked')
-var ensureRequiredHeadersPresent = require('../middlewares/ensure-required-headers-present')
-var mitigateReplayAttack = require('../middlewares/mitigate-replay-attack')
+var assertAppActivated = require('../middleware/assert-app-activated')
+var assertHeaders = require('../middlewares/assert-headers')
+var findUser = require('../middlewares/find-user')
+var replayAttack = require('../middlewares/replay-attack')
 var verifySignature = require('../middlewares/verify-signature')
 var notFound = require('../middlewares/not-found')
 
@@ -70,13 +71,11 @@ require('./database')(
   server.set('db', db)
   server.set('models', models)
   
-  // attach authentication middleware
-  server.use(ensureRequiredHeadersPresent.bind(server))
-  server.use(mitigateReplayAttack.bind(server))
+  server.use(assertHeaders.bind(server))
+  server.use(findUser.bind(server))
+  server.use(assertAppActivated.bind(server))
+  server.use(replayAttack.bind(server))
   server.use(verifySignature.bind(server))
-  
-  // attach app activation middleware
-  server.use(ensureAppActivationLinkClicked.bind(server))
 
   // enumerate all routes
   fs.readdir(`${__dirname}/../routes`, function(err, files) {
