@@ -2,9 +2,10 @@
 'use strict'
 
 // TODO query string parameters (limit,offset, etc)
-// TODO call webhooks for all permitted parties when data changes (PUT)
 
 module.exports = [
+  
+  // 0 GET /resource
   {
     uri: '/resource',
     method: 'get',
@@ -13,8 +14,31 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all entities
+      var {db} = this.get('db')
+      db.query('SELECT DISTINCT entity WHERE owner_id = :owner_id', {
+        replacements: {owner_id: req.user.id},
+        type: db.QueryTypes.SELECT
+      }).then(function(found) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: found.length ? found.map(ud => ud.entity) : []
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   },
+  
+  // 1 GET /resource/:entity
   {
     uri: '/resource/:entity',
     method: 'get',
@@ -23,8 +47,34 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all attributes
+      var {db} = this.get('db')
+      db.query('SELECT DISTINCT attribute WHERE entity = :entity AND owner_id = :owner_id', {
+        type: db.QueryTypes.SELECT,
+        replacements: {
+          entity: req.params.entity,
+          owner_id: req.user.id
+        }
+      }).then(function(found) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: found.length ? found.map(ud => ud.attribute) : []
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   },
+  
+  // 2 GET /resource/:entity/:attribute
   {
     uri: '/resource/:entity/:attribute',
     method: 'get',
@@ -33,8 +83,36 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all aliases
+      var {db} = this.get('db')
+      var {entity, attribute} = req.params
+      db.query('SELECT alias WHERE attribute = :attribute AND entity = :entity AND owner_id = :owner_id', {
+        type: db.QueryTypes.SELECT,
+        replacements: {
+          attribute: attribute,
+          entity: entity,
+          owner_id: req.user.id
+        }
+      }).then(function(found) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: found.length ? found.map(ud => ud.alias) : []
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   },
+
+  // 3 GET /resource/:entity/:attribute/:alias
   {
     uri: '/resource/:entity/:attribute/:alias',
     method: 'get',
@@ -51,23 +129,26 @@ module.exports = [
         user
       } = this.get('models')
 
-      if (owner !== '') {
-        // access by other user
-        return information_sharing_agreement.findAll({where: {
-          $and: [
-            {
-              $or: [
-                {to_id: owner},
-                {to_did: owner}
-              ]
-            },
-            {
-              $or: [
-                {from_id: req.user.id},
-                {from_did: req.user.did}
-              ]
-            }
-          ]}
+      // user accessing another user's resources
+      if (owner && owner.length) {
+        
+        return information_sharing_agreement.findAll({
+          where: {
+            $and: [
+              {
+                $or: [
+                  {to_id: owner},
+                  {to_did: owner}
+                ]
+              },
+              {
+                $or: [
+                  {from_id: req.user.id},
+                  {from_did: req.user.did}
+                ]
+              }
+            ]
+          }
         }).then(function(found) {
           if (found) {
             return Promise.all(
@@ -158,7 +239,7 @@ module.exports = [
         })
       }
 
-      // access from the owner
+      // user accessing their own resources
       user_datum.findOne({
         where: {
           owner_id: req.user.id,
@@ -193,6 +274,8 @@ module.exports = [
       })
     }
   },
+
+  // 4 POST /resource/:entity/:attribute/:alias
   {
     uri: '/resource/:entity/:attribute/:alias',
     method: 'post',
@@ -267,6 +350,8 @@ module.exports = [
       })
     }
   },
+
+  // 5 PUT /resource/:entity/:attribute/:alias
   {
     uri: '/resource/:entity/:attribute/:alias',
     method: 'put',
@@ -303,6 +388,7 @@ module.exports = [
         })
       }).then(function(updated) {
         if (updated) {
+          // TODO dispatch webhooks for concerned parties
           return res.status(200).json({
             error: false,
             status: 200,
@@ -328,6 +414,8 @@ module.exports = [
       })
     }
   },
+
+  // 6 DELETE /resource/:entity/:attribute/:alias
   {
     uri: '/resource/:entity/:attribute/:alias',
     method: 'delete',
@@ -335,7 +423,43 @@ module.exports = [
     active: true,
     callback: function(req, res) {
       // OWNER ONLY
-      // remove an aliased datum
+      // archive an aliased datum
+
+      var {entity, attribute, alias} = req.params
+      var {user_datum} = this.get('models')
+
+      user_datum.findOne({
+        where: {
+          owner_id: req.user.id,
+          entity: entity,
+          attribute: attribute,
+          alias: alias
+        }
+      }).then(function(found) {
+        if (found) return found.update({is_archived: true})
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_datum record not found',
+          body: null
+        })
+      }).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'user_datum record archived',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   }
 ]
