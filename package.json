@@ -7,6 +7,7 @@
   "scripts": {
     "test": "NODE_ENV=development istanbul test _mocha -- --recursive -R spec",
     "start": "node src/init/index.js",
+    "todo": "leasot {test,src}/**/*.js; exit 0",
     "db:create": "NODE_ENV=development bin/database_tables_create",
     "db:truncate": "NODE_ENV=development bin/database_tables_truncate",
     "db:drop": "NODE_ENV=development bin/database_tables_drop"
