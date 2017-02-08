@@ -874,12 +874,14 @@ module.exports = [
         // this case is permitted as the user may be programmitic
         return Promise.resolve()
       }).then(function() {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'user_connection record updated',
-          body: null
-        })
+        return Promise.resolve(
+          res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'user_connection record updated',
+            body: null
+          })
+        )
       }).catch(function(err) {
         return res.status(
           err.status || 500
@@ -1292,7 +1294,7 @@ module.exports = [
           body: null
         })
       }).then(function(updated) {
-        if (updated) {
+        if (updated && resolution) {
           return information_sharing_agreement.create({
             isar_id: updated.id,
             from_id: updated.from_id,
@@ -1302,15 +1304,20 @@ module.exports = [
             to_did: updated.to_did,
             to_url: updated.to_url
           })
+        } else if (!updated) {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'unable to update information_sharing_agreement_request record',
+            body: null
+          })
+        } else {
+          return Promise.resolve()
         }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to update information_sharing_agreement_request record',
-          body: null
-        })
       }).then(function(created) {
-        if (created) {
+        if (!resolution) {
+          return Promise.resolve({rejected: true})
+        } else if (created) {
           // TODO webhook to notify `from` party that the resources they requested are available
           isa = created
           return Promise.all(
@@ -1321,15 +1328,23 @@ module.exports = [
               })
             })
           )
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'unable to create information_sharing_agreement record',
+            body: null
+          })
         }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create information_sharing_agreement record',
-          body: null
-        })
       }).then(function(created) {
-        if (created) {
+        if (created.rejected) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'information_sharing_agreement_request rejected',
+            body: null
+          })
+        } else if (created) {
           return res.status(201).json({
             error: false,
             status: 201,
@@ -1415,12 +1430,14 @@ module.exports = [
         }
         return Promise.resolve()
       }).then(function() {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: body
-        })
+        return Promise.resolve(
+          res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: body
+          })
+        )
       }).catch(function(err) {
         return res.status(
           err.status || 500
@@ -1447,6 +1464,7 @@ module.exports = [
       var {isa_id} = req.params
       var {
         information_sharing_agreement,
+        information_sharing_permission,
         information_sharing_agreement_request
       } = this.get('models')
       var isa, isar, isps
@@ -1465,7 +1483,7 @@ module.exports = [
         if (found) {
           isa = found
           return information_sharing_agreement_request.findOne({
-            where: {id: found.information_sharing_agreement_request_id}
+            where: {id: found.isar_id}
           })
         }
         return Promise.reject({
@@ -1478,9 +1496,7 @@ module.exports = [
         if (found) {
           isar = found
           return information_sharing_permission.findAll({
-            where: {
-              information_sharing_agreement_id: isa_id
-            }
+            where: {isa_id: isa_id}
           })
         }
         return Promise.reject({
@@ -1506,9 +1522,9 @@ module.exports = [
           status: 200,
           message: 'ok',
           body: {
-            information_sharing_agreement: isa,
-            information_sharing_permissions: isps,
-            information_sharing_agreement_request: isar
+            information_sharing_agreement: isa.toJSON(),
+            information_sharing_permissions: isps.map(isp => isp.toJSON()),
+            information_sharing_agreement_request: isar.toJSON()
           }
         })
       }).catch(function(err) {
@@ -1533,6 +1549,8 @@ module.exports = [
     callback: function(req, res) {
       // FROM and TO only
       // deactivate isa record
+
+      // TODO check for noop
       var {isa_id} = req.params
       var {information_sharing_agreement} = this.get('models')
 
