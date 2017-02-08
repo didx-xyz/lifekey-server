@@ -570,9 +570,9 @@ module.exports = [
       }).then(function(user_connection_requests) {
         if (user_connection_requests) {
           // append to data structure
-          body.unacked = user_connection_requests.map(
-            ucr => {id: ucr.id, document: ucr.document}
-          )
+          body.unacked = user_connection_requests.map(ucr => {
+            return {id: ucr.id, document: ucr.document}
+          })
         }
 
         // respond!
@@ -943,10 +943,11 @@ module.exports = [
       var {document, to} = req.body
       var {
         user,
+        user_connection,
         information_sharing_agreement_request
       } = this.get('models')
 
-      var to_user
+      var to_user, purpose, license, original = document
 
       var parse_json_doc = (function() {
         if (!(document || to)) {
@@ -977,34 +978,52 @@ module.exports = [
             to = q.query('cn:to @value')
             var from = q.query('cn:from @value')
             var requested_resources = q.queryAll('cn:requestedResourceUris @value')
+            purpose = q.query('cn:purpose @value')
+            license = q.query('cn:license @value')
             var from_vartype = typeof from
             var to_vartype = typeof to
-            if (from_vartype === 'undefined') {
+            var purpose_vartype = typeof purpose
+            var license_vartype = typeof license
+            if (from_vartype === 'undefined' || !from) {
               return Promise.reject({
                 error: true,
                 status: 400,
-                message: `expected truthy type for 'from' field but got '${from_vartype}'`,
+                message: 'expected truthy type for from field but got undefined',
                 body: null
               })
-            } else if (('' + from) !== (req.user.id || req.user.did)) {
+            } else if (from !== req.user.id && ('' + from) !== req.user.did) {
               return Promise.reject({
                 error: true,
                 status: 400,
-                message: `the specified 'from' value does not match the calling agent's id/did`,
+                message: 'the from field does not match the calling agents identifier',
                 body: null
               })
-            } else if (to_vartype === 'undefined') {
+            } else if (to_vartype === 'undefined' || !to) {
               return Promise.reject({
                 error: true,
                 status: 400,
-                message: `expected truthy type for 'to' field but got '${to_vartype}'`,
+                message: 'expected truthy type for to field but got undefined',
                 body: null
               })
             } else if (!(Array.isArray(requested_resources) && requested_resources.length)) {
               return Promise.reject({
                 error: true,
                 status: 400,
-                message: `expected lenghty array type for requestedResourceUris but got ${requested_resources}`,
+                message: 'expected lenghty arrayish type for requestedResourceUris field',
+                body: null
+              })
+            } else if (purpose_vartype === 'undefined' || !purpose) {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: 'expected truthy type for purpose field but got undefined',
+                body: null
+              })
+            } else if (license_vartype === 'undefined' || !license) {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: 'expected truthy type license to field but got undefined',
                 body: null
               })
             }
@@ -1015,7 +1034,7 @@ module.exports = [
         }
       })(document)
 
-      parse_json_doc.then(function() {
+      parse_json_doc.then(function(found) {
         return user.findOne({
           where: {
             $or: [
@@ -1027,12 +1046,44 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           to_user = found
-          return information_sharing_agreement_request.create({
-            from_did: req.user.did,
-            from_id: req.user.id,
-            to_did: found.did,
-            to_id: found.id,
-            document: document
+          return user_connection.findOne({
+            where: {
+              enabled: true,
+              $and: [
+                {
+                  $or: [
+                    {
+                      to_did: req.user.did,
+                      from_id: to
+                    },
+                    {
+                      to_did: req.user.did,
+                      from_did: to
+                    },
+                    {
+                      from_did: req.user.did,
+                      to_did: to
+                    },
+                    {
+                      from_did: req.user.did,
+                      to_id: to
+                    },
+                    {
+                      to_id: req.user.id,
+                      from_id: to
+                    },
+                    {
+                      from_id: req.user.id,
+                      to_id: to
+                    },
+                    {
+                      to_id: req.user.id,
+                      from_did: to
+                    }
+                  ]
+                }
+              ]
+            }
           })
         }
         return Promise.reject({
@@ -1041,9 +1092,28 @@ module.exports = [
           message: 'user record not found',
           body: null
         })
+      }).then(function(found) {
+        if (found) {
+          return information_sharing_agreement_request.create({
+            from_did: req.user.did,
+            from_id: req.user.id,
+            to_did: to_user.did,
+            to_id: to_user.id,
+            document: original,
+            license: license,
+            purpose: purpose
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 400,
+          message: 'expected an association to exist between the specified users but found none',
+          body: null
+        })
       }).then(function(created) {
         if (created) {
           process.send({
+            // TODO webhook
             push_notification_request: {
               user_id: to_user.id,
               new_isa_request: true
@@ -1056,6 +1126,7 @@ module.exports = [
             body: {id: created.id}
           })
         }
+        // probably unreachable
         return Promise.reject({
           error: true,
           status: 500,
@@ -1100,8 +1171,6 @@ module.exports = [
         signature,
         signing_key_alias
       } = req.body
-
-      // TODO verify singature with specified signing key
 
       var {
         crypto_key,
@@ -1161,7 +1230,9 @@ module.exports = [
             var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
             // ensure doc is the same as original from request
             resolution = q.query('cn:resolution @value')
+            permitted_resources = q.queryAll('cn:permittedResourceUris @value')
             var resolution_vartype = typeof resolution
+            
             if (resolution_vartype !== 'boolean') {
               return Promise.reject({
                 error: true,
@@ -1169,8 +1240,19 @@ module.exports = [
                 message: `expected boolean type for field resolution but got ${resolution_vartype}`,
                 body: null
               })
+            } else if (resolution &&
+                       !(Array.isArray(permitted_resources) &&
+                         permitted_resources.length)) {
+              return Promise.reject({
+                error: true,
+                status: 400,
+                message: 'expected lenghty arrayish type for permittedResourceUris field',
+                body: null
+              })
             }
-            permitted_resources = q.queryAll('cn:permittedResourceUris @value')
+
+            // TODO verify singature with specified signing key
+            
             return Promise.resolve()
           })
         })
@@ -1212,7 +1294,7 @@ module.exports = [
       }).then(function(updated) {
         if (updated) {
           return information_sharing_agreement.create({
-            information_sharing_agreement_request_id: updated.id,
+            isar_id: updated.id,
             from_id: updated.from_id,
             from_did: updated.from_did,
             from_url: updated.from_url,
@@ -1234,7 +1316,7 @@ module.exports = [
           return Promise.all(
             permitted_resources.map(function(uri) {
               return information_sharing_permission.create({
-                information_sharing_agreement_id: created.id,
+                isa_id: created.id,
                 resource_uri: uri
               })
             })
@@ -1247,11 +1329,19 @@ module.exports = [
           body: null
         })
       }).then(function(created) {
-        return res.status(201).json({
-          error: false,
-          status: 201,
-          message: 'created information_sharing_agreement record',
-          body: {id: isa.id}
+        if (created) {
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'created information_sharing_agreement record',
+            body: {id: isa.id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create information_sharing_permission records',
+          body: null
         })
       }).catch(function(err) {
         return res.status(
@@ -1273,12 +1363,6 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {
-        acknowledged,
-        resolution,
-        from
-      } = req.query
-
       var {
         information_sharing_agreement_request,
         information_sharing_agreement
@@ -1302,11 +1386,11 @@ module.exports = [
             }
           ]
         }
-      }).then(function(information_sharing_agreement_requests) {
-        if (information_sharing_agreement_requests) {
-          body.unacked = information_sharing_agreement_requests.map(
-            isar => {id: isar.id, document: isar.document}
-          )
+      }).then(function(isars) {
+        if (isars) {
+          body.unacked = isars.map(isar => {
+            return {id: isar.id, document: isar.document}
+          })
         }
         return information_sharing_agreement.findAll({
           where: {
@@ -1316,14 +1400,14 @@ module.exports = [
             ]
           }
         })
-      }).then(function(information_sharing_agreements) {
-        if (information_sharing_agreements) {
-          body.enabled = information_sharing_agreements.filter(
+      }).then(function(isas) {
+        if (isas) {
+          body.enabled = isas.filter(
             isa => !isa.expired
           ).map(
             isa => isa.id
           )
-          body.disabled = information_sharing_agreements.filter(
+          body.disabled = isas.filter(
             isa => isa.expired
           ).map(
             isa => isa.id
@@ -1338,6 +1422,7 @@ module.exports = [
           body: body
         })
       }).catch(function(err) {
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({
