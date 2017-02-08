@@ -15,6 +15,7 @@ var routes = require('../../src/routes/management')
 // user record fixtures
 var now = Date.now()
 var respondid, respondid2 // sender of connection requests
+var isar_respond1
 var update_uc, update_uc2
 var test_users = [
   {
@@ -172,8 +173,11 @@ describe('management endpoints', function() {
   var mgmt_connection_respond = routes[4]
   var mgmt_connection_update = routes[5]
   var mgmt_app_activate = routes[6]
-  var mgmt_isa_create = routes[7]
-  var mgmt_isa_respond = routes[8]
+  var mgmt_isar_create = routes[7]
+  var mgmt_isar_respond = routes[8]
+  var mgmt_isa_list = routes[9]
+  var mgmt_isa_getone = routes[10]
+  var mgmt_isa_remove = routes[11]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -378,7 +382,7 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(200)
         expect(Array.isArray(res.body.unacked)).to.be.ok
         expect(res.body.unacked.length).to.equal(1)
-        expect(res.body.unacked[0]).to.equal(respondid)
+        expect(res.body.unacked[0].id).to.equal(respondid)
         expect(Array.isArray(res.body.enabled)).to.be.ok
         expect(res.body.enabled.length).to.equal(0)
         
@@ -388,7 +392,7 @@ describe('management endpoints', function() {
           expect(res.status).to.equal(200)
           expect(Array(res.body.unacked)).to.be.ok
           expect(res.body.unacked.length).to.equal(1)
-          expect(res.body.unacked[0]).to.equal(respondid2)
+          expect(res.body.unacked[0].id).to.equal(respondid2)
           expect(Array.isArray(res.body.enabled)).to.be.ok
           expect(res.body.enabled.length).to.equal(0)
 
@@ -575,22 +579,419 @@ describe('management endpoints', function() {
     })
   })
 
-  describe.skip(`${mgmt_isa_create.method.toUpperCase()} ${mgmt_isa_create.uri}`, function() {
-    it('should throw an error if required arguments are missing', function(done) {
+  describe(`${mgmt_isar_create.method.toUpperCase()} ${mgmt_isar_create.uri}`, function(done) {
 
+    var blank_isar_document = {
+      "@context": "http://schema.cnsnt.io/information_sharing_agreement",
+      "@type": "InformationSharingAgreement",
+      from: null,
+      to: null,
+      requestedResourceUris: [],
+      permittedResourceUris: [],
+      resolution: null,
+      purpose: null,
+      license: null,
+      resolverSignature: null,
+      dateAcknowledged: null,
+      dateResolved: null,
+      dateExpires: null
+    }
+
+    it('should respond with error if missing arguments', function(done) {
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing request body parameters')
+        done()
+      }))
+    })
+    
+    it('should respond with error if json is not given', function(done) {
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: 'foo'},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected well-formed and validatable json string')
+        done()
+      }))
     })
 
-    it('should create a information_sharing_agreement record if all required arguments are given and respond with the record identifier', function(done) {
+    it('should respond with error if from field is falsy', function(done) {
+      var broken_doc = blank_isar_document
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected truthy type for from field but got undefined')
+        done()
+      }))
+    })
 
+    it('should respond with error if the from field doesnt match the calling agents identifier', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'baz'
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('the from field does not match the calling agents identifier')
+        done()
+      }))
+    })
+
+    it('should respond with error if to field is falsy', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'foo'
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected truthy type for to field but got undefined')
+        done()
+      }))
+    })
+
+    it('should respond with error if purpose field is falsy', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'foo'
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected truthy type for to field but got undefined')
+        done()
+      }))
+    })
+
+    it('should respond with error if license field is falsy', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'foo'
+      broken_doc.purpose = 'lolz'
+
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected truthy type for to field but got undefined')
+        done()
+      }))
+    })
+
+    it('should respond with error if requestedResourceUris field is not arrayish or lengthy', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'foo'
+      broken_doc.to = 'bar'
+      broken_doc.purpose = 'lolz'
+      broken_doc.license = 'none'
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
+        
+        broken_doc.requestedResourceUris = []
+        
+        mgmt_isar_create.callback.call(mock.express, {
+          body: {document: JSON.stringify(broken_doc)},
+          user: {id: 'foo', did: 'bar'}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with error if the to user is not found', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = 'foo'
+      broken_doc.to = 'baz'
+      broken_doc.purpose = 'lolz'
+      broken_doc.license = 'none'
+      broken_doc.requestedResourceUris = ['/resource/foo/bar']
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: 'foo', did: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user record not found')
+        done()
+      }))
+    })
+
+    it('should respond with error if from and to fields do not represent users with an active connection', function(done) {
+      var broken_doc = blank_isar_document
+      broken_doc.from = test_users[0].id
+      broken_doc.to = test_users[3].id
+      broken_doc.purpose = 'lolz'
+      broken_doc.license = 'none'
+      broken_doc.requestedResourceUris = ['/resource/foo/bar']
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(broken_doc)},
+        user: {id: test_users[0].id, did: test_users[0].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected an association to exist between the specified users but found none')
+        done()
+      }))
+    })
+
+    it('should create isar record if all arguments check out', function(done) {
+      var working_doc = blank_isar_document
+      working_doc.from = test_users[2].id
+      working_doc.to = test_users[3].id
+      working_doc.purpose = 'lolz'
+      working_doc.license = 'none'
+      working_doc.requestedResourceUris = ['/resource/foo/bar']
+      
+      mgmt_isar_create.callback.call(mock.express, {
+        body: {document: JSON.stringify(working_doc)},
+        user: {id: test_users[2].id, did: test_users[2].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('information_sharing_agreement_request record created')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+
+        isar_respond1 = res.body.id
+        done()
+      }))
     })
   })
 
-  describe.skip(`${mgmt_isa_respond.method.toUpperCase()} ${mgmt_isa_respond.uri}`, function() {
-    it('should throw an error if required arguments are missing', function(done) {
-
+  describe(`${mgmt_isa_list.method.toUpperCase()} ${mgmt_isa_list.uri}`, function(done) {
+    it('should respond with arrays of unacknowledged isar records, enabled isa records and disbaled isa records', function(done) {
+      mgmt_isa_list.callback.call(mock.express, {
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(
+          Array.isArray(res.body.unacked) && 
+          Array.isArray(res.body.enabled) && 
+          Array.isArray(res.body.disabled)
+        ).to.equal(true)
+        expect(res.body.unacked.length).to.equal(1)
+        expect(res.body.unacked[0].id).to.equal(isar_respond1)
+        expect(res.body.enabled.length).to.equal(0)
+        expect(res.body.disabled.length).to.equal(0)
+        done()
+      }))
     })
-    it('should update the information_sharing_agreement record\'s resolution field', function(done) {
+  })
 
+  describe(`${mgmt_isar_respond.method.toUpperCase()} ${mgmt_isar_respond.uri}`, function(done) {
+    
+    var document
+    before(function(done) {
+      mgmt_isa_list.callback.call(mock.express, {
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        if (res.error) return done(new Error('should not have been called'))
+        document = JSON.parse(res.body.unacked[0].document)
+        done()
+      }))
+    })
+
+    it('should respond with an error if missing required arguments', function(done) {
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 1},
+        body: {},
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        done()
+      }))
+    })
+
+    it('should respond with an error if the specified signing key does not exist', function(done) {
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 1},
+        body: {
+          document: 'foo',
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {alias: 'bar'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('crypto_key record not found')
+        done()
+      }))
+    })
+
+    it('should respond with an error if json is not given', function(done) {
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 1},
+        body: {
+          document: 'foo',
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {
+            alias: 'foo'
+          }
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected well-formed and validatable json string')
+        done()
+      }))
+    })
+
+    it('should respond with an error if a boolean is not given for the resolution field', function(done) {
+      var resolved_document = document
+      resolved_document.resolution = 'foo'
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 1},
+        body: {
+          document: JSON.stringify(resolved_document),
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {alias: 'foo'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal(`expected boolean type for field resolution but got ${typeof resolved_document.resolution}`)
+        done()
+      }))
+    })
+
+    it('should respond with an error if a truthy resolution is given but a non lengthy and/or non arrayish type is given for the permittedresourceuris field', function(done) {
+      var resolved_document = document
+      resolved_document.resolution = true
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 1},
+        body: {
+          document: JSON.stringify(resolved_document),
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {alias: 'foo'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
+        
+        resolved_document.permittedResourceUris = []
+        mgmt_isar_respond.callback.call(mock.express, {
+          params: {isar_id: 1},
+          body: {
+            document: JSON.stringify(resolved_document),
+            signature: true,
+            signing_key_alias: 'foo'
+          },
+          user: {
+            id: test_users[3].id, 
+            did: test_users[3].id,
+            crypto: {alias: 'foo'}
+          }
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
+          
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if the isar record is not found', function(done) {
+
+      var resolved_document = document
+      resolved_document.resolution = true
+      resolved_document.permittedResourceUris = ['/resource/foo/bar']
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: 'foo'},
+        body: {
+          document: JSON.stringify(resolved_document),
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {alias: 'foo'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement_request record not found')
+        done()
+      }))
+    })
+
+    it('should create an isa and isp records if all checks out', function(done) {
+      var resolved_document = document
+      resolved_document.resolution = true
+      resolved_document.permittedResourceUris = ['/resource/foo/bar']
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: isar_respond1},
+        body: {
+          document: JSON.stringify(resolved_document),
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[3].id, 
+          did: test_users[3].id,
+          crypto: {alias: 'foo'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created information_sharing_agreement record')
+        done()
+      }))
     })
   })
 })
