@@ -15,7 +15,8 @@ var routes = require('../../src/routes/management')
 // user record fixtures
 var now = Date.now()
 var respondid, respondid2 // sender of connection requests
-var isar_respond1
+var isar_respond1, isar_respond2
+var created_isa_id
 var update_uc, update_uc2
 var test_users = [
   {
@@ -529,7 +530,17 @@ describe('management endpoints', function() {
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('user_connection record updated')
-        done()
+        
+        // reset the value for subsequent tests
+        mgmt_connection_update.callback.call(mock.express, {
+          params: {user_connection_id: update_uc},
+          user: {id: test_users[0].id},
+          body: {enabled: true}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(200)
+          expect(res.message).to.equal('user_connection record updated')
+          done()
+        }))
       }))
     })
   })
@@ -769,7 +780,6 @@ describe('management endpoints', function() {
       working_doc.purpose = 'lolz'
       working_doc.license = 'none'
       working_doc.requestedResourceUris = ['/resource/foo/bar']
-      
       mgmt_isar_create.callback.call(mock.express, {
         body: {document: JSON.stringify(working_doc)},
         user: {id: test_users[2].id, did: test_users[2].id}
@@ -781,7 +791,23 @@ describe('management endpoints', function() {
         expect(typeof res.body.id).to.equal('number')
 
         isar_respond1 = res.body.id
-        done()
+        
+        working_doc.from = test_users[0].id
+        working_doc.to = test_users[1].id
+        mgmt_isar_create.callback.call(mock.express, {
+          body: {document: JSON.stringify(working_doc)},
+          user: {id: test_users[0].id, did: test_users[0].id}
+        }, mock.res(function(res) {
+          
+          expect(res.error).to.equal(false)
+          expect(res.status).to.equal(201)
+          expect(res.message).to.equal('information_sharing_agreement_request record created')
+          expect(typeof res.body).to.equal('object')
+          expect(typeof res.body.id).to.equal('number')
+
+          isar_respond2 = res.body.id
+          done()
+        }))
       }))
     })
   })
@@ -811,20 +837,27 @@ describe('management endpoints', function() {
 
   describe(`${mgmt_isar_respond.method.toUpperCase()} ${mgmt_isar_respond.uri}`, function(done) {
     
-    var document
+    var document, document2
     before(function(done) {
       mgmt_isa_list.callback.call(mock.express, {
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
         if (res.error) return done(new Error('should not have been called'))
         document = JSON.parse(res.body.unacked[0].document)
-        done()
+        
+        mgmt_isa_list.callback.call(mock.express, {
+          user: {id: test_users[1].id, did: test_users[1].id}
+        }, mock.res(function(res) {
+          if (res.error) return done(new Error('should not have been called'))
+          document2 = JSON.parse(res.body.unacked[0].document)
+          done()
+        }))
       }))
     })
 
     it('should respond with an error if missing required arguments', function(done) {
       mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 1},
+        params: {isar_id: 'foo'},
         body: {},
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
@@ -837,7 +870,7 @@ describe('management endpoints', function() {
 
     it('should respond with an error if the specified signing key does not exist', function(done) {
       mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 1},
+        params: {isar_id: 'foo'},
         body: {
           document: 'foo',
           signature: true,
@@ -858,7 +891,7 @@ describe('management endpoints', function() {
 
     it('should respond with an error if json is not given', function(done) {
       mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 1},
+        params: {isar_id: 'foo'},
         body: {
           document: 'foo',
           signature: true,
@@ -883,7 +916,7 @@ describe('management endpoints', function() {
       var resolved_document = document
       resolved_document.resolution = 'foo'
       mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 1},
+        params: {isar_id: 'foo'},
         body: {
           document: JSON.stringify(resolved_document),
           signature: true,
@@ -906,7 +939,7 @@ describe('management endpoints', function() {
       var resolved_document = document
       resolved_document.resolution = true
       mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 1},
+        params: {isar_id: 'foo'},
         body: {
           document: JSON.stringify(resolved_document),
           signature: true,
@@ -924,7 +957,7 @@ describe('management endpoints', function() {
         
         resolved_document.permittedResourceUris = []
         mgmt_isar_respond.callback.call(mock.express, {
-          params: {isar_id: 1},
+          params: {isar_id: 'foo'},
           body: {
             document: JSON.stringify(resolved_document),
             signature: true,
@@ -946,7 +979,6 @@ describe('management endpoints', function() {
     })
 
     it('should respond with an error if the isar record is not found', function(done) {
-
       var resolved_document = document
       resolved_document.resolution = true
       resolved_document.permittedResourceUris = ['/resource/foo/bar']
@@ -966,6 +998,29 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('information_sharing_agreement_request record not found')
+        done()
+      }))
+    })
+
+    it('should not create an isa and isp records if resolution is falsy', function(done) {
+      var resolved_document = document2
+      resolved_document.resolution = false
+      mgmt_isar_respond.callback.call(mock.express, {
+        params: {isar_id: isar_respond2},
+        body: {
+          document: JSON.stringify(resolved_document),
+          signature: true,
+          signing_key_alias: 'foo'
+        },
+        user: {
+          id: test_users[1].id, 
+          did: test_users[1].id,
+          crypto: {alias: 'foo'}
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('information_sharing_agreement_request rejected')
         done()
       }))
     })
@@ -990,6 +1045,76 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('created information_sharing_agreement record')
+        created_isa_id = res.body.id
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_getone.method.toUpperCase()} ${mgmt_isa_getone.uri}`, function() {
+
+    it('should respond with an error if the isa record does not exist or does not belong to the calling agent', function(done) {
+      mgmt_isa_getone.callback.call(mock.express, {
+        params: {isa_id: 'foo'},
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        
+        mgmt_isa_getone.callback.call(mock.express, {
+          params: {isa_id: created_isa_id},
+          user: {id: test_users[0].id, did: test_users[0].id}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(404)
+          expect(res.message).to.equal('information_sharing_agreement record not found')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an object describing the isa, isp and isar', function(done) {
+      mgmt_isa_getone.callback.call(mock.express, {
+        params: {isa_id: created_isa_id},
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(res.body).to.have.keys([
+          'information_sharing_agreement',
+          'information_sharing_permissions',
+          'information_sharing_agreement_request'
+        ])
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_remove.method.toUpperCase()} ${mgmt_isa_remove.uri}`, function() {
+
+    it('should respond with an error if the isa record does not exist', function(done) {
+      mgmt_isa_remove.callback.call(mock.express, {
+        params: {isa_id: 'foo'},
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    it('should set the expired bit to true if given an id that corresponds to an existing record', function(done) {
+      mgmt_isa_remove.callback.call(mock.express, {
+        params: {isa_id: created_isa_id},
+        user: {id: test_users[3].id, did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
         done()
       }))
     })
