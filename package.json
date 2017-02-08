@@ -10,7 +10,8 @@
     "todo": "leasot {test,src}/**/*.js; exit 0",
     "db:create": "NODE_ENV=development bin/database_tables_create",
     "db:truncate": "NODE_ENV=development bin/database_tables_truncate",
-    "db:drop": "NODE_ENV=development bin/database_tables_drop"
+    "db:drop": "NODE_ENV=development bin/database_tables_drop",
+    "db:reset": "npm run db:drop && npm run db:create"
   },
   "keywords": [],
   "author": "",
