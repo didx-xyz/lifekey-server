@@ -1,7 +1,7 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement', {
-    information_sharing_agreement_request_id: {
+    isar_id: {
       type: sqlize.INTEGER,
       allowNull: false,
       unique: true
