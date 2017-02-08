@@ -8,10 +8,6 @@ module.exports = function(instance, sqlize) {
     },
     nickname: {
       type: sqlize.STRING,
-      allowNull: false
-    },
-    account_name: {
-      type: sqlize.STRING,
       allowNull: false,
       unique: true
     },
