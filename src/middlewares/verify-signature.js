@@ -1,13 +1,18 @@
 
 'use strict'
 
-var secp = require('eccrypto')
-var rsa = require('ursa')
+var secp = require('secp256k1')
+var ursa = require('ursa')
+
+// TODO factor our the verification procedures for each scheme so that we can dispatch over specified algorithm using [].indexOf as a guard instead of huge if/else/switch nightmares
 
 module.exports = function(req, res, next) {
 
   // if the current route and method are not a secured route, skip the middleware
   if (req.skip_secure_checks) return next()
+
+  // TODO plaintext repr can be omitted if possible (some schemes may require it)
+  var b_plain = Buffer.from(req.headers['x-cnsnt-plain'])
 
   try {
     var b_signable = Buffer.from(req.headers['x-cnsnt-signable'], 'hex')
@@ -17,17 +22,6 @@ module.exports = function(req, res, next) {
       error: true,
       status: 400,
       message: 'error hex-parsing any of: x-cnsnt-signable, x-cnsnt-signed',
-      body: null
-    })
-  }
-
-  try {
-    var b_plain = Buffer.from(req.headers['x-cnsnt-plain'])
-  } catch (e) {
-    return res.status(400).json({
-      error: true,
-      status: 400,
-      message: 'error utf8-parsing any of: x-cnsnt-plain',
       body: null
     })
   }
@@ -44,28 +38,44 @@ module.exports = function(req, res, next) {
   // do the verification
   var {algorithm, public_key} = req.user.crypto
   if (algorithm === 'secp256k1') {
-    secp.verify(
-      req.user.crypto.public_key,
-      b_signable,
-      b_signed
-    ).catch(function() {
-      // verification failure
+    var verified = secp.verify(b_signable, b_signed, req.user.crypto.public_key)
+    if (verified) return next()
+    return res.status(400).json({
+      error: true,
+      status: 400,
+      message: 'signature verification failure',
+      body: null
+    })
+  } else if (algorithm === 'rsa') {
+    try {
+      var ursapublickey = ursa.coercePublicKey(req.user.crypto.public_key)
+    } catch (e) {
+      return res.status(400).json({
+        error: true,
+        status: 400,
+        message: 'parsing of pem-encoded public key failed',
+        body: null
+      })
+    }
+    try {
+      var verified = ursapublickey.hashAndVerify('sha256', b_plain, b_signed.toString('hex'), 'hex', true)
+    } catch (e) {
       return res.status(400).json({
         error: true,
         status: 400,
         message: 'signature verification failure',
         body: null
       })
-    }).then(next) // all good, otherwise
-  } else if (algorithm === 'rsa') {
+    }
+    if (verified) return next()
     return res.status(400).json({
       error: true,
-      status: 500, // TODO can this ever happen?
-      message: 'rsa not yet implemented',
+      status: 400,
+      message: 'signature verification failure',
       body: null
     })
   } else {
-    return res.status(400).json({
+    return res.status(500).json({
       error: true,
       status: 500, // TODO can this ever happen?
       message: `unsupported key algorithm ${algorithm}`,
