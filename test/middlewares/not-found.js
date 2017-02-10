@@ -3,17 +3,16 @@
 
 var {expect} = require('chai')
 
-// mock express instance
 var mock = require('../mock/express')
-
-// the test subject
 var subject = require('../../src/middlewares/not-found')
 
-describe.skip('middleware not-found', function() {
+describe('middleware not-found', function() {
   it('should respond with 404', function(done) {
-    done(new Error('not implemented'))
-  })
-  it('should not invoke the success callback', function(done) {
-    done(new Error('not implemented'))
+    subject.call(null, mock.express, {}, mock.res(function(res) {
+      expect(res.error).to.equal(true)
+      expect(res.status).to.equal(404)
+      expect(res.message).to.equal('not found')
+      done()
+    }), done.bind(done, new Error('should not be called')))
   })
 })
