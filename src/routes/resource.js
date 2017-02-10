@@ -14,8 +14,8 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all entities
-      var {db} = this.get('db')
-      db.query('SELECT DISTINCT entity WHERE owner_id = :owner_id', {
+      var db = this.get('db')
+      db.query('SELECT DISTINCT entity FROM user_data WHERE owner_id = :owner_id', {
         replacements: {owner_id: req.user.id},
         type: db.QueryTypes.SELECT
       }).then(function(found) {
@@ -47,8 +47,8 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all attributes
-      var {db} = this.get('db')
-      db.query('SELECT DISTINCT attribute WHERE entity = :entity AND owner_id = :owner_id', {
+      var db = this.get('db')
+      db.query('SELECT DISTINCT attribute FROM user_data WHERE entity = :entity AND owner_id = :owner_id', {
         type: db.QueryTypes.SELECT,
         replacements: {
           entity: req.params.entity,
@@ -83,9 +83,9 @@ module.exports = [
     callback: function(req, res) {
       // OWNER ONLY
       // list all aliases
-      var {db} = this.get('db')
+      var db = this.get('db')
       var {entity, attribute} = req.params
-      db.query('SELECT alias WHERE attribute = :attribute AND entity = :entity AND owner_id = :owner_id', {
+      db.query('SELECT alias FROM user_data WHERE attribute = :attribute AND entity = :entity AND owner_id = :owner_id', {
         type: db.QueryTypes.SELECT,
         replacements: {
           attribute: attribute,
@@ -131,30 +131,29 @@ module.exports = [
 
       // user accessing another user's resources
       if (owner && owner.length) {
-        
-        return information_sharing_agreement.findAll({
+        information_sharing_agreement.findAll({
           where: {
             $and: [
-              {
-                $or: [
-                  {to_id: owner},
-                  {to_did: owner}
-                ]
-              },
               {
                 $or: [
                   {from_id: req.user.id},
                   {from_did: req.user.did}
                 ]
+              },
+              {
+                $or: [
+                  {to_id: owner},
+                  {to_did: owner}
+                ]
               }
             ]
           }
         }).then(function(found) {
-          if (found) {
+          if (found && found.length) {
             return Promise.all(
               found.map(function(isa) {
                 return information_sharing_permission.findAll({
-                  where: {information_sharing_agreement_id: isa.id}
+                  where: {isa_id: isa.id}
                 })
               })
             )
@@ -162,20 +161,21 @@ module.exports = [
           return Promise.reject({
             error: true,
             status: 404,
-            message: 'information_sharing_agreement records not found',
+            message: 'information_sharing_agreement record(s) not found',
             body: null
           })
         }).then(function(found) {
-          if (found) {
-            for (var i = 0, len = found.length; i < len; i++) {
-              if (found[i].resource_uri ===
-                  `/resource/${entity}/${attribute}/${alias}`) {
-                return Promise.resolve()
-              }
-            }
-            return Promise.reject({
+          if (found && found.length) {
+            var permitted = false
+            found.forEach(function(permissions) {
+              permissions.forEach(function(permission) {
+                if (permission.resource_uri === `/resource/${entity}/${attribute}/${alias}`) permitted = true
+              })
+            })
+            return permitted ? Promise.resolve() : Promise.reject({
               error: true,
               status: 400,
+              // TODO this should actually be a 404 (covering the case that the calling agent is not permitted to access as well as the resource not existing)
               message: 'not permitted to access the requested resource',
               body: null
             })
@@ -183,7 +183,7 @@ module.exports = [
           return Promise.reject({
             error: true,
             status: 404,
-            message: 'information_sharing_permission records not found',
+            message: 'information_sharing_permission record(s) not found',
             body: null
           })
         }).then(function() {
@@ -218,7 +218,7 @@ module.exports = [
               error: false,
               status: 200,
               message: 'ok',
-              body: found
+              body: found.toJSON()
             })
           }
           return Promise.reject({
@@ -237,41 +237,43 @@ module.exports = [
             body: err.body || null
           })
         })
-      }
-
-      // user accessing their own resources
-      user_datum.findOne({
-        where: {
-          owner_id: req.user.id,
-          entity: entity,
-          attribute: attribute,
-          alias: alias
-        }
-      }).then(function(found) {
-        if (found) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'ok',
+      } else {
+        // user accessing their own resources
+        user_datum.findOne({
+          where: {
+            owner_id: req.user.id,
+            entity: entity,
+            attribute: attribute,
+            alias: alias
+          }
+        }).then(function(found) {
+          if (found) {
+            return Promise.resolve(
+              res.status(200).json({
+                error: false,
+                status: 200,
+                message: 'ok',
+                body: found.toJSON()
+              })
+            )
+          }
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user_datum record not found',
             body: null
           })
-        }
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'user_datum record not found',
-          body: null
+        }).catch(function(err) {
+          return res.status(
+            err.status || 500
+          ).json({
+            error: err.error || true,
+            status: err.status || 500,
+            message: err.message || 'internal server error',
+            body: err.body || null
+          })
         })
-      }).catch(function(err) {
-        return res.status(
-          err.status || 500
-        ).json({
-          error: err.error || true,
-          status: err.status || 500,
-          message: err.message || 'internal server error',
-          body: err.body || null
-        })
-      })
+      }
     }
   },
 
@@ -393,7 +395,7 @@ module.exports = [
             error: false,
             status: 200,
             message: 'user_datum record updated',
-            body: null
+            body: updated.toJSON()
           })
         }
         return Promise.reject({
