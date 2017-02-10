@@ -41,17 +41,6 @@ before(function(done) {
   rsa_signed = rsa_privatekey.hashAndSign('sha256', Buffer.from(rsa_plain), 'utf8', 'hex', true)
   rsa_signed2 = rsa_privatekey2.hashAndSign('sha256', Buffer.from(rsa_plain), 'utf8', 'hex', true)
 
-  console.log(rsa_signed, rsa_signed2)
-
-  // rsa_signer = ursa.createSigner('sha256')
-  // rsa_signer2 = ursa.createSigner('sha256')
-  
-  // rsa_signer.update(rsa_hashed)
-  // rsa_signer2.update(rsa_hashed)
-  
-  // rsa_signed = rsa_signer.sign(rsa_privatekey, 'hex')
-  // rsa_signed2 = rsa_signer2.sign(rsa_privatekey2, 'hex')
-
   done()
 })
 
