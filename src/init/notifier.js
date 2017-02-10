@@ -4,8 +4,10 @@
 var http = require('https')
 var fcm = require('../messaging/fcm')
 
-require('./database')(false).then(function(database) {
-  
+require('./database')(
+  false // disable logging
+).then(function(database) {
+
   var {db, models} = database
 
   process.on('message', function(msg) {
@@ -18,5 +20,4 @@ require('./database')(false).then(function(database) {
     }
   }).send({ready: true})
 
-  
 })
