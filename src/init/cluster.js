@@ -29,9 +29,9 @@ var services = {}
 
 function cluster_send(msg) {
   Object.keys(
-    lifekey.cluster.workers
+    services.lifekey.cluster.workers
   ).forEach(function(id) {
-    lifekey.cluster.workers[id].send(msg)
+    services.lifekey.cluster.workers[id].send(msg)
   })
 }
 
