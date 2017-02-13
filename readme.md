@@ -17,6 +17,7 @@
 ## todos
 
 ```c
+// TODO remove ursa and secp256k1 libraries and use node's impln instead
 // TODO change push_notification worker to query user device id itself
 // TODO memoise app activation check results per user and worker
 // TODO remove `to_id` fallbacks once eis service calls are in place
