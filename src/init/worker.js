@@ -46,7 +46,7 @@ var morgan = require('morgan')
 var bodyParser = require('body-parser')
 var express = require('express')
 
-var assertAppActivated = require('../middleware/assert-app-activated')
+var assertAppActivated = require('../middlewares/assert-app-activated')
 var assertHeaders = require('../middlewares/assert-headers')
 var findUser = require('../middlewares/find-user')
 var replayAttack = require('../middlewares/replay-attack')
