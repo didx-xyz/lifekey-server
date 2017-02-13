@@ -15,11 +15,10 @@ require('./database')(false).then(function(database) {
       // via firebase push or webhook
     }
   }).send({ready: true})
-
-  // simulate work for now...
-  setInterval(function() {
-    process.send({now: Date.now()})
-  }, 1000 * 60)
   
 })
 
+// simulate work for now...
+setInterval(function() {
+  process.send({now: Date.now()})
+}, 1000 * 60)
