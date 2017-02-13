@@ -5,9 +5,12 @@
 
 - `cp ect/env/blank.env.json etc/env/development.env.json && nano etc/env/development.env.json`
 - **(skip if hosting own sql database)** get a `keyfile` from ant and store in `etc/keys`
-- **(skip if hosting own sql database)** download `cloud_sql_proxy` (vendored by google)
-- **(skip if hosting own sql database)** ```bash
-  ./bin/cloud_sql_proxy -credential_file=etc/keys/$YOUR_KEYFILE -instances=vivid-case-125013:europe-west1:lifekey=tcp:3306
+- **(skip if hosting own sql database)** download `cloud_sql_proxy` (vendored by google) and save to `bin`
+- **(skip if hosting own sql database)** 
+  ```bash
+  ./bin/cloud_sql_proxy \
+    -credential_file=etc/keys/$YOUR_KEYFILE \
+    -instances=vivid-case-125013:europe-west1:lifekey=tcp:3306
   ```
 - `npm install`
 - `git status` to ensure you've not modified the index, otherwise bail out and tell ant what isn't ignored by git that should be
