@@ -28,4 +28,4 @@ ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server stop; rm -rf /srv/
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
 # restart the service once everything has been replaced
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server restart"
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server restart; service nginx restart"
