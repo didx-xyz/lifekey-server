@@ -57,7 +57,7 @@ var TESTING = NODE_ENV === 'testing' || !!~(process.env._ || '').indexOf('istanb
 
 var server = express()
 
-if (!TESTING && NODE_ENV === 'development') server.use(morgan('dev'))
+if (!TESTING && NODE_ENV !== 'production') server.use(morgan('dev'))
 
 server.use(cors())
 server.use(bodyParser.json())
