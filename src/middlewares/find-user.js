@@ -1,10 +1,31 @@
 
 'use strict'
 
+var assertAppActivated = (
+  !!~process.env._.indexOf('istanbul') ?
+  ((req, res, next) => next()) :
+  require('./assert-app-activated')
+)
+
 module.exports = function(req, res, next) {
-  var {skip_secure_checks, skip_active_checks} = req
-  if (skip_active_checks || skip_secure_checks) return next()
+  var OUTER = this
+
+  if (!(('x-cnsnt-id' in req.headers ||
+         'x-cnsnt-did' in req.headers) &&
+        'x-cnsnt-plain' in req.headers &&
+        'x-cnsnt-signable' in req.headers &&
+        'x-cnsnt-signed' in req.headers)) {
+    // if missing any of the above
+    return res.status(400).json({
+      error: true,
+      status: 400,
+      message: 'authentication parameters missing from request headers',
+      body: null
+    })
+  }
+  
   var {user, crypto_key} = this.get('models')
+  
   user.findOne({
     where: {
       $or: [
@@ -31,7 +52,7 @@ module.exports = function(req, res, next) {
   }).then(function(found) {
     if (found) {
       req.user.crypto = found
-      return next()
+      return assertAppActivated.call(OUTER, req, res, next)
     }
     return Promise.reject({
       error: true,
