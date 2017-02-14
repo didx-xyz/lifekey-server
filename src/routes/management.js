@@ -188,8 +188,8 @@ module.exports = [
           return secp.verify(...keys)
         } else if (lower_public_key_algorithm === 'rsa') {
           try {
-            var rsa_public_key = ursa.createPublicKey(keys[0])
-            var rsa_verifier = ursa.createVerifier('base64')
+            var rsa_public_key = ursa.coercePublicKey(keys[0].toString('utf8'))
+            var rsa_verifier = ursa.createVerifier('hex')
             rsa_verifier.update(Buffer.from(plaintext_proof, 'utf8'))
             var verified = rsa_verifier.verify(rsa_public_key, keys[1])
             return verified ? (
