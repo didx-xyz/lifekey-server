@@ -4,6 +4,7 @@ bin/cloud_sql_proxy
 
 # environment files
 etc/env/*.env.json
+!etc/env/staging.env.json
 !etc/env/blank.env.json
 
 # operator keys
