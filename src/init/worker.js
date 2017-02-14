@@ -46,11 +46,7 @@ var morgan = require('morgan')
 var bodyParser = require('body-parser')
 var express = require('express')
 
-var assertAppActivated = require('../middlewares/assert-app-activated')
-var assertHeaders = require('../middlewares/assert-headers')
-var findUser = require('../middlewares/find-user')
-var replayAttack = require('../middlewares/replay-attack')
-var verifySignature = require('../middlewares/verify-signature')
+var preflight = require('../middlewares/preflight')
 var notFound = require('../middlewares/not-found')
 
 var TESTING = NODE_ENV === 'testing' || !!~(process.env._ || '').indexOf('istanbul')
@@ -71,12 +67,6 @@ require('./database')(
   server.set('db', db)
   server.set('models', models)
   
-  server.use(assertHeaders.bind(server))
-  server.use(findUser.bind(server))
-  server.use(assertAppActivated.bind(server))
-  server.use(replayAttack.bind(server))
-  server.use(verifySignature.bind(server))
-
   // enumerate all routes
   fs.readdir(`${__dirname}/../routes`, function(err, files) {
     if (err) {
@@ -100,6 +90,7 @@ require('./database')(
       )
       server[route.method](
         route.uri,
+        preflight.bind(server),
         route.callback.bind(server)
       )
     })
@@ -111,15 +102,12 @@ require('./database')(
   // and finally, attach
   server.listen(env.WEB_PORT, function() {
     process.send({ready: true})
-    
-    
     if (env.DEBUG_BLOCKING) {
       var blocked = require('blocked')
       blocked(function(ms) {
         console.log('blocked for', ms)
       })
     }
-
   })
 }).catch(function(err) {
   console.log('db init error', err)

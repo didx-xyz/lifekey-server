@@ -8,9 +8,6 @@ var ursa = require('ursa')
 
 module.exports = function(req, res, next) {
 
-  // if the current route and method are not a secured route, skip the middleware
-  if (req.skip_secure_checks) return next()
-
   // TODO plaintext repr can be omitted if possible (some schemes may require it)
   var b_plain = Buffer.from(req.headers['x-cnsnt-plain'])
 

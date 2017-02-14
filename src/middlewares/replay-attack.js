@@ -1,10 +1,15 @@
 
 'use strict'
 
+var verifySignature = (
+  !!~process.env._.indexOf('istanbul') ?
+  ((req, res, next) => next()) :
+  require('./verify-signature')
+)
+
 module.exports = function(req, res, next) {
 
-  // if the current route and method are not a secured route, skip the middleware
-  if (req.skip_secure_checks) return next()
+  var OUTER = this
 
   // load models for querying and insertion
   var {http_request_verification} = this.get('models')
@@ -35,7 +40,8 @@ module.exports = function(req, res, next) {
       signature: req.headers['x-cnsnt-signed']
     })
   }).then(function(created) {
-    if (created) return next() // we're done here!
+    // we're done here!
+    if (created) return verifySignature.call(OUTER, req, res, next)
     return Promise.reject({
       error: true,
       status: 500,

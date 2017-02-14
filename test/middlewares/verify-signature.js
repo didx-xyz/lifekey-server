@@ -45,14 +45,6 @@ before(function(done) {
 })
 
 describe('middleware verify-signature', function() {
-  it('should invoke the success callback if the matched route is not secured', function(done) {
-    subject.call(
-      mock.express,
-      {skip_secure_checks: true},
-      done.bind(done, new Error('should not have been called')),
-      done
-    )
-  })
   
   it('should respond with bad request if non-hexadecimal headers are given', function(done) {
     subject.call(mock.express, {
