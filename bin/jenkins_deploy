@@ -21,11 +21,11 @@ scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/init/cloud_sql_proxy.conf" "root@$TARG
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/init/lifekey-server.conf" "root@$TARGET:/etc/init"
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io" "root@$TARGET:/etc/nginx/sites-available"
 
-# make a destination directory
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "mkdir -p /srv/$SERVER_ENV.api.lifekey.cnsnt.io"
+# stop the sevice and remove current source code
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server stop; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
-# copy over source code
-scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/*" "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
+# copy new source code
+scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
 # restart the service once everything has been replaced
 ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server restart"
