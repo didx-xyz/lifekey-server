@@ -24,10 +24,10 @@ scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/init/lifekey-server.conf" "root@$TARGE
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io" "root@$TARGET:/etc/nginx/sites-available" && echo "copied virtualhost"
 
 # stop the sevice and remove current source code
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server stop; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io" && echo "stopped service and removed source code"
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" "stop lifekey-server; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io" && echo "stopped service and removed source code"
 
 # copy new source code
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io" && echo "copied source code"
 
 # restart the service once everything has been replaced
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "service lifekey-server restart; service nginx restart" && echo "restarted service and nginx"
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" "start lifekey-server; service nginx restart" && echo "restarted service and nginx"
