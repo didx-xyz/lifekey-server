@@ -1,10 +1,7 @@
 #!/bin/bash
 
 # ensure we're up to date and have the bare minimum
-apt-get update && apt-get install -y build-essential libssl-dev nginx git mysql-client jq upstart-sysv
-
-# update the init system or something?
-update-initramfs -u
+apt-get update && apt-get install -y build-essential libssl-dev nginx git mysql-client jq
 
 # workspaces
 mkdir -p /srv /opt/cloud_sql_proxy /etc/lifekey
