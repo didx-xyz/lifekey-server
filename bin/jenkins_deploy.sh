@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+# deployment script
+
 if [ "$GIT_BRANCH" = "origin/develop" ]; then
   TARGET="130.211.78.173"
   SERVER_ENV=staging
