@@ -20,6 +20,7 @@
 ## todos
 
 ```c
+// TODO runtime options for hosting eis and notification service ourselves or specifying respective hostnames for services
 // TODO remove ursa and secp256k1 libraries and use node's impln instead
 // TODO change push_notification worker to query user device id itself
 // TODO memoise app activation check results per user and worker
