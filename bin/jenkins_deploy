@@ -16,18 +16,18 @@ fi
 
 DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
-# copy over upstart services and virtualhost configuration
-scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/init/cloud_sql_proxy.conf" "root@$TARGET:/etc/init" && echo "copied cloudsql init"
-
-scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/init/lifekey-server.conf" "root@$TARGET:/etc/init" && echo "copied lifekey server init"
-
-scp "$DONT_CHECK_KEYS" -r "$WORKSPACE/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io" "root@$TARGET:/etc/nginx/sites-available" && echo "copied virtualhost"
-
 # stop the sevice and remove current source code
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "stop lifekey-server; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io" && echo "stopped service and removed source code"
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
+    "stop lifekey-server; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
 # copy new source code
-scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io" && echo "copied source code"
+scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" \
+    "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
-# restart the service once everything has been replaced
-ssh "$DONT_CHECK_KEYS" "root@$TARGET" "start lifekey-server; service nginx restart" && echo "restarted service and nginx"
+# copy service configurations to respective locations and restart the service
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
+    "cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/cloud_sql_proxy.conf /etc/init
+    cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/lifekey-server.conf /etc/init
+    cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io /etc/nginx/sites-available
+    start lifekey-server
+    service nginx restart"
