@@ -3,17 +3,13 @@ module.exports = function(instance, sqlize) {
   return instance.define('user', {
     did: {
       type: sqlize.STRING,
-      // unique: true,
-      // allowNull: false,
+      unique: true,
       allowNull: true
     },
-    first_name: {
+    nickname: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    last_name: {
-      type: sqlize.STRING,
-      allowNull: true
+      allowNull: false,
+      unique: true
     },
     email: {
       type: sqlize.STRING,
@@ -21,12 +17,19 @@ module.exports = function(instance, sqlize) {
       unique: true,
       validate: {isEmail: true}
     },
-    password: {
-      type: sqlize.BLOB,
+    webhook_url: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
+    app_activation_code: {
+      type: sqlize.STRING,
       allowNull: false
     },
-    // TODO
-    // verified: {}
+    app_activation_link_clicked: {
+      type: sqlize.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    }
   }, {
     timestamps: true,
     paranoid: true,

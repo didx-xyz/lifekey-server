@@ -1,7 +1,34 @@
 
 'use strict'
 
-process.on('message', function(message) {})
+process.on('message', function(message) {
+
+  if (Array.isArray(message)) {
+    // to support fluster data messages
+
+    for (var i = 0, len = message.length; i < len; i++) {
+      // process message
+    }
+  }
+
+  if (typeof message.did_service_ready === 'boolean') {
+    console.log('SLAVE updating DID service availability to', (
+      message.did_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('did_service_ready', message.did_service_ready)
+  } else if (typeof message.notifier_service_ready === 'boolean') {
+    console.log('SLAVE updating notifier service availability to', (
+      message.notifier_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('notifier_service_ready', message.notifier_service_ready)
+  } else {
+    // otherwise, nothing doing
+  }
+})
 
 var fs = require('fs')
 var NODE_ENV = process.env.NODE_ENV || 'development'
@@ -18,6 +45,13 @@ var cors = require('cors')
 var morgan = require('morgan')
 var bodyParser = require('body-parser')
 var express = require('express')
+
+var assertAppActivated = require('../middlewares/assert-app-activated')
+var assertHeaders = require('../middlewares/assert-headers')
+var findUser = require('../middlewares/find-user')
+var replayAttack = require('../middlewares/replay-attack')
+var verifySignature = require('../middlewares/verify-signature')
+var notFound = require('../middlewares/not-found')
 
 var TESTING = NODE_ENV === 'testing' || !!~(process.env._ || '').indexOf('istanbul')
 
@@ -37,39 +71,56 @@ require('./database')(
   server.set('db', db)
   server.set('models', models)
   
-  // TODO
-  // mount middlewares here ---
+  server.use(assertHeaders.bind(server))
+  server.use(findUser.bind(server))
+  server.use(assertAppActivated.bind(server))
+  server.use(replayAttack.bind(server))
+  server.use(verifySignature.bind(server))
 
+  // enumerate all routes
   fs.readdir(`${__dirname}/../routes`, function(err, files) {
     if (err) {
       console.log('unable to enumerate routes', err)
       process.exit(1)
     }
+    
+    // load them and attach to express instance
     files.map(function(file) {
       return require(`../routes/${file}`)
     }).reduce(function(prev, curr) {
       return prev.concat(curr)
     }).forEach(function(route) {
+      server.set( // set whether user must have app activated to invoke route
+        `active_${route.method}_${route.uri}`,
+        route.active
+      )
+      server.set( // set whether user must authenticate to invoke route
+        `secure_${route.method}_${route.uri}`,
+        route.secure
+      )
       server[route.method](
         route.uri,
-        route.callback.bind(server) // we dynamically bind to `server` to allow
-                                    // lookups on `this` in route callbacks
+        route.callback.bind(server)
       )
     })
   })
 
   // 404 route
-  server.use(function(err, req, res, next) {
-    res.status(404)
-    return res.json({
-      status: 404,
-      error: true,
-      message: 'not found'
-    })
-  })
+  server.use(notFound.bind(server))
 
   // and finally, attach
-  server.listen(env.WEB_PORT)
+  server.listen(env.WEB_PORT, function() {
+    process.send({ready: true})
+    
+    
+    if (env.DEBUG_BLOCKING) {
+      var blocked = require('blocked')
+      blocked(function(ms) {
+        console.log('blocked for', ms)
+      })
+    }
+
+  })
 }).catch(function(err) {
   console.log('db init error', err)
   process.exit(1)

@@ -5,10 +5,6 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER,
       allowNull: false
     },
-    name: {
-      type: sqlize.STRING,
-      allowNull: false
-    },
     entity: {
       type: sqlize.STRING,
       allowNull: false
@@ -19,20 +15,31 @@ module.exports = function(instance, sqlize) {
     },
     value: {
       type: sqlize.BLOB,
-      allowNull: true
-    },
-    default: {
-      type: sqlize.BOOLEAN,
       allowNull: false
     },
-    archived: {
-      type: sqlize.BOOLEAN,
-      allowNull: false
+    mime: {
+      type: sqlize.STRING,
+      allowNull: false,
+      defaultValue: 'application/json+ld'
     },
-    secure_mode: {
-      type: sqlize.INTEGER,
+    encoding: {
+      type: sqlize.STRING,
       allowNull: true,
-      defaultValue: 3
+      defaultValue: 'utf8'
+    },
+    alias: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
+    is_default: {
+      type: sqlize.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    is_archived: {
+      type: sqlize.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
     }
   }, {
     timestamps: true,

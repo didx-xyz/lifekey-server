@@ -1,24 +1,31 @@
 
 'use strict'
 
+var inst = {}
+
 module.exports = {
   express: {
+    set: function(prop, val) {
+      inst[prop] = val
+    },
     get: function(prop) {
-      if (!this[prop]) {
-        throw new Error(
-          `expected mock.express['${prop}'] to be truthy. ${JSON.stringify(this)}`
-        )
+      if (typeof inst[prop] === 'undefined') {
+        console.log('trying to get', prop)
+        throw new Error(`expected inst.${prop} to be truthy.`)
       }
-      return this[prop]
+      return inst[prop]
     }
   },
   res: function(onend) {
     var mock = {}
+    mock.set = function(k, v) {
+      return mock
+    }
     mock.write = function(w) {
       return mock
     }
     mock.end = function(e) {
-      return mock
+      return onend(e)
     }
     mock.status = function(s) {
       return mock

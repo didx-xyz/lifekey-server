@@ -4,13 +4,15 @@ bin/cloud_sql_proxy
 
 # environment files
 etc/env/*.env.json
+!etc/env/staging.env.json
 !etc/env/blank.env.json
 
 # operator keys
-etc/keys/*.json
+etc/keys/*
+!etc/keys/.gitkeep
 
 # node
-npm-debug.log
+*.log
 node_modules/
 
 # os x

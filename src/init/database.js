@@ -1,4 +1,6 @@
 
+// TODO move this file to src/models/index.js
+
 'use strict'
 
 var fs = require('fs')
@@ -16,6 +18,8 @@ try {
   throw new Error(`unable to find matching env file for ${NODE_ENV}`)
 }
 
+// TODO make less ghetto with kwargs
+// TODO maybe add option for specific model loading (would help speed up tests and boot speed and footprint for workers using few models)
 module.exports = function(logging) {
   return new Promise(function(resolve, reject) {
     if (instance) return resolve(instance)
@@ -34,14 +38,13 @@ module.exports = function(logging) {
     }
     
     instance.db.authenticate().then(function() {
-      
-      // we're in...
-      // initialise all table models!
-      
+      // initialise all the table models
       instance.models = {}
       fs.readdir(`${__dirname}/../models`, function(err, files) {
         if (err) return reject(err)
-        files.forEach(function(file) {
+        files.filter(function(file) {
+          return file !== 'index.js'
+        }).forEach(function(file) {
           instance.models[
             path.basename(file, '.js')
           ] = require(
