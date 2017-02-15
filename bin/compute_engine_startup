@@ -1,10 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# what are we building?
+ENVIRONMENT=staging
 
 # ensure we're up to date and have the bare minimum
-apt-get update && apt-get install -y build-essential libssl-dev nginx git mysql-client jq
+apt-get update && apt-get install -y \
+    build-essential libssl-dev nginx git jq
 
 # workspaces
-mkdir -p /srv /opt/cloud_sql_proxy /etc/lifekey
+mkdir -p /srv /opt/nvm /etc/lifekey
+
+echo -n $ENVIRONMENT > /etc/lifekey/environment
 
 # install or update nvm
 if [[ -d /opt/nvm ]]; then
@@ -16,11 +22,10 @@ else
   git checkout "$(git describe --abbrev=0 --tags --match "v[0-9]*" origin)"
 fi
 
-# install cloud_sql_proxy
-cd /opt/cloud_sql_proxy
-wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64
-mv cloud_sql_proxy.linux.amd64 cloud_sql_proxy
-chmod +x cloud_sql_proxy
-
-# change this value per host environment
-echo -n "staging" > /etc/lifekey/environment
+if [[ ! -f /usr/bin/cloud_sql_proxy ]]; then
+  cd /var/tmp
+  wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64
+  mv cloud_sql_proxy.linux.amd64 /usr/bin/cloud_sql_proxy
+  chmod +x /usr/bin/cloud_sql_proxy
+  rm cloud_sql_proxy.linux.amd64
+fi
