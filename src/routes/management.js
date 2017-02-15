@@ -79,9 +79,11 @@ module.exports = [
         public_key_algorithm,
         public_key,
         plaintext_proof,
-        signable_proof,
+        // signable_proof,
         signed_proof
       } = req.body
+
+      console.log(req.body)
 
       var activation_code, created_user_id, key_buffers
 
@@ -103,7 +105,7 @@ module.exports = [
         })
       }
 
-      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(public_key_algorithm)
+      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(public_key_algorithm.toLowerCase())
       if (!supported_algo) {
         return res.status(400).json({
           error: true,
