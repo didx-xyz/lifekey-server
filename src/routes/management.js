@@ -183,7 +183,7 @@ module.exports = [
                 Buffer(plaintext_proof),
                 signed_proof,
                 'base64',
-                true
+                false
               )
             ) ? Promise.resolve() : (
               Promise.reject({
