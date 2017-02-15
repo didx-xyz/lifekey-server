@@ -14,13 +14,13 @@ module.exports = function(req, res, next) {
   // load models for querying and insertion
   var {http_request_verification} = this.get('models')
 
-  var hex_public_key = req.user.crypto.public_key.toString('hex')
+  var b64_public_key = req.user.crypto.public_key.toString('base64')
 
   http_request_verification.findOne({
     where: {
-      public_key: hex_public_key,
+      public_key: b64_public_key,
       algorithm: req.user.crypto.algorithm,
-      signable: req.headers['x-cnsnt-signable'],
+      plaintext: req.headers['x-cnsnt-plain'],
       signature: req.headers['x-cnsnt-signed']
     }
   }).then(function(found) {
@@ -34,9 +34,9 @@ module.exports = function(req, res, next) {
     }
     // create the record for posterity
     return http_request_verification.create({
-      public_key: hex_public_key,
+      public_key: b64_public_key,
       algorithm: req.user.crypto.algorithm,
-      signable: req.headers['x-cnsnt-signable'],
+      plaintext: req.headers['x-cnsnt-plain'],
       signature: req.headers['x-cnsnt-signed']
     })
   }).then(function(created) {

@@ -14,8 +14,8 @@ describe('middleware replay-attack', function() {
     subject.call(mock.express, {
       skip_secure_checks: false,
       headers: {
-        'x-cnsnt-signable': now,
-        'x-cnsnt-signed': now
+        'x-cnsnt-signed': now,
+        'x-cnsnt-plain': now
       },
       user: {
         crypto: {
@@ -32,8 +32,8 @@ describe('middleware replay-attack', function() {
     subject.call(mock.express, {
       skip_secure_checks: false,
       headers: {
-        'x-cnsnt-signable': now,
-        'x-cnsnt-signed': now
+        'x-cnsnt-signed': now,
+        'x-cnsnt-plain': now
       },
       user: {
         crypto: {

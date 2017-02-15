@@ -93,7 +93,6 @@ module.exports = [
             public_key_algorithm &&
             public_key &&
             plaintext_proof &&
-            signable_proof &&
             signed_proof)) {
         res.status(400)
         return res.json({
@@ -126,7 +125,7 @@ module.exports = [
       http_request_verification.findOne({
         where: {
           public_key: public_key,
-          signable: signable_proof,
+          plaintext: plaintext_proof,
           signature: signed_proof
         }
       }).then(function(found) {
@@ -151,33 +150,19 @@ module.exports = [
         }
         return Promise.resolve()
       }).then(function() {
-        try { // turn the given crypto args into buffers
-          var b_public_key = Buffer.from(public_key, 'hex')
-          var b_signable_proof = Buffer.from(signable_proof, 'hex')
-          var b_signed_proof = Buffer.from(signed_proof, 'hex')
-          if (!(b_public_key.length &&
-                b_signable_proof.length &&
-                b_signed_proof.length)) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'hexadecimal parsing error in any of: public_key, signable_proof, signed_proof',
-              body: null
-            })
-          }
-          return Promise.resolve([
-            b_public_key,
-            b_signable_proof,
-            b_signed_proof
-          ])
-        } catch (e) { // get outta here, guy
+        var b_public_key = Buffer.from(public_key, 'base64')
+        // var b_signable_proof = Buffer.from(signable_proof, 'base64')
+        var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
+        var b_signed_proof = Buffer.from(signed_proof, 'base64')
+        if (!(b_public_key.length && b_signable_proof.length && b_signed_proof.length)) {
           return Promise.reject({
             error: true,
             status: 400,
-            message: 'hexadecimal parsing error in any of: public_key, signable_proof, signed_proof',
+            message: 'base64 parsing or shasum error in any of: public_key, plaintext_proof signed_proof',
             body: null
           })
         }
+        return Promise.resolve([b_public_key, b_signable_proof, b_signed_proof])
       }).then(function(keys) {
         // optimistically make them available in outer function context
         key_buffers = keys
@@ -189,12 +174,15 @@ module.exports = [
         } else if (lower_public_key_algorithm === 'rsa') {
           try {
             var rsa_public_key = ursa.coercePublicKey(keys[0].toString('utf8'))
-            var rsa_verifier = ursa.createVerifier('hex')
-            rsa_verifier.update(Buffer.from(plaintext_proof, 'utf8'))
-            var verified = rsa_verifier.verify(rsa_public_key, keys[1])
-            return verified ? (
-              Promise.resolve()
-            ) : (
+            return (
+              rsa_public_key.hashAndVerify(
+                'sha256',
+                Buffer(plaintext_proof),
+                signed_proof,
+                'base64',
+                true
+              )
+            ) ? Promise.resolve() : (
               Promise.reject({
                 error: true,
                 status: 400,
@@ -225,7 +213,6 @@ module.exports = [
           public_key: public_key,
           algorithm: public_key_algorithm,
           plaintext: plaintext_proof,
-          signable: signable_proof,
           signature: signed_proof
         })
       }).then(function(created) {
@@ -325,6 +312,14 @@ module.exports = [
           })
         )
       }).catch(function(err) {
+        if (err.toString() === 'Error: couldn\'t parse DER signature') {
+          err = {
+            error: true,
+            status: 400,
+            message: 'non-signature value given',
+            body: null
+          }
+        }
         return res.status(
           err.status || 500
         ).json({

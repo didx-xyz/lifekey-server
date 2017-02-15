@@ -49,7 +49,10 @@ var express = require('express')
 var preflight = require('../middlewares/preflight')
 var notFound = require('../middlewares/not-found')
 
-var TESTING = NODE_ENV === 'testing' || !!~(process.env._ || '').indexOf('istanbul')
+var TESTING = (
+  NODE_ENV === 'testing' ||
+  !!~(process.env._ || '').indexOf('istanbul')
+)
 
 var server = express()
 

@@ -69,7 +69,6 @@ describe('middleware find-user', function() {
         'x-cnsnt-id': 'foo',
         'x-cnsnt-did': 'bar',
         'x-cnsnt-plain': 'foo',
-        'x-cnsnt-signable': 'foo',
         'x-cnsnt-signed': 'foo'
       }
     }, mock.res(function(res) {
@@ -86,7 +85,6 @@ describe('middleware find-user', function() {
         'x-cnsnt-id': test_user.id,
         'x-cnsnt-did': test_user.did,
         'x-cnsnt-plain': 'foo',
-        'x-cnsnt-signable': 'foo',
         'x-cnsnt-signed': 'foo'
       }
     }, mock.res(function(res) {

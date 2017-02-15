@@ -13,7 +13,6 @@ module.exports = function(req, res, next) {
   if (!(('x-cnsnt-id' in req.headers ||
          'x-cnsnt-did' in req.headers) &&
         'x-cnsnt-plain' in req.headers &&
-        'x-cnsnt-signable' in req.headers &&
         'x-cnsnt-signed' in req.headers)) {
     // if missing any of the above
     return res.status(400).json({

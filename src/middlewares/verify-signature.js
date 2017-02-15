@@ -1,6 +1,8 @@
 
 'use strict'
 
+var crypto = require('crypto')
+
 var secp = require('secp256k1')
 var ursa = require('ursa')
 
@@ -8,26 +10,15 @@ var ursa = require('ursa')
 
 module.exports = function(req, res, next) {
 
-  // TODO plaintext repr can be omitted if possible (some schemes may require it)
   var b_plain = Buffer.from(req.headers['x-cnsnt-plain'])
-
-  try {
-    var b_signable = Buffer.from(req.headers['x-cnsnt-signable'], 'hex')
-    var b_signed = Buffer.from(req.headers['x-cnsnt-signed'], 'hex')
-  } catch (e) {
-    return res.status(400).json({
-      error: true,
-      status: 400,
-      message: 'error hex-parsing any of: x-cnsnt-signable, x-cnsnt-signed',
-      body: null
-    })
-  }
+  var b_signable = crypto.createHash('sha256').update(b_plain).digest()
+  var b_signed = Buffer.from(req.headers['x-cnsnt-signed'], 'base64')
 
   if (!(b_signable.length && b_signed.length && b_plain.length)) {
     return res.status(400).json({
       error: true,
       status: 400,
-      message: 'error parsing any of: x-cnsnt-signable, x-cnsnt-signed, x-cnsnt-plain',
+      message: 'error base64-parsing or shasumming any of: x-cnsnt-plain, x-cnsnt-signed',
       body: null
     })
   }
@@ -45,7 +36,7 @@ module.exports = function(req, res, next) {
     })
   } else if (algorithm === 'rsa') {
     try {
-      var ursapublickey = ursa.coercePublicKey(req.user.crypto.public_key)
+      var ursapublickey = ursa.coercePublicKey(req.user.crypto.public_key.toString('utf8'))
     } catch (e) {
       return res.status(400).json({
         error: true,

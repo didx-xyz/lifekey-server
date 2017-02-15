@@ -5,10 +5,7 @@ var crypto = require('crypto')
 
 var {expect} = require('chai')
 
-// mock express instance
 var mock = require('../mock/express')
-
-// the test subject
 var subject = require('../../src/middlewares/assert-app-activated')
 
 describe('middleware assert-app-activated', function() {

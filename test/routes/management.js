@@ -4,6 +4,7 @@
 var crypto = require('crypto')
 
 var ec = require('eccrypto')
+var rsa = require('ursa')
 var {expect} = require('chai')
 
 // mock express instance
@@ -46,7 +47,7 @@ var test_users = [
     nickname: `u_3${now}`,
     device_id: `u_3${now}`,
     device_platform: 'ios',
-    public_key_algorithm: 'secp256k1',
+    public_key_algorithm: 'rsa',
     public_key: '',
     plaintext_proof: `u_3${now}`,
     signable_proof: crypto.createHash('sha256').update(`u_3${now}`).digest(),
@@ -57,7 +58,7 @@ var test_users = [
     nickname: `u_4${now}`,
     device_id: `u_4${now}`,
     device_platform: 'ios',
-    public_key_algorithm: 'secp256k1',
+    public_key_algorithm: 'rsa',
     public_key: '',
     plaintext_proof: `u_4${now}`,
     signable_proof: crypto.createHash('sha256').update(`u_4${now}`).digest(),
@@ -117,46 +118,46 @@ before(function(done) {
   }).then(function() {
     test_users[0].private_key = crypto.randomBytes(32)
     test_users[1].private_key = crypto.randomBytes(32)
-    test_users[2].private_key = crypto.randomBytes(32)
-    test_users[3].private_key = crypto.randomBytes(32)
+    test_users[2].private_key = rsa.generatePrivateKey()
+    test_users[3].private_key = rsa.generatePrivateKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.getPublic(test_users[0].private_key),
       ec.getPublic(test_users[1].private_key),
-      ec.getPublic(test_users[2].private_key),
-      ec.getPublic(test_users[3].private_key)
+      test_users[2].private_key.toPublicPem(),
+      test_users[3].private_key.toPublicPem()
     ])
   }).then(function(public_keys) {
     console.log('✓ calculated public keys')
-    test_users[0].public_key = public_keys[0].toString('hex')
-    test_users[1].public_key = public_keys[1].toString('hex')
-    test_users[2].public_key = public_keys[2].toString('hex')
-    test_users[3].public_key = public_keys[3].toString('hex')
-    console.log('✓ hexified public keys')
+    test_users[0].public_key = public_keys[0].toString('base64')
+    test_users[1].public_key = public_keys[1].toString('base64')
+    test_users[2].public_key = public_keys[2].toString('base64')
+    test_users[3].public_key = public_keys[3].toString('base64')
+    console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.sign(test_users[0].private_key, test_users[0].signable_proof),
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
-      ec.sign(test_users[2].private_key, test_users[2].signable_proof),
-      ec.sign(test_users[3].private_key, test_users[3].signable_proof)
+      test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', true),
+      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', true)
     ])
   }).then(function(signatures) {
     console.log('✓ signed initial key proofs')
-    test_users[0].signed_proof = signatures[0].toString('hex')
-    test_users[1].signed_proof = signatures[1].toString('hex')
-    test_users[2].signed_proof = signatures[2].toString('hex')
-    test_users[3].signed_proof = signatures[3].toString('hex')
-    console.log('✓ hexified signed proofs')
+    test_users[0].signed_proof = signatures[0].toString('base64')
+    test_users[1].signed_proof = signatures[1].toString('base64')
+    test_users[2].signed_proof = signatures[2]
+    test_users[3].signed_proof = signatures[3]
+    console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
-    test_users[0].signable_proof = test_users[0].signable_proof.toString('hex')
-    test_users[1].signable_proof = test_users[1].signable_proof.toString('hex')
-    test_users[2].signable_proof = test_users[2].signable_proof.toString('hex')
-    test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
-    console.log('✓ hexified signable proofs')
+    test_users[0].signable_proof = test_users[0].signable_proof.toString('base64')
+    test_users[1].signable_proof = test_users[1].signable_proof.toString('base64')
+    test_users[2].signable_proof = test_users[2].signable_proof.toString('base64')
+    test_users[3].signable_proof = test_users[3].signable_proof.toString('base64')
+    console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
     done()
   }).catch(done)
@@ -187,20 +188,25 @@ describe('management endpoints', function() {
       mgmt_register.callback.call(mock.express, {
         body: test_users[1]
       }, mock.res(function(res) {
-        
-        if (!res.body.id) return done(new Error('should not be called'))
+        if (res.status !== 201) {
+          return done(new Error('should not be called'))
+        }
         test_users[1].id = res.body.id
         
         mgmt_register.callback.call(mock.express, {
           body: test_users[2]
         }, mock.res(function(res) {
-          if (!res.body.id) return done(new Error('should not be called'))
+          if (res.status !== 201) {
+            return done(new Error('should not be called'))
+          }
           test_users[2].id = res.body.id
           
           mgmt_register.callback.call(mock.express, {
             body: test_users[3]
           }, mock.res(function(res) {
-            if (!res.body.id) return done(new Error('should not be called'))
+            if (res.status !== 201) {
+              return done(new Error('should not be called'))
+            }
             test_users[3].id = res.body.id
             
             // DONE!
@@ -252,12 +258,12 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should fail if non-hexadecimal key parameters are given', function(done) {
+    it('should fail if non-signature key parameters are given', function(done) {
       mgmt_register.callback.call(mock.express, {
         body: test_users_fail_cases[1]
       }, mock.res(function(res) {
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('hexadecimal parsing error in any of: public_key, signable_proof, signed_proof')
+        expect(res.message).to.equal('non-signature value given')
         done()
       }))
     })
