@@ -40,6 +40,7 @@ var CONNECTION_REQUEST_CTX = {
 
 var crypto = require('crypto')
 
+var pemstrip = require('pemstrip')
 var cuid = require('cuid')
 var secp = require('eccrypto')
 var ursa = require('ursa')
@@ -152,7 +153,7 @@ module.exports = [
         }
         return Promise.resolve()
       }).then(function() {
-        var b_public_key = Buffer.from(public_key, 'base64')
+        var b_public_key = Buffer.from(public_key)
         // var b_signable_proof = Buffer.from(signable_proof, 'base64')
         var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
         var b_signed_proof = Buffer.from(signed_proof, 'base64')
