@@ -56,6 +56,8 @@ var TESTING = (
 
 var server = express()
 
+server.enable('trust proxy')
+
 if (!TESTING && NODE_ENV !== 'production') server.use(morgan('dev'))
 
 server.use(cors())
