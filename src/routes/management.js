@@ -2,6 +2,7 @@
 // TODO check server.get('did_service_ready') before posting a message to the service
 // TODO add retries if did service is unavailable
 // TODO resolve this data structure dynamically (over the network)
+// TODO some of the procedures (like registration) are not atomic - if they fail at any point, the state of the database might be partially corrupt
 
 var send_is_undefined = !process.send
 if (send_is_undefined) process.send = function() {}
@@ -77,6 +78,7 @@ module.exports = [
         nickname,
         device_id,
         device_platform,
+        webhook_url,
         public_key_algorithm,
         public_key,
         plaintext_proof,
@@ -90,12 +92,19 @@ module.exports = [
       // ensure all required args are present
       if (!(email &&
             nickname &&
-            device_id &&
-            device_platform &&
             public_key_algorithm &&
             public_key &&
             plaintext_proof &&
             signed_proof)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing request body parameters',
+          body: null
+        })
+      }
+
+      if (!(webhook_url || (device_id && device_platform))) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -208,7 +217,6 @@ module.exports = [
           })
         }
       }).then(function() {
-        
         // now store the key and sig for posterity
         return http_request_verification.create({
           public_key: public_key,
@@ -224,6 +232,7 @@ module.exports = [
           return user.create({
             email: email,
             nickname: nickname,
+            webhook_url: webhook_url,
             app_activation_code: activation_code
           })
         }
@@ -289,8 +298,14 @@ module.exports = [
         if (created) {
           return Promise.resolve(
             // send an activation email
-            // concurrently to the promise pipeline
-            sendActivationEmail(nickname, email, activation_code)
+            process.send({
+              send_email_request: {
+                to: email,
+                subject: 'Consent account activation',
+                content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${CNSNT_SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
+                mime: 'text/html'
+              }
+            })
           )
         }
         return Promise.reject({
