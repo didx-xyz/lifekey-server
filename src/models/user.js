@@ -19,7 +19,8 @@ module.exports = function(instance, sqlize) {
     },
     webhook_url: {
       type: sqlize.TEXT,
-      allowNull: true
+      allowNull: true,
+      unique: true
     },
     app_activation_code: {
       type: sqlize.STRING,
