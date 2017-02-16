@@ -35,7 +35,7 @@ function cluster_send(msg) {
   })
 }
 
-function init_service(name, onmessage, then) {
+function service_init(name, onmessage, then) {
   services[name] = cp.fork(
     `./src/init/${name}.js`
   ).on('error', function(err) {
@@ -45,7 +45,7 @@ function init_service(name, onmessage, then) {
     var msg = {}
     msg[`${name}_service_ready`] = false
     cluster_send(msg)
-    init_service.apply(OUTER, arguments)
+    service_init.apply(OUTER, arguments)
   }).on('message', function(msg) {
     if (msg.ready) {
       msg = {}
@@ -72,13 +72,14 @@ services.lifekey = cluster({
         if (msg.ready) {
           worker_ready += 1
           if (worker_ready === worker_count) {
-            init_service.call(OUTER, 'did', function(msg) {
+            service_init.call(OUTER, 'did', function(msg) {
               if (msg.push_notification_request ||
                   msg.webhook_notification_request) {
-                services.notifier_service.send(msg)
+                services.notifier.send(msg)
               }
             })
-            init_service.call(OUTER, 'notifier', function(msg) {})
+            service_init.call(OUTER, 'notifier', function(msg) {})
+            service_init.call(OUTER, 'sendgrid', function(msg) {})
           }
         } else if (msg.did_allocation_request) {
           // proxy the message to the DID service
@@ -87,6 +88,8 @@ services.lifekey = cluster({
                    msg.webhook_notification_request) {
           // proxy the message to the notifier service
           notifier_service.send(msg)
+        } else if (msg.send_email_request) {
+          services.sendgrid.send(msg)
         } else {
           // nothing doing, otherwise
         }
