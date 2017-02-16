@@ -126,23 +126,23 @@ before(function(done) {
     return Promise.all([
       ec.getPublic(test_users[0].private_key),
       ec.getPublic(test_users[1].private_key),
-      test_users[2].private_key.toPublicPem(),
-      test_users[3].private_key.toPublicPem()
+      test_users[2].private_key.toPublicPem().toString('utf8'),
+      test_users[3].private_key.toPublicPem().toString('utf8')
     ])
   }).then(function(public_keys) {
     console.log('✓ calculated public keys')
     test_users[0].public_key = public_keys[0].toString('base64')
     test_users[1].public_key = public_keys[1].toString('base64')
-    test_users[2].public_key = public_keys[2].toString('base64')
-    test_users[3].public_key = public_keys[3].toString('base64')
+    test_users[2].public_key = public_keys[2]
+    test_users[3].public_key = public_keys[3]
     console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.sign(test_users[0].private_key, test_users[0].signable_proof),
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
-      test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', true),
-      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', true)
+      test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', false),
+      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false)
     ])
   }).then(function(signatures) {
     console.log('✓ signed initial key proofs')
@@ -153,10 +153,10 @@ before(function(done) {
     console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
-    test_users[0].signable_proof = test_users[0].signable_proof.toString('base64')
-    test_users[1].signable_proof = test_users[1].signable_proof.toString('base64')
-    test_users[2].signable_proof = test_users[2].signable_proof.toString('base64')
-    test_users[3].signable_proof = test_users[3].signable_proof.toString('base64')
+    test_users[0].signable_proof = test_users[0].signable_proof.toString('hex')
+    test_users[1].signable_proof = test_users[1].signable_proof.toString('hex')
+    test_users[2].signable_proof = test_users[2].signable_proof.toString('hex')
+    test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
     console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
     done()
@@ -189,6 +189,7 @@ describe('management endpoints', function() {
         body: test_users[1]
       }, mock.res(function(res) {
         if (res.status !== 201) {
+          console.log(res)
           return done(new Error('should not be called'))
         }
         test_users[1].id = res.body.id
@@ -197,6 +198,7 @@ describe('management endpoints', function() {
           body: test_users[2]
         }, mock.res(function(res) {
           if (res.status !== 201) {
+            console.log(res)
             return done(new Error('should not be called'))
           }
           test_users[2].id = res.body.id
@@ -205,6 +207,7 @@ describe('management endpoints', function() {
             body: test_users[3]
           }, mock.res(function(res) {
             if (res.status !== 201) {
+              console.log(res)
               return done(new Error('should not be called'))
             }
             test_users[3].id = res.body.id
