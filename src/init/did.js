@@ -17,8 +17,3 @@ require('./database')(false).then(function(database) {
   }).send({ready: true})
   
 })
-
-// simulate work for now...
-setInterval(function() {
-  process.send({now: Date.now()})
-}, 1000 * 60)

@@ -25,6 +25,13 @@ process.on('message', function(message) {
       '[UNAVAILABLE]'
     ))
     server.set('notifier_service_ready', message.notifier_service_ready)
+  } else if (typeof message.sendgrid_service_ready === 'boolean') {
+    console.log('SLAVE updating sendgrid service availability to', (
+      message.sendgrid_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('sengrid_service_ready', message.sendgrid_service_ready)
   } else {
     // otherwise, nothing doing
   }
