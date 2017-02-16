@@ -110,7 +110,7 @@ require('./database')(
     if (env.DEBUG_BLOCKING) {
       var blocked = require('blocked')
       blocked(function(ms) {
-        console.log('blocked for', ms)
+        console.log('event loop blocked for', ms)
       })
     }
   })
