@@ -71,7 +71,7 @@ module.exports = [
     secure: false,
     active: false,
     callback: function(req, res) {
-
+      
       var {
         email,
         nickname,
@@ -80,14 +80,13 @@ module.exports = [
         public_key_algorithm,
         public_key,
         plaintext_proof,
-        // signable_proof,
         signed_proof
       } = req.body
-
-      console.log(req.body)
-
+      
+      // console.log(req.body)
+      
       var activation_code, created_user_id, key_buffers
-
+      
       // ensure all required args are present
       if (!(email &&
             nickname &&
@@ -97,8 +96,7 @@ module.exports = [
             public_key &&
             plaintext_proof &&
             signed_proof)) {
-        res.status(400)
-        return res.json({
+        return res.status(400).json({
           error: true,
           status: 400,
           message: 'missing request body parameters',
@@ -106,7 +104,8 @@ module.exports = [
         })
       }
 
-      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(public_key_algorithm.toLowerCase())
+      var lower_algo = public_key_algorithm.toLowerCase()
+      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(lower_algo)
       if (!supported_algo) {
         return res.status(400).json({
           error: true,
@@ -153,8 +152,7 @@ module.exports = [
         }
         return Promise.resolve()
       }).then(function() {
-        var b_public_key = Buffer.from(public_key)
-        // var b_signable_proof = Buffer.from(signable_proof, 'base64')
+        var b_public_key = Buffer.from(public_key, lower_algo === 'rsa' ? 'utf8' : 'base64')
         var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
         var b_signed_proof = Buffer.from(signed_proof, 'base64')
         if (!(b_public_key.length && b_signable_proof.length && b_signed_proof.length)) {
@@ -171,12 +169,12 @@ module.exports = [
         key_buffers = keys
 
         // and then verify ownership of given public key
-        var lower_public_key_algorithm = public_key_algorithm.toLowerCase()
-        if (lower_public_key_algorithm === 'secp256k1') {
+        if (lower_algo === 'secp256k1') {
           return secp.verify(...keys)
-        } else if (lower_public_key_algorithm === 'rsa') {
+        } else if (lower_algo === 'rsa') {
           try {
-            var rsa_public_key = ursa.coercePublicKey(keys[0].toString('utf8'))
+            // var rsa_public_key = ursa.coercePublicKey(keys[0].toString('utf8'))
+            var rsa_public_key = ursa.coercePublicKey(public_key)
             return (
               rsa_public_key.hashAndVerify(
                 'sha256',
@@ -315,6 +313,7 @@ module.exports = [
           })
         )
       }).catch(function(err) {
+        // TODO catch email validation and unique validation errors here
         if (err.toString() === 'Error: couldn\'t parse DER signature') {
           err = {
             error: true,
