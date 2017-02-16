@@ -9,8 +9,8 @@ var findUser = (
 
 module.exports = function(req, res, next) {
 
-  console.log('user-agent', req.headers['user-agent'])
-  console.log('remote-addr', req.ip)
+  console.log('user-agent', req.get('user-agent'))
+  console.log('remote-addr', req.get('x-real-ip'))
 
   // if the matched route is neither secured-only, nor activated-only, skip the middleware
   var is_secure = this.get(
