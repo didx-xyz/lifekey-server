@@ -17,8 +17,10 @@ before(function(done) {
 describe('middleware preflight', function() {
   it('should invoke the success callback if the request is flagged as skippable', function(done) {
     subject.call(mock.express, {
+      ip: 'foo',
       method: 'FOO',
       route: {path: 'foo'},
+      headers: {'user-agent': 'foo'}
     }, mock.res(function(res) {
       return done(new Error('should not be called'))
     }), done)
@@ -26,8 +28,10 @@ describe('middleware preflight', function() {
 
   it('should invoke the next middleware if the request is not skippable', function(done) {
     subject.call(mock.express, {
+      ip: 'foo',
       method: 'FOO',
       route: {path: 'baz'},
+      headers: {'user-agent': 'foo'}
     }, mock.res(function(res) {
       return done(new Error('should not be called'))
     }), done)
