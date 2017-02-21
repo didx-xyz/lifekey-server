@@ -19,7 +19,6 @@
 // TODO change push_notification worker to query user device id itself
 // TODO memoise app activation check results per user and worker
 // TODO remove `to_id` fallbacks once eis service calls are in place
-// TODO see source files for more todos
 // FIXME refactor sqlize models to have associations
 // TODO find a new unique id system (cuid is not collision prone, but exposes sensitive information that would make the identifiers easier to guess)
 // TODO JSON.parse on large json(ld) documents and files embedded in json are going to bring us to a halt (switch to streaming json parser and real http uploads)
