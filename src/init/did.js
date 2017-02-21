@@ -36,10 +36,10 @@ require('./database')(false).then(function(database) {
     if (!msg.did_allocation_request) return
 
     // generate the eis signing key
-    var {userid} = msg.did_allocation_request
+    var {user_id} = msg.did_allocation_request
     var [privatekey, publickey] = new_keypair()
     crypto_key.create({
-      owner_id: userid,
+      owner_id: user_id,
       algorithm: 'secp256k1',
       purpose: 'sign,verify',
       alias: 'eis',
