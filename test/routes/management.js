@@ -112,6 +112,7 @@ before(function(done) {
   require('../../src/init/database')(
     false // disable sql logging
   ).then(function(database) {
+    mock.express.set('env', {SERVER_HOSTNAME: 'localhost'})
     mock.express.set('models', database.models)
     console.log('✓ initialised database models')
     return Promise.resolve()
@@ -189,7 +190,6 @@ describe('management endpoints', function() {
         body: test_users[1]
       }, mock.res(function(res) {
         if (res.status !== 201) {
-          console.log(res)
           return done(new Error('should not be called'))
         }
         test_users[1].id = res.body.id
@@ -198,7 +198,6 @@ describe('management endpoints', function() {
           body: test_users[2]
         }, mock.res(function(res) {
           if (res.status !== 201) {
-            console.log(res)
             return done(new Error('should not be called'))
           }
           test_users[2].id = res.body.id
@@ -207,7 +206,6 @@ describe('management endpoints', function() {
             body: test_users[3]
           }, mock.res(function(res) {
             if (res.status !== 201) {
-              console.log(res)
               return done(new Error('should not be called'))
             }
             test_users[3].id = res.body.id
