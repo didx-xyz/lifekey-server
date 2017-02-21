@@ -9,7 +9,7 @@ module.exports = [
       return res.status(200).json({
         error: false,
         status: 200,
-        message: 'sorry, there\'s nothing to see here',
+        message: 'sorry, there\'s nothing to see here...',
         body: null
       })
     }
