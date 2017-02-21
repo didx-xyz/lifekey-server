@@ -319,7 +319,6 @@ module.exports = [
             process.send({
               send_email_request: {
                 to: email,
-                from: 'ant@io.co.za', //from: 'no-reply@consent.global',
                 subject: 'Consent account activation',
                 content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
                 mime: 'text/html'
