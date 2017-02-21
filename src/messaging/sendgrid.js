@@ -17,18 +17,22 @@ module.exports = function(to, from, subject, content, mime) {
   return sendgrid.API(sendgrid.emptyRequest({
     method: 'POST',
     path: '/v3/mail/send',
-    body: (new compose.Mail(
-      new compose.Email(to),
-      subject,
-      new compose.Email('shaun@consent.global'), //new compose.Email(from || 'no-reply@consent.global'),
-      new compose.Content(mime || 'text/plain', content)
-    )).toJSON()
-  }), function(err, res) {
-    if (err) console.log(err)
-    else {
-      console.log(res.statusCode)
-      console.log(res.body)
-      console.log(res.headers)
+    body: {
+      personalizations: [
+        {
+          to: [{email: to}],
+          subject: subject
+        }
+      ],
+      from: {
+        email: 'no-replay@consent.global'
+      },
+      content: [
+        {
+          type: mime || 'text/plain',
+          value: content
+        }
+      ]
     }
-  })
+  }), console.log)
 }
