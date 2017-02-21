@@ -463,5 +463,55 @@ module.exports = [
         })
       })
     }
+  },
+
+  // 7 GET /profile/:user_id
+  {
+    uri: '/profile/:user_id',
+    method: 'get',
+    secure: false,
+    active: true,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              user: {
+                nickname: found.nickname,
+                did: found.did
+              }
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 ]
