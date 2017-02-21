@@ -72,6 +72,8 @@ module.exports = function(recipient, notification, data, sent) {
       } catch (e) {
         return sent(e)
       }
+
+      console.log('FCM response', response)
       
       if (response.failure === 0 || response.canonical_ids === 0) {
         // success, message sent
