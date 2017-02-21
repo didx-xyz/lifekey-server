@@ -18,7 +18,7 @@ module.exports = function(instance, sqlize) {
       validate: {isEmail: true}
     },
     webhook_url: {
-      type: sqlize.TEXT,
+      type: sqlize.STRING,
       allowNull: true,
       unique: true
     },
