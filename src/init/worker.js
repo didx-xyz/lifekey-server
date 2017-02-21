@@ -76,6 +76,7 @@ require('./database')(
   
   // attach database connection and models
   var {db, models} = database
+  server.set('env', env)
   server.set('db', db)
   server.set('models', models)
   
@@ -93,12 +94,12 @@ require('./database')(
       return prev.concat(curr)
     }).forEach(function(route) {
       server.set( // set whether user must have app activated to invoke route
-        `active_${route.method}_${route.uri}`,
-        route.active
+        `active_${route.method.toLowerCase()}_${route.uri}`,
+        route.active || false
       )
       server.set( // set whether user must authenticate to invoke route
-        `secure_${route.method}_${route.uri}`,
-        route.secure
+        `secure_${route.method.toLowerCase()}_${route.uri}`,
+        route.secure || false
       )
       server[route.method](
         route.uri,
