@@ -7,7 +7,6 @@
 var send_is_undefined = !process.send
 if (send_is_undefined) process.send = function() {}
 
-var CNSNT_SERVER_HOSTNAME = 'pdr.cnsnt.io'
 var CNSNT_SCHEMA_HOST = 'http://schema.cnsnt.io/'
 var CONNECTION_REQUEST_CTX = {
   '@context': {
@@ -41,6 +40,7 @@ var CONNECTION_REQUEST_CTX = {
 
 var crypto = require('crypto')
 
+var qr = require('qr-image')
 var pemstrip = require('pemstrip')
 var cuid = require('cuid')
 var secp = require('eccrypto')
@@ -48,20 +48,6 @@ var ursa = require('ursa')
 var sendmail = require('sendmail')({/* TODO sendmail cfg */})
 var jsonld = require('jsonld')
 var query = require('ld-query')
-
-function sendActivationEmail(nickname, address, identifier) {
-  if (send_is_undefined) return
-  // TODO mail configuration
-  sendmail({
-    from: 'no-reply@consent.global',
-    to: address,
-    subject: 'Consent account activation',
-    html: `<p>Hi ${nickname}!</p><p>Please <a href="http://${CNSNT_SERVER_HOSTNAME}/management/activation/${identifier}">click here</a> to verify your email address and activate your account.</p>`,
-  }, function(err, reply) {
-    // TODO handle email send retries
-    if (err) return console.log('sendmail failure', err)
-  })
-}
 
 module.exports = [
   
@@ -85,7 +71,7 @@ module.exports = [
         signed_proof
       } = req.body
       
-      // console.log(req.body)
+      console.log(req.body)
       
       var activation_code, created_user_id, key_buffers
       
@@ -104,6 +90,7 @@ module.exports = [
         })
       }
 
+      // ensure all required args are present
       if (!(webhook_url || (device_id && device_platform))) {
         return res.status(400).json({
           error: true,
@@ -111,6 +98,29 @@ module.exports = [
           message: 'missing request body parameters',
           body: null
         })
+      }
+
+      // TODO write a test to cover this branch
+      if (webhook_url) {
+        var caught = false
+        try {
+          var userhook = url.parse(webhook_url)
+        } catch (e) {
+          caught = true
+        } finally {
+          if (caught || !userhook.host) {
+            return res.status(400).json({
+              error: true,
+              status: 400,
+              message: (
+                caught ?
+                'expected string type for webhook_url' :
+                'url not given for webhook_url'
+              ),
+              body: null
+            })
+          }
+        }
       }
 
       var lower_algo = public_key_algorithm.toLowerCase()
@@ -270,6 +280,14 @@ module.exports = [
           return Promise.resolve(
             process.send({
               webhook_request: {},
+              push_notification_request: {
+                user_id: created_user_id,
+                device_id: created.device_id,
+                notification: {
+                  title: 'Your registration with LifeKey is nearly complete!',
+                  body: 'Check your email to conclude registration...'
+                }
+              },
               did_allocation_request: {
                 user_id: created_user_id,
                 device_id: created.device_id
@@ -301,8 +319,9 @@ module.exports = [
             process.send({
               send_email_request: {
                 to: email,
+                from: 'ant@io.co.za', //from: 'no-reply@consent.global',
                 subject: 'Consent account activation',
-                content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${CNSNT_SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
+                content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
                 mime: 'text/html'
               }
             })
@@ -314,7 +333,7 @@ module.exports = [
           message: 'unable to create crypto_key record',
           body: null
         })
-      }).then(function() {
+      }.bind(this)).then(function() {
         // and finally respond affirmatively
         // to the calling agent
         return Promise.resolve(
@@ -500,9 +519,9 @@ module.exports = [
         if (found) {
           return Promise.resolve(
             process.send({
-              webhook_request: {
-                // TODO webhook url
-              },
+              // webhook_request: {
+              //   // TODO webhook url
+              // },
               push_notification_request: {
                 device_id: found.device_id,
                 // TODO notification/data envelope
@@ -1611,6 +1630,50 @@ module.exports = [
           body: err.body || null
         })
       })
+    }
+  },
+
+  // 12 GET /demo/qr/:user_id
+  {
+    uri: '/demo/qr/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          var {SERVER_HOSTNAME} = this.get('env')
+          return qr.image(
+            `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
+            {type: 'png'}
+          ).pipe(res)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }.bind(this)).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+      
     }
   }
 ]
