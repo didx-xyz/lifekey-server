@@ -17,7 +17,6 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
-    "an.hour.ago": "^0.3.0",
     "blocked": "^1.2.1",
     "body-parser": "^1.15.2",
     "cors": "^2.8.1",
@@ -25,25 +24,19 @@
     "eccrypto": "^1.0.3",
     "express": "^4.14.0",
     "fluster": "0.0.15",
-    "google-cloud": "^0.45.1",
     "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#af19d0b4deab47ce1b476eba2cf7b740f3bf6e55",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
-    "mysql": "^2.12.0",
-    "pemstrip": "0.0.1",
+    "mysql2": "^1.2.0",
     "qr-image": "^3.2.0",
-    "scrypt": "^6.0.3",
     "secp256k1": "^3.2.5",
     "sendgrid": "^4.7.1",
-    "sendmail": "^1.1.1",
     "sequelize": "^3.28.0",
-    "sodium-native": "^1.3.1",
     "ursa": "^0.9.4"
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "chai-as-promised": "^6.0.0",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0"
   }
