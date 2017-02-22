@@ -44,7 +44,6 @@ var qr = require('qr-image')
 var cuid = require('cuid')
 var secp = require('eccrypto')
 var ursa = require('ursa')
-var sendmail = require('sendmail')({/* TODO sendmail cfg */})
 var jsonld = require('jsonld')
 var query = require('ld-query')
 
