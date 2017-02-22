@@ -5,15 +5,7 @@ var crypto = require('crypto')
 
 var secp = require('secp256k1')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
-
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('./env')()
 
 var isw = require('identity-service-wrapper')(env.EIS_HOST)
 
@@ -36,7 +28,7 @@ require('./database')(false).then(function(database) {
     if (!msg.did_allocation_request) return
 
     // generate the eis signing key
-    var {user_id} = msg.did_allocation_request
+    var {user_id, device_id} = msg.did_allocation_request
     var [privatekey, publickey] = new_keypair()
     crypto_key.create({
       owner_id: user_id,
@@ -51,6 +43,16 @@ require('./database')(false).then(function(database) {
       }
 
       // TODO use the key to create the eis record
+
+      // set a fake and random did for now
+      var did = crypto.rng(32).toString('hex')
+      return user.update({did: did, id: user_id})
+    }).then(function() {
+      process.send({push_notification_request: {
+        user_id: user_id,
+        device_id: device_id,
+        data: {received_did: true, did_value: did}
+      }})
     }).catch(function(err) {
       console.log('error occurred during eis registration', err)
     })
