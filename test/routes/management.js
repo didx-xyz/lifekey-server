@@ -112,7 +112,10 @@ before(function(done) {
   require('../../src/init/database')(
     false // disable sql logging
   ).then(function(database) {
-    mock.express.set('env', {SERVER_HOSTNAME: 'localhost'})
+    mock.express.set('env', {
+      _: process.env._,
+      SERVER_HOSTNAME: 'localhost'
+    })
     mock.express.set('models', database.models)
     console.log('✓ initialised database models')
     return Promise.resolve()
