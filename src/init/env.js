@@ -13,6 +13,7 @@ function load(refresh) {
     throw new Error(`unable to find matching env file for ${NODE_ENV}`)
   }
   env.NODE_ENV = NODE_ENV
+  env._ = process.env._
   return env
 }
 
