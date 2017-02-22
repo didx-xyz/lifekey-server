@@ -8,15 +8,9 @@ var path = require('path')
 
 var sqlize = require('sequelize')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env, instance
+var env = require('./env')()
 
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var instance
 
 // TODO make less ghetto with kwargs
 // TODO maybe add option for specific model loading (would help speed up tests and boot speed and footprint for workers using few models)
