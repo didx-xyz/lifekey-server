@@ -38,15 +38,8 @@ process.on('message', function(message) {
 })
 
 var fs = require('fs')
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
 
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('./env')()
 
 var cors = require('cors')
 var morgan = require('morgan')
@@ -57,7 +50,7 @@ var preflight = require('../middlewares/preflight')
 var notFound = require('../middlewares/not-found')
 
 var TESTING = (
-  NODE_ENV === 'testing' ||
+  env.NODE_ENV === 'testing' ||
   !!~(process.env._ || '').indexOf('istanbul')
 )
 
@@ -65,7 +58,7 @@ var server = express()
 
 server.enable('trust proxy')
 
-if (!TESTING && NODE_ENV !== 'production') server.use(morgan('dev'))
+if (!TESTING && env.NODE_ENV !== 'production') server.use(morgan('dev'))
 
 server.use(cors())
 server.use(bodyParser.json())
