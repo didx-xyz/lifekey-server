@@ -13,5 +13,15 @@ module.exports = [
         body: null
       })
     }
+  },
+  {
+    uri: '/robots.txt',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      res.set('content-type', 'text/plain')
+      return res.status(200).end('User-agent: *\nDisallow: /')
+    }
   }
 ]

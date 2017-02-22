@@ -3,7 +3,6 @@
 
 var env = require('../init/env')()
 
-var compose = require('sendgrid').mail
 var sendgrid = require('sendgrid')(env.SENDGRID_API_KEY)
 
 module.exports = function(to, from, subject, content, mime) {
