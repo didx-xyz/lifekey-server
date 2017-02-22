@@ -7,15 +7,7 @@ var cp = require('child_process')
 
 var cluster = require('fluster')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
-
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('./env')()
 
 // keep a reference to the outermost context
 // to avoid typeerrors when respawning the service
