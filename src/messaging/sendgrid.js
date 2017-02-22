@@ -1,14 +1,7 @@
 
 'use strict'
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-
-try {
-  var env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('../init/env')()
 
 var compose = require('sendgrid').mail
 var sendgrid = require('sendgrid')(env.SENDGRID_API_KEY)
