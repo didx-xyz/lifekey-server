@@ -41,7 +41,6 @@ var CONNECTION_REQUEST_CTX = {
 var crypto = require('crypto')
 
 var qr = require('qr-image')
-var pemstrip = require('pemstrip')
 var cuid = require('cuid')
 var secp = require('eccrypto')
 var ursa = require('ursa')
