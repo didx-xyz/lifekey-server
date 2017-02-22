@@ -32,7 +32,29 @@ require('./database')(
       
       var {user_id, device_id, notification, data} = msg.push_notification_request
       // FIXME wire up to retries (has prerequisite FIXME in messaging/fcm)
-      fcm(device_id, notification, data, console.log)
+
+      if (user_id && !device_id) {
+        models.user_device.findOne({
+          where: {owner_id: user_id}
+        }).then(function(found) {
+          if (found) {
+            return fcm(
+              device_id,
+              notification,
+              data,
+              console.log
+            )
+          }
+          // USER DEVICE NOT FOUND
+        })
+      } else {
+        fcm(
+          device_id,
+          notification,
+          data,
+          console.log
+        )
+      }
     } else if (msg.webhook_notification_request) {
       
       var {user_id, webhook_url, notification, data} = msg.webhook_notification_request
