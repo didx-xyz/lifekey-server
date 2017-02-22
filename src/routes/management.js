@@ -286,7 +286,8 @@ module.exports = [
                 notification: {
                   title: 'Your registration with LifeKey is nearly complete!',
                   body: 'Check your email to conclude registration...'
-                }
+                },
+                data: {sent_activation_email: true}
               },
               did_allocation_request: {
                 user_id: created_user_id,
@@ -935,7 +936,7 @@ module.exports = [
     callback: function(req, res) {
       var {activation_code} = req.params
       var {user} = this.get('models')
-      
+      var user_id
       user.findOne({
         where: {app_activation_code: activation_code}
       }).then(function(found) {
@@ -947,11 +948,20 @@ module.exports = [
             body: null
           })
         }
+        user_id = found.id
         // update the record
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
-        res.set('Content-Type', 'text/html')
-        res.status(200).end(`<p>LifeKey is now activated!</p><p><a href="cnsnt:main-menu">Click here</a> to begin!</p>`)
+        process.send({push_notification_request: {
+          user_id: user_id,
+          data: {app_activation_link_clicked: true}
+        }}, function() {
+          res.set('Content-Type', 'text/html')
+          res.status(200).end(
+            '<p>LifeKey is now activated!</p>' +
+            '<p><a href="lifekey:main-menu">Click here</a> to begin!</p>'
+          )
+        })
       }).catch(function(err) {
         return res.status(
           err.status || 500
