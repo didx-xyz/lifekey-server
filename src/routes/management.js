@@ -317,9 +317,10 @@ module.exports = [
           return Promise.resolve(
             // send an activation email
             process.send({
+              // TODO this kinda stuff needs to be wrapped up and i18n'ed
               send_email_request: {
                 to: email,
-                subject: 'Consent account activation',
+                subject: 'LifeKey Account Activation',
                 content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
                 mime: 'text/html'
               }
