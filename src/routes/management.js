@@ -71,7 +71,9 @@ module.exports = [
         signed_proof
       } = req.body
       
-      console.log(req.body)
+      if (!~this.get('env')._.indexOf('istanbul')) {
+        console.log(req.body)
+      }
       
       var activation_code, created_user_id, key_buffers
       
@@ -955,13 +957,12 @@ module.exports = [
         process.send({push_notification_request: {
           user_id: user_id,
           data: {app_activation_link_clicked: true}
-        }}, function() {
-          res.set('Content-Type', 'text/html')
-          res.status(200).end(
-            '<p>LifeKey is now activated!</p>' +
-            '<p><a href="lifekey:main-menu">Click here</a> to begin!</p>'
-          )
-        })
+        }})
+        res.set('Content-Type', 'text/html')
+        res.status(200).end(
+          '<p>LifeKey is now activated!</p>' +
+          '<p><a href="lifekey:main-menu">Click here</a> to begin!</p>'
+        )
       }).catch(function(err) {
         return res.status(
           err.status || 500
