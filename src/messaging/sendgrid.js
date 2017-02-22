@@ -18,21 +18,15 @@ module.exports = function(to, from, subject, content, mime) {
     method: 'POST',
     path: '/v3/mail/send',
     body: {
-      personalizations: [
-        {
-          to: [{email: to}],
-          subject: subject
-        }
-      ],
-      from: {
-        email: 'no-replay@consent.global'
-      },
-      content: [
-        {
-          type: mime || 'text/plain',
-          value: content
-        }
-      ]
+      personalizations: [{
+        to: [{email: to}],
+        subject: subject
+      }],
+      from: {email: 'no-reply@consent.global'},
+      content: [{
+        type: mime || 'text/plain',
+        value: content
+      }]
     }
   }), console.log)
 }
