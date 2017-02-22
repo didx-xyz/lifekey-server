@@ -3,15 +3,7 @@
 
 var http = require('https')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
-
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('../init/env')()
 
 function message(recipient, notification, data) {
   // TODO expand with more options (platforms, design, topics)
