@@ -37,7 +37,6 @@ require('./database')(
         models.user_device.findOne({
           where: {owner_id: user_id}
         }).then(function(found) {
-          console.log(found.toJSON())
           if (found) {
             fcm(
               found.device_id,
@@ -45,9 +44,9 @@ require('./database')(
               data,
               console.log
             )
+          } else {
+            console.log('fatal - user_device record not found')
           }
-          // USER DEVICE NOT FOUND
-          console.log('fatal - user device not found')
         }).catch(function(err) {
           console.log(err)
         })
