@@ -11,6 +11,7 @@
 ## todos
 
 ```c
+// TODO add parameter for specify a signing key alias to use in a request
 // TODO add perf metrics to each service (http worker, did, notifier, sendgrid)
 // TODO nginx rate limiting
 // TODO error codes for clients
