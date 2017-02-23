@@ -37,15 +37,19 @@ require('./database')(
         models.user_device.findOne({
           where: {owner_id: user_id}
         }).then(function(found) {
+          console.log(found.toJSON())
           if (found) {
-            return fcm(
-              device_id,
+            fcm(
+              found.device_id,
               notification,
               data,
               console.log
             )
           }
           // USER DEVICE NOT FOUND
+          console.log('fatal - user device not found')
+        }).catch(function(err) {
+          console.log(err)
         })
       } else {
         fcm(
@@ -55,7 +59,7 @@ require('./database')(
           console.log
         )
       }
-    } else if (msg.webhook_notification_request) {
+    } else if (msg.webhook_request) {
       
       var {user_id, webhook_url, notification, data} = msg.webhook_notification_request
       var msg = {notification: notification, data: data}
