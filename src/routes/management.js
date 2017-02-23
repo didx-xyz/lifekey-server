@@ -954,6 +954,7 @@ module.exports = [
       }).then(function() {
         process.send({push_notification_request: {
           user_id: user_id,
+          notification: {title: 'LifeKey is now activated!', body: 'Thank you for activating!'},
           data: {app_activation_link_clicked: true}
         }})
         res.set('Content-Type', 'text/html')
