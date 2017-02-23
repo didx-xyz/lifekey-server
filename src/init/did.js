@@ -11,8 +11,8 @@ var isw = require('identity-service-wrapper')(env.EIS_HOST)
 
 // [16:00]  
 // Stephan Bothma `signer_key` will be your key (or keys) — it doesn't get used in the flow after spawning.
-// `admin_addr` will be _our_ key (or smart contract), which can only work with DDO/Did info, and
-// `owner_addr` will be the key that controls the wallet features, that belong to the user.
+// `admin_addr` will be _our_ key (or smart contract), which can only work with DDO/Did info, 
+// and `owner_addr` will be the key that controls the wallet features, that belong to the user.
 
 function new_keypair() {
   do {
@@ -46,7 +46,7 @@ require('./database')(false).then(function(database) {
 
       // set a fake and random did for now
       var did = crypto.rng(32).toString('hex')
-      return user.update({did: did, id: user_id})
+      return user.update({where: {did: did, id: user_id}})
     }).then(function() {
       process.send({push_notification_request: {
         user_id: user_id,
