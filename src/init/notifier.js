@@ -29,7 +29,7 @@ require('./database')(
   process.on('message', function(msg) {
 
     if (msg.push_notification_request) {
-      
+      console.log('new push request', msg.push_notification_request)
       var {user_id, device_id, notification, data} = msg.push_notification_request
       // FIXME wire up to retries (has prerequisite FIXME in messaging/fcm)
 

@@ -65,25 +65,24 @@ services.lifekey = cluster({
           worker_ready += 1
           if (worker_ready === worker_count) {
             service_init.call(OUTER, 'did', function(msg) {
-              if (msg.push_notification_request ||
-                  msg.webhook_notification_request) {
+              if (msg.push_notification_request || msg.webhook_request) {
                 services.notifier.send(msg)
               }
             })
             service_init.call(OUTER, 'notifier', function(msg) {})
             service_init.call(OUTER, 'sendgrid', function(msg) {})
           }
-        } else if (msg.did_allocation_request) {
+        }
+        if (msg.did_allocation_request) {
           // proxy the message to the DID service
           services.did.send(msg)
-        } else if (msg.push_notification_request ||
-                   msg.webhook_notification_request) {
+        }
+        if (msg.push_notification_request || msg.webhook_request) {
           // proxy the message to the notifier service
           services.notifier.send(msg)
-        } else if (msg.send_email_request) {
+        }
+        if (msg.send_email_request) {
           services.sendgrid.send(msg)
-        } else {
-          // nothing doing, otherwise
         }
       }
     }
