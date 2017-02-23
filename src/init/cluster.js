@@ -79,7 +79,7 @@ services.lifekey = cluster({
         } else if (msg.push_notification_request ||
                    msg.webhook_notification_request) {
           // proxy the message to the notifier service
-          notifier_service.send(msg)
+          services.notifier.send(msg)
         } else if (msg.send_email_request) {
           services.sendgrid.send(msg)
         } else {
