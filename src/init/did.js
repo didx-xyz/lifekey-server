@@ -23,6 +23,7 @@ function new_keypair() {
 
 require('./database')(false).then(function(database) {
   var {user, crypto_key} = database.models
+  var did
   process.on('message', function(msg) {
     // TODO error case
     if (!msg.did_allocation_request) return
@@ -45,7 +46,7 @@ require('./database')(false).then(function(database) {
       // TODO use the key to create the eis record
 
       // set a fake and random did for now
-      var did = crypto.rng(32).toString('hex')
+      did = crypto.rng(32).toString('hex')
       return user.update({did: did}, {where: {id: user_id}})
     }).then(function() {
       process.send({push_notification_request: {
