@@ -46,7 +46,7 @@ require('./database')(false).then(function(database) {
 
       // set a fake and random did for now
       var did = crypto.rng(32).toString('hex')
-      return user.update({where: {did: did, id: user_id}})
+      return user.update({did: did}, {where: {id: user_id}})
     }).then(function() {
       process.send({push_notification_request: {
         user_id: user_id,
