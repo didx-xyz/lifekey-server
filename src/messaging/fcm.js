@@ -30,12 +30,12 @@ function message(recipient, notification, data) {
   return msg
 }
 
-module.exports = function(recipient, notification, data, sent) {
+module.exports = function(recipient, notification, data, onsent) {
   // serialise the given message parameters
   try {
     var envelope = message(recipient, notification, data)
   } catch (e) {
-    return sent(e)
+    return onsent(e)
   }
   // construct the fcm request
   var request = http.request({
@@ -52,7 +52,7 @@ module.exports = function(recipient, notification, data, sent) {
   // attach listeners
   request.on('response', function(res) {
     if (res.statusCode !== 200) {
-      return sent(new Error(res.statusCode))
+      return onsent(new Error(res.statusCode))
     }
     
     var response = ''
@@ -62,14 +62,14 @@ module.exports = function(recipient, notification, data, sent) {
       try {
         response = JSON.parse(response)
       } catch (e) {
-        return sent(e)
+        return onsent(e)
       }
 
       console.log('FCM response', response)
       
       if (response.failure === 0 || response.canonical_ids === 0) {
         // success, message sent
-        return sent(null, response)
+        return onsent()
       }
       
       // FIXME see below
@@ -84,7 +84,7 @@ module.exports = function(recipient, notification, data, sent) {
         // If it is `NotRegistered`, you should remove the `registration ID` from your server database because the application was uninstalled from the device, or the client app isn't configured to receive messages.
         // Otherwise, there is something wrong in the registration token passed in the request; it is probably a non-recoverable error that will also require removing the registration from the server database.
     })
-  }).on('error', sent)
+  }).on('error', onsent)
 
   // and send
   request.end(JSON.stringify(envelope))
