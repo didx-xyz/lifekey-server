@@ -289,7 +289,7 @@ module.exports = [
                   title: 'Your registration with LifeKey is nearly complete!',
                   body: 'Check your email to conclude registration...'
                 },
-                data: {sent_activation_email: true}
+                data: {type: 'sent_activation_email'}
               },
               did_allocation_request: {
                 user_id: created_user_id,
@@ -518,7 +518,8 @@ module.exports = [
                 body: `You received a connection request from ${target_user.nickname}!`
               },
               data: {
-                is_connection_request: true,
+                type: 'user_connection_request',
+                is_user_connection_request: true,
                 user_connection_request_id: created.id,
                 from_id: req.user.id,
                 from_did: req.user.did
@@ -745,6 +746,7 @@ module.exports = [
             title: 'User Connection',
             body: 'User connection successfully created!'
           }, pnr_data = {
+            type: 'user_connection_created',
             is_user_connection_created: true,
             user_connection_id: created.id,
             to_id: ucr.to_id,
@@ -876,6 +878,7 @@ module.exports = [
               user_id: found.id,
               notification: {title: 'User Connection Update', body: 'Your connection has been updated!'},
               data: {
+                type: 'user_connection_updated',
                 is_user_connection_update: true,
                 user_connection_id: uc.id,
                 new_value: enabled
@@ -940,7 +943,7 @@ module.exports = [
         process.send({push_notification_request: {
           user_id: user_id,
           notification: {title: 'LifeKey is now activated!', body: 'Thank you for activating!'},
-          data: {app_activation_link_clicked: true}
+          data: {type: 'app_activation_link_clicked'}
         }})
         res.set('Content-Type', 'text/html')
         res.status(200).end(
@@ -1144,7 +1147,10 @@ module.exports = [
             // TODO webhook
             push_notification_request: {
               user_id: to_user.id,
-              new_isa_request: true
+              notification: {title: 'New Information Sharing Agreement', body: 'New information sharing agreement'},
+              data: {
+                type: 'information_sharing_agreement_request'
+              }
             }
           })
           return res.status(201).json({
