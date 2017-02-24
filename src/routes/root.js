@@ -27,7 +27,7 @@ module.exports = [
   {
     // /azenv.php?auth=148793672741&a=PSCMN&i=2194886317&p=80
     uri: '/azenv.php',
-    method: 'get',
+    method: 'post',
     secure: false,
     active: false,
     callback: function(req, res) {
