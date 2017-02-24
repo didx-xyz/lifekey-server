@@ -57,10 +57,10 @@ require('./database')(
         )
       }
     }
-    
+
     if (msg.webhook_request) {
       
-      var {user_id, webhook_url, notification, data} = msg.webhook_notification_request
+      var {user_id, webhook_url, notification, data} = msg.webhook_request
       var msg = {notification: notification, data: data}
 
       var get_user_hook_addr = (function() {
