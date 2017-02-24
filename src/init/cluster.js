@@ -37,7 +37,7 @@ function service_init(name, onmessage, then) {
     var msg = {}
     msg[`${name}_service_ready`] = false
     cluster_send(msg)
-    service_init.apply(OUTER, arguments)
+    service_init.apply(OUTER, [name, onmessage, then])
   }).on('message', function(msg) {
     if (msg.ready) {
       msg = {}
