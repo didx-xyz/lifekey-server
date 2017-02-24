@@ -281,7 +281,7 @@ module.exports = [
           // due to the promise pipeline we're sitting inside
           return Promise.resolve(
             process.send({
-              webhook_request: {},
+              // webhook_request: {},
               push_notification_request: {
                 user_id: created_user_id,
                 device_id: created.device_id,
