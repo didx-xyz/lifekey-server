@@ -47,9 +47,7 @@ require('./database')(
           } else {
             console.log('fatal - user_device record not found')
           }
-        }).catch(function(err) {
-          console.log(err)
-        })
+        }).catch(console.log)
       } else {
         fcm(
           device_id,
@@ -58,7 +56,9 @@ require('./database')(
           console.log
         )
       }
-    } else if (msg.webhook_request) {
+    }
+    
+    if (msg.webhook_request) {
       
       var {user_id, webhook_url, notification, data} = msg.webhook_notification_request
       var msg = {notification: notification, data: data}
@@ -100,8 +100,6 @@ require('./database')(
         console.log(err)
       })
 
-    } else {
-      // otherwise, nothing doing
     }
   }).send({ready: true})
 
