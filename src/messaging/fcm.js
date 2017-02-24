@@ -71,6 +71,9 @@ module.exports = function(recipient, notification, data, onsent) {
         // success, message sent
         return onsent()
       }
+
+      // failed to send message
+      onsent(response)
       
       // FIXME see below
       // otherwise, inspect message further
