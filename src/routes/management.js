@@ -643,6 +643,8 @@ module.exports = [
       
       var {user, user_device, user_connection, user_connection_request} = this.get('models')
 
+      // TODO send push notifications to both users
+
       if (typeof accepted !== 'boolean' && !document) {
         return res.status(400).json({
           error: true,
