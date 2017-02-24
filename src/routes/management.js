@@ -1,4 +1,6 @@
 
+'use strict'
+
 // TODO check server.get('did_service_ready') before posting a message to the service
 // TODO add retries if did service is unavailable
 // TODO resolve this data structure dynamically (over the network)
@@ -424,7 +426,7 @@ module.exports = [
       // send a connection request
       var {document, target} = req.body
       var {user, user_device, user_connection_request} = this.get('models')
-      var ucr
+      var ucr, target_user
 
       var parse_json_doc = (function(document) {
         if (!(document || target)) {
@@ -490,6 +492,7 @@ module.exports = [
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
+          target_user = found
           return user_connection_request.create({
             to_id: found.id,
             from_id: req.user.id,
@@ -506,37 +509,34 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
-          // TODO webhook for programmatic user
           ucr = created
-          return user_device.findOne({where: {owner_id: req.user.id}})
+          process.send({
+            push_notification_request: {
+              user_id: created.to_id,
+              notification: {
+                title: 'New Connection Request',
+                body: `You received a connection request from ${target_user.nickname}!`
+              },
+              data: {
+                is_connection_request: true,
+                user_connection_request_id: created.id,
+                from_id: req.user.id,
+                from_did: req.user.did
+              }
+            }
+          })
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'user_connection_request record created',
+            body: {id: ucr.id}
+          })
         }
         return Promise.reject({
           error: true,
           status: 500,
           message: 'unable to create user_connection_request record',
           body: null
-        })
-      }).then(function(found) {
-        if (found) {
-          return Promise.resolve(
-            process.send({
-              // webhook_request: {
-              //   // TODO webhook url
-              // },
-              push_notification_request: {
-                device_id: found.device_id,
-                // TODO notification/data envelope
-              }
-            })
-          )
-        }
-      }).then(function() {
-        res.status(201)
-        return res.json({
-          error: false,
-          status: 201,
-          message: 'user_connection_request record created',
-          body: {id: ucr.id}
         })
       }).catch(function(err) {
         return res.status(
@@ -709,9 +709,7 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           // accept/reject the ucr
-
           ucr = found
-
           return found.update({
             acknowledged: true,
             accepted: accepted
@@ -743,14 +741,30 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           uc = created
-          return user.findOne({
-            where: {
-              $or: [
-                {did: created.from_did},
-                {id: created.from_id}
-              ]
+          var pnr_notif = {
+            title: 'User Connection',
+            body: 'User connection successfully created!'
+          }, pnr_data = {
+            is_user_connection_created: true,
+            user_connection_id: created.id,
+            to_id: ucr.to_id,
+            from_id: ucr.from_id
+          }
+          process.send({
+            push_notification_request: {
+              user_id: ucr.to_id,
+              notification: pnr_notif,
+              data: pnr_data
             }
           })
+          process.send({
+            push_notification_request: {
+              user_id: ucr.from_id,
+              notification: pnr_notif,
+              data: pnr_data
+            }
+          })
+          return Promise.resolve()
         }
         return Promise.reject({
           error: true,
@@ -758,41 +772,11 @@ module.exports = [
           message: 'unable to create user_connection record',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          return user_device.findOne({where: {owner_id: found.id}})
-        }
-        return res.status(404).json({
-          error: true,
-          status: 404,
-          message: 'user record not found',
-          body: null
-        })
-      }).then(function(found) {
-        if (found) {
-          return Promise.resolve(
-            process.send({
-              webhook_request: {
-                // TODO webhook url
-              },
-              push_notification_request: {
-                recipient: found.device_id,
-                // TODO message args (notification/data)
-              }
-            })
-          )
-        }
-        return res.status(404).json({
-          error: true,
-          status: 404,
-          message: 'user_device record not found',
-          body: null
-        })
       }).then(function() {
         // node generates a warning if this res.json
         // call is NOT wrapped in a promise O_o
         return Promise.resolve(
-          res.status(200).json({
+          res.status(201).json({
             error: false,
             status: 201,
             message: 'user_connection created',
@@ -821,7 +805,7 @@ module.exports = [
     callback: function(req, res) {
       var {user_connection_id} = req.params
       var {enabled} = req.body
-      var old_value, other_party
+      var old_value, other_party, uc
       var {user, user_device, user_connection} = this.get('models')
 
       if (typeof enabled !== 'boolean') {
@@ -850,6 +834,7 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           if (found.enabled !== enabled) {
+            uc = found
             old_value = found.enabled
             // figure out who the other party in the connection is
             // DIDs take prescedence
@@ -885,8 +870,19 @@ module.exports = [
         }})
       }).then(function(found) {
         if (found) {
-          process.send({webhook_request: {url: found.webhook_url}})
-          return user_device.findOne({where: {owner_id: found.id}})
+          process.send({
+            // webhook_request: {url: found.webhook_url}
+            push_notification_request: {
+              user_id: found.id,
+              notification: {title: 'User Connection Update', body: 'Your connection has been updated!'},
+              data: {
+                is_user_connection_update: true,
+                user_connection_id: uc.id,
+                new_value: enabled
+              }
+            }
+          })
+          return Promise.resolve()
         }
         return Promise.reject({
           error: true,
@@ -894,19 +890,6 @@ module.exports = [
           message: 'user record not found',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          // send notifications to other party
-          return Promise.resolve(
-            process.send({
-              push_notification_request: {
-                device_id: found.device_id
-              }
-            })
-          )
-        }
-        // this case is permitted as the user may be programmitic
-        return Promise.resolve()
       }).then(function() {
         return Promise.resolve(
           res.status(200).json({
@@ -1224,7 +1207,7 @@ module.exports = [
         information_sharing_agreement_request
       } = this.get('models')
 
-      var requested_resources, resolution, sk, isar, isa
+      var permitted_resources, resolution, sk, isar, isa
 
       var parse_json_doc_and_verify_doc_signature = (function(document, signature, signing_key_alias) {
         if (!(document && signature && signing_key_alias)) {
