@@ -31,7 +31,6 @@ module.exports = [
     secure: false,
     active: false,
     callback: function(req, res) {
-      
       var {auth, a, i, p} = req.query
       console.log(req.headers)
       res.status(200).json({

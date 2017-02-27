@@ -428,6 +428,8 @@ module.exports = [
       var {user, user_device, user_connection_request} = this.get('models')
       var ucr, target_user
 
+      console.log(req.body)
+      
       var parse_json_doc = (function(document) {
         if (!(document || target)) {
           return Promise.reject({
@@ -642,6 +644,8 @@ module.exports = [
       var {accepted, document} = req.body
       var uc, ucr, requested_id // user id of target
       
+      console.log(req.body)
+
       var {user, user_device, user_connection, user_connection_request} = this.get('models')
 
       // TODO send push notifications to both users
