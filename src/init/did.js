@@ -52,7 +52,7 @@ require('./database')(false).then(function(database) {
       process.send({push_notification_request: {
         user_id: user_id,
         device_id: device_id,
-        data: {received_did: true, did_value: did}
+        data: {type: 'received_did', received_did: true, did_value: did}
       }})
     }).catch(function(err) {
       console.log('error occurred during eis registration', err)
