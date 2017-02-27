@@ -469,7 +469,7 @@ module.exports = [
   {
     uri: '/profile/:user_id',
     method: 'get',
-    secure: false,
+    secure: true,
     active: true,
     callback: function(req, res) {
       var {user_id} = req.params
@@ -477,10 +477,7 @@ module.exports = [
 
       user.findOne({
         where: {
-          $or: [
-            {id: user_id},
-            {did: user_id}
-          ]
+          id: user_id
         }
       }).then(function(found) {
         if (found) {
