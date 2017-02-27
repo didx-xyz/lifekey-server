@@ -474,10 +474,13 @@ module.exports = [
     callback: function(req, res) {
       var {user_id} = req.params
       var {user} = this.get('models')
-
+      console.log(req.params)
       user.findOne({
         where: {
-          id: user_id
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
         }
       }).then(function(found) {
         if (found) {
