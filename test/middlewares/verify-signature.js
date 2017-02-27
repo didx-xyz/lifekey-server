@@ -38,8 +38,8 @@ before(function(done) {
   rsa_privatekey2 = ursa.generatePrivateKey()
   rsa_publickey2 = rsa_privatekey2.toPublicPem()
 
-  rsa_signed = rsa_privatekey.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', true)
-  rsa_signed2 = rsa_privatekey2.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', true)
+  rsa_signed = rsa_privatekey.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', false)
+  rsa_signed2 = rsa_privatekey2.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', false)
 
   done()
 })

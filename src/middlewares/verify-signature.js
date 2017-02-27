@@ -48,7 +48,13 @@ module.exports = function(req, res, next) {
       })
     }
     try {
-      var verified = ursapublickey.hashAndVerify('sha256', b_plain, b_signed.toString('hex'), 'hex', true)
+      var verified = ursapublickey.hashAndVerify(
+        'sha256',
+        b_plain,
+        b_signed.toString('base64'),
+        'base64',
+        false
+      )
     } catch (e) {
       return res.status(400).json({
         error: true,
