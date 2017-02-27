@@ -491,6 +491,7 @@ module.exports = [
             body: {
               user: {
                 nickname: found.nickname,
+                id: found.id,
                 did: found.did
               }
             }
