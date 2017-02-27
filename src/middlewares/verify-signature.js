@@ -22,6 +22,8 @@ module.exports = function(req, res, next) {
       body: null
     })
   }
+
+  console.log(req.headers)
   
   // do the verification
   var {algorithm, public_key} = req.user.crypto
