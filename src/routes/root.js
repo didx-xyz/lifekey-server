@@ -33,6 +33,13 @@ module.exports = [
     callback: function(req, res) {
       var {auth, a, i, p} = req.query
       console.log(req.headers)
+      // { connection: 'upgrade',
+      // host: 'check.proxyradar.com',
+      // 'content-length': '13',
+      // cookie: 'testCookie=true',
+      // 'user-agent': 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0)',
+      // referer: 'https://proxyradar.com/',
+      // 'content-type': 'application/x-www-form-urlencoded' }
       res.status(200).json({
         who: 'are',
         you: 'and',
