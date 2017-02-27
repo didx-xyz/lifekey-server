@@ -429,7 +429,7 @@ module.exports = [
       var ucr, target_user
 
       console.log(req.body)
-      
+
       var parse_json_doc = (function(document) {
         if (!(document || target)) {
           return Promise.reject({
@@ -517,14 +517,15 @@ module.exports = [
               user_id: created.to_id,
               notification: {
                 title: 'New Connection Request',
-                body: `You received a connection request from ${target_user.nickname}!`
+                body: `You have received a connection request from ${req.user.nickname}!`
               },
               data: {
                 type: 'user_connection_request',
                 is_user_connection_request: true,
                 user_connection_request_id: created.id,
                 from_id: req.user.id,
-                from_did: req.user.did
+                from_did: req.user.did,
+                from_nickname: req.user.nickname
               }
             }
           })
