@@ -1659,7 +1659,7 @@ module.exports = [
         if (found) {
           var {SERVER_HOSTNAME} = this.get('env')
           return qr.image(
-            `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
+            `${SERVER_HOSTNAME}/profile/${found.id}`, // TODO use did instead
             {type: 'png'}
           ).pipe(res)
         }
