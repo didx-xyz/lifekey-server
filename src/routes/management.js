@@ -1650,10 +1650,11 @@ module.exports = [
       var {user} = this.get('models')
       user.findOne({
         where: {
-          $or: [
-            {id: user_id},
-            {did: user_id}
-          ]
+          // $or: [
+          //   {id: user_id},
+          //   {did: user_id}
+          // ]
+          did: user_id
         }
       }).then(function(found) {
         if (found) {
