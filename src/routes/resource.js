@@ -469,8 +469,8 @@ module.exports = [
   {
     uri: '/profile/:user_id',
     method: 'get',
-    secure: true,
-    active: true,
+    secure: false,
+    active: false,
     callback: function(req, res) {
       var {user_id} = req.params
       var {user} = this.get('models')
