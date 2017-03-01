@@ -5,20 +5,16 @@
 
 - `cp ect/env/blank.env.json etc/env/dev.env.json && nano etc/env/dev.env.json`
 - `npm install`
-- `npm run db:drop && npm run db:create`
-- `npm test && NODE_ENV=dev npm start`
+- `npm run db:reset && npm test && NODE_ENV=dev npm start`
 
 ## todos
 
 ```c
-// TODO it's possible to create multiple connection requests between the same users
 // TODO add parameter for specify a signing key alias to use in a request
 // TODO add perf metrics to each service (http worker, did, notifier, sendgrid)
 // TODO nginx rate limiting
 // TODO error codes for clients
 // TODO runtime options for hosting eis and notification service ourselves or specifying respective hostnames for services
-// TODO remove ursa and secp256k1 libraries and use node's impln instead
-// TODO change push_notification worker to query user device id itself
 // TODO memoise app activation check results per user and worker
 // TODO remove `to_id` fallbacks once eis service calls are in place
 // FIXME refactor sqlize models to have associations
