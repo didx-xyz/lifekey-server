@@ -324,17 +324,6 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should fail for unparsable document', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[0].id},
-        body: {document: 'lasjfdljasdfljksdfj'}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
-        done()
-      }))
-    })
-    
     it('should disallow self-association', function(done) {
       mgmt_connection_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
@@ -346,7 +335,7 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should create a user connection request (NOT using jsonld)', function(done) {
+    it('should create a user connection request', function(done) {
       mgmt_connection_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {target: test_users[1].id}
@@ -360,28 +349,8 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should create a user connection request (using jsonld)', function(done) {
-      var document = {
-        "@context": "http://schema.cnsnt.io/connection_request",
-        "@type": "ConnectionRequest",
-        "from": test_users[2].id,
-        "to": test_users[3].id,
-        "resolution": null,
-        "dateAcknowledged": null,
-        "dateResolved": null,
-        "resolverSignature": null
-      }
-
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[2].id},
-        body: {document: JSON.stringify(document)}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(201)
-        expect(res.message).to.equal('user_connection_request record created')
-        respondid2 = res.body.id
-        done()
-      }))
-    })
+    // TODO add test case for duplicate connection requests
+    // TOOD add test case for sending connection request when connection is already established
     
   })
 
@@ -396,19 +365,7 @@ describe('management endpoints', function() {
         expect(res.body.unacked[0].id).to.equal(respondid)
         expect(Array.isArray(res.body.enabled)).to.be.ok
         expect(res.body.enabled.length).to.equal(0)
-        
-        mgmt_connection_list.callback.call(mock.express, {
-          user: {id: test_users[3].id}
-        }, mock.res(function(res) {
-          expect(res.status).to.equal(200)
-          expect(Array(res.body.unacked)).to.be.ok
-          expect(res.body.unacked.length).to.equal(1)
-          expect(res.body.unacked[0].id).to.equal(respondid2)
-          expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(0)
-
-          done()
-        }))
+        done()
       }))
     })
   })
@@ -426,7 +383,8 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should accept the user connection request without error (NOT using jsonld)', function(done) {
+    it('should accept the user connection request without error', function(done) {
+
       mgmt_connection_respond.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
         user: {id: test_users[1].id},
@@ -454,45 +412,7 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should accept the user connection request without error (using jsonld)', function(done) {
-      var now = new Date().toISOString()
-      var resolved_document = {
-        "@context": "http://schema.cnsnt.io/connection_request",
-        "@type": "ConnectionRequest",
-        from: test_users[2].id,
-        to: test_users[3].id,
-        resolution: true,
-        dateAcknowledged: now,
-        dateResolved: now
-      }
-
-      mgmt_connection_respond.callback.call(mock.express, {
-        params: {user_connection_request_id: respondid2},
-        user: {id: test_users[3].id},
-        body: {document: JSON.stringify(resolved_document)}
-      }, mock.res(function(res) {
-
-        // assert that the acceptance was successful
-        expect(res.status).to.equal(201)
-        expect(res.message).to.equal('user_connection created')
-        expect(typeof res.body).to.equal('object')
-        expect(typeof res.body.id).to.equal('number')
-        update_uc2 = res.body.id
-
-        // enumerate list of connections again to assert correct
-        mgmt_connection_list.callback.call(mock.express, {
-          user: {id: test_users[3].id}
-        }, mock.res(function(res) {
-          expect(res.status).to.equal(200)
-          expect(Array.isArray(res.body.unacked)).to.be.ok
-          expect(res.body.unacked.length).to.equal(0)
-          expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(1)
-
-          done()
-        }))
-      }))
-    })
+    // TODO test case: should return not found if the user is not associated to the record
   })
 
   describe(`${mgmt_connection_update.method.toUpperCase()} ${mgmt_connection_update.uri}`, function() {
@@ -600,23 +520,34 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isar_create.method.toUpperCase()} ${mgmt_isar_create.uri}`, function(done) {
+  describe(`${mgmt_isar_create.method.toUpperCase()} ${mgmt_isar_create.uri}`, function() {
 
-    var blank_isar_document = {
-      "@context": "http://schema.cnsnt.io/information_sharing_agreement",
-      "@type": "InformationSharingAgreement",
-      from: null,
-      to: null,
-      requestedResourceUris: [],
-      permittedResourceUris: [],
-      resolution: null,
-      purpose: null,
-      license: null,
-      resolverSignature: null,
-      dateAcknowledged: null,
-      dateResolved: null,
-      dateExpires: null
-    }
+    before(function(done) {
+      mgmt_connection_create.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        body: {target: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.status).to.equal(201)
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+        expect(res.message).to.equal('user_connection_request record created')
+        
+        mgmt_connection_respond.callback.call(mock.express, {
+          params: {user_connection_request_id: res.body.id},
+          user: {id: test_users[3].id},
+          body: {accepted: true}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(201)
+          expect(res.message).to.equal('user_connection created')
+          expect(typeof res.body).to.equal('object')
+          expect(typeof res.body.id).to.equal('number')
+
+          console.log('created user connection for isar test')
+          
+          done()
+        }))
+      }))
+    })
 
     it('should respond with error if missing arguments', function(done) {
       mgmt_isar_create.callback.call(mock.express, {
@@ -629,112 +560,27 @@ describe('management endpoints', function() {
         done()
       }))
     })
-    
-    it('should respond with error if json is not given', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: 'foo'},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
-        done()
-      }))
-    })
-
-    it('should respond with error if from field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for from field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if the from field doesnt match the calling agents identifier', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'baz'
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('the from field does not match the calling agents identifier')
-        done()
-      }))
-    })
-
-    it('should respond with error if to field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if purpose field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if license field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.purpose = 'lolz'
-
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
 
     it('should respond with error if requestedResourceUris field is not arrayish or lengthy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.to = 'bar'
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      
       mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
+        body: {
+          to: 'bar',
+          purpose:'lolz',
+          license: 'none'
+        },
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
         expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
         
-        broken_doc.requestedResourceUris = []
-        
         mgmt_isar_create.callback.call(mock.express, {
-          body: {document: JSON.stringify(broken_doc)},
+          body: {
+            to: 'bar',
+            purpose:'lolz',
+            license: 'none',
+            requestedResourceUris: []
+          },
           user: {id: 'foo', did: 'bar'}
         }, mock.res(function(res) {
           expect(res.error).to.equal(true)
@@ -746,15 +592,13 @@ describe('management endpoints', function() {
     })
 
     it('should respond with error if the to user is not found', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.to = 'baz'
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      broken_doc.requestedResourceUris = ['/resource/foo/bar']
-      
       mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
+        body: {
+          to: 'baz',
+          purpose: 'lolz',
+          license: 'none',
+          requestedResourceUris: ['/resource/foo/bar']
+        },
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -764,35 +608,32 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should respond with error if from and to fields do not represent users with an active connection', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = test_users[0].id
-      broken_doc.to = test_users[3].id
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      broken_doc.requestedResourceUris = ['/resource/foo/bar']
-      
+    it('should respond with error if the calling agent and the to-user do not have an active connection', function(done) {
       mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          requestedResourceUris: ['/resource/foo/bar']
+        },
         user: {id: test_users[0].id, did: test_users[0].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected an association to exist between the specified users but found none')
+        expect(res.message).to.equal('user_connection record not found')
         done()
       }))
     })
 
     it('should create isar record if all arguments check out', function(done) {
-      var working_doc = blank_isar_document
-      working_doc.from = test_users[2].id
-      working_doc.to = test_users[3].id
-      working_doc.purpose = 'lolz'
-      working_doc.license = 'none'
-      working_doc.requestedResourceUris = ['/resource/foo/bar']
       mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(working_doc)},
-        user: {id: test_users[2].id, did: test_users[2].id}
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          requestedResourceUris: ['/resource/foo/bar']
+        },
+        user: {id: test_users[2].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(201)
@@ -802,10 +643,13 @@ describe('management endpoints', function() {
 
         isar_respond1 = res.body.id
         
-        working_doc.from = test_users[0].id
-        working_doc.to = test_users[1].id
         mgmt_isar_create.callback.call(mock.express, {
-          body: {document: JSON.stringify(working_doc)},
+          body: {
+            to: test_users[1].id,
+            purpose: 'lolz',
+            license: 'none',
+            requestedResourceUris: ['/resource/foo/bar']
+          },
           user: {id: test_users[0].id, did: test_users[0].id}
         }, mock.res(function(res) {
           
@@ -832,8 +676,8 @@ describe('management endpoints', function() {
         expect(res.message).to.equal('ok')
         expect(typeof res.body).to.equal('object')
         expect(
-          Array.isArray(res.body.unacked) && 
-          Array.isArray(res.body.enabled) && 
+          Array.isArray(res.body.unacked) &&
+          Array.isArray(res.body.enabled) &&
           Array.isArray(res.body.disabled)
         ).to.equal(true)
         expect(res.body.unacked.length).to.equal(1)
@@ -847,136 +691,66 @@ describe('management endpoints', function() {
 
   describe(`${mgmt_isar_respond.method.toUpperCase()} ${mgmt_isar_respond.uri}`, function(done) {
     
-    var document, document2
+    var requested1, requested2
     before(function(done) {
       mgmt_isa_list.callback.call(mock.express, {
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
         if (res.error) return done(new Error('should not have been called'))
-        document = JSON.parse(res.body.unacked[0].document)
+        requested1 = res.body.unacked[0].requestedResourceUris
         
         mgmt_isa_list.callback.call(mock.express, {
           user: {id: test_users[1].id, did: test_users[1].id}
         }, mock.res(function(res) {
           if (res.error) return done(new Error('should not have been called'))
-          document2 = JSON.parse(res.body.unacked[0].document)
+          requested2 = res.body.unacked[0].requestedResourceUris
           done()
         }))
       }))
     })
 
-    it('should respond with an error if missing required arguments', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {},
-        user: {id: test_users[3].id, did: test_users[3].id}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing required arguments')
-        done()
-      }))
-    })
-
-    it('should respond with an error if the specified signing key does not exist', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {
-          document: 'foo',
-          signature: true,
-          signing_key_alias: 'foo'
-        },
-        user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'bar'}
-        }
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(404)
-        expect(res.message).to.equal('crypto_key record not found')
-        done()
-      }))
-    })
-
-    it('should respond with an error if json is not given', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {
-          document: 'foo',
-          signature: true,
-          signing_key_alias: 'foo'
-        },
-        user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {
-            alias: 'foo'
-          }
-        }
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
-        done()
-      }))
-    })
-
     it('should respond with an error if a boolean is not given for the resolution field', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = 'foo'
       mgmt_isar_respond.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {resolution: 'foo'},
         user: {
           id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal(`expected boolean type for field resolution but got ${typeof resolved_document.resolution}`)
+        expect(res.message).to.equal('expected boolean type for resolution field')
         done()
       }))
     })
 
     it('should respond with an error if a truthy resolution is given but a non lengthy and/or non arrayish type is given for the permittedresourceuris field', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
+      
       mgmt_isar_respond.callback.call(mock.express, {
         params: {isar_id: 'foo'},
         body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
+          resolution: true,
+          permittedResourceUris: 'foo'
         },
         user: {
           id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
         expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
-        
-        resolved_document.permittedResourceUris = []
+
         mgmt_isar_respond.callback.call(mock.express, {
           params: {isar_id: 'foo'},
           body: {
-            document: JSON.stringify(resolved_document),
-            signature: true,
-            signing_key_alias: 'foo'
+            resolution: true,
+            permittedResourceUris: []
           },
           user: {
             id: test_users[3].id, 
-            did: test_users[3].id,
-            crypto: {alias: 'foo'}
+            did: test_users[3].id
           }
         }, mock.res(function(res) {
           expect(res.error).to.equal(true)
@@ -989,20 +763,12 @@ describe('management endpoints', function() {
     })
 
     it('should respond with an error if the isar record is not found', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
-      resolved_document.permittedResourceUris = ['/resource/foo/bar']
       mgmt_isar_respond.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {resolution: false},
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          id: test_users[3].id,
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -1013,19 +779,12 @@ describe('management endpoints', function() {
     })
 
     it('should not create an isa and isp records if resolution is falsy', function(done) {
-      var resolved_document = document2
-      resolved_document.resolution = false
       mgmt_isar_respond.callback.call(mock.express, {
         params: {isar_id: isar_respond2},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {resolution: false},
         user: {
-          id: test_users[1].id, 
-          did: test_users[1].id,
-          crypto: {alias: 'foo'}
+          id: test_users[1].id,
+          did: test_users[1].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
@@ -1036,20 +795,15 @@ describe('management endpoints', function() {
     })
 
     it('should create an isa and isp records if all checks out', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
-      resolved_document.permittedResourceUris = ['/resource/foo/bar']
       mgmt_isar_respond.callback.call(mock.express, {
         params: {isar_id: isar_respond1},
         body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
+          resolution: true,
+          permittedResourceUris: requested1
         },
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          id: test_users[3].id,
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
