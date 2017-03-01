@@ -13,6 +13,12 @@ var env = require('./env')()
 // to avoid typeerrors when respawning the service
 var OUTER = this
 
+var worker_shutdown_ready = 0
+
+process.on('SIGUSR2', function() {
+  cluster_send({shutdown: true})
+})
+
 // we can only initialiase the DID service
 // once everyone's accounted for
 var worker_count = os.cpus().length, worker_ready = 0
@@ -61,6 +67,12 @@ services.lifekey = cluster({
       },
       message: function(msg) {
         // TODO it would be nice to allow the services (http workers included) to boot in any order
+        if (msg.shutdown) {
+          worker_shutdown_ready += 1
+          if (worker_shutdown_ready === worker_count) {
+            process.exit(0)
+          }
+        }
         if (msg.ready) {
           worker_ready += 1
           if (worker_ready === worker_count) {
