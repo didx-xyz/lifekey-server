@@ -27,13 +27,13 @@ module.exports = function(instance, sqlize) {
       type: sqlize.TEXT,
       allowNull: true
     },
-    document: {
-      type: sqlize.TEXT,
-      allowNull: false
-    },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
+    },
+    requestedResourceUris: {
+      type: sqlize.TEXT,
+      allowNull: false
     },
     purpose: {
       type: sqlize.STRING,
@@ -47,23 +47,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    resolver_signature: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    resolver_signing_key_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
-    },
     acknowledged_at: {
       type: sqlize.DATE,
       allowNull: true
     },
     resolved_at: {
-      type: sqlize.DATE,
-      allowNull: true
-    },
-    expires_at: {
       type: sqlize.DATE,
       allowNull: true
     }
