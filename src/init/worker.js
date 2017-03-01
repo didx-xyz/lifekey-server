@@ -11,6 +11,14 @@ process.on('message', function(message) {
     }
   }
 
+  if (message.shutdown) {
+    console.log('received a shutdown signal from cluster master')
+    http_server.close(function() {
+      console.log('requests drained, shutting down...')
+      process.send({shutdown: true})
+    })
+  }
+
   if (typeof message.did_service_ready === 'boolean') {
     console.log('SLAVE updating DID service availability to', (
       message.did_service_ready ?
@@ -18,22 +26,22 @@ process.on('message', function(message) {
       '[UNAVAILABLE]'
     ))
     server.set('did_service_ready', message.did_service_ready)
-  } else if (typeof message.notifier_service_ready === 'boolean') {
+  }
+  if (typeof message.notifier_service_ready === 'boolean') {
     console.log('SLAVE updating notifier service availability to', (
       message.notifier_service_ready ?
       '[AVAILABLE]' :
       '[UNAVAILABLE]'
     ))
     server.set('notifier_service_ready', message.notifier_service_ready)
-  } else if (typeof message.sendgrid_service_ready === 'boolean') {
+  }
+  if (typeof message.sendgrid_service_ready === 'boolean') {
     console.log('SLAVE updating sendgrid service availability to', (
       message.sendgrid_service_ready ?
       '[AVAILABLE]' :
       '[UNAVAILABLE]'
     ))
     server.set('sengrid_service_ready', message.sendgrid_service_ready)
-  } else {
-    // otherwise, nothing doing
   }
 })
 
@@ -55,6 +63,7 @@ var TESTING = (
 )
 
 var server = express()
+var http_server
 
 server.enable('trust proxy')
 
@@ -106,7 +115,7 @@ require('./database')(
   server.use(notFound.bind(server))
 
   // and finally, attach
-  server.listen(env.WEB_PORT, function() {
+  http_server = server.listen(env.WEB_PORT, function() {
     process.send({ready: true})
     if (env.DEBUG_BLOCKING) {
       var blocked = require('blocked')
