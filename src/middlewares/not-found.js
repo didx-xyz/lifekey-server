@@ -3,9 +3,11 @@
 
 module.exports = function(err, req, res, next) {
 
-  if (err) console.log('routing or middleware error', err)
+  if (err) {
+    console.log('ROUTING OR MIDDLEWARE ERROR', err)
+  }
   
-  // TODO content negotiation for this response content-type type
+  console.log('REQUEST DUMP', req.method, req.headers)
 
   return res.status(404).json({
     status: 404,
