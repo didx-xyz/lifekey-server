@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "test": "NODE_ENV=development istanbul test _mocha -- --recursive --use_strict --bail --prof --check-leaks --no-exit -R spec",
-    "start": "node --trace-sync-io src/init/index.js",
+    "start": "node src/init/index.js",
     "todo": "leasot --skip-unsupported --ignore=node_modules/**/* {test,src}/**/*.js; exit 0",
     "db:create": "NODE_ENV=development bin/database_tables_create",
     "db:truncate": "NODE_ENV=development bin/database_tables_truncate",
