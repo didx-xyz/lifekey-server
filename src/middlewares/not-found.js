@@ -1,14 +1,8 @@
 
 'use strict'
 
-module.exports = function(err, req, res, next) {
-
-  if (err) {
-    console.log('ROUTING OR MIDDLEWARE ERROR', err)
-  }
-  
+module.exports = function(req, res, next) {
   console.log('REQUEST DUMP', req.method, req.headers)
-
   return res.status(404).json({
     status: 404,
     error: true,
