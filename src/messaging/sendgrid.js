@@ -3,6 +3,11 @@
 
 var env = require('../init/env')()
 
+if (!env.SENDGRID_API_KEY) {
+  console.log('SENDGRID_API_KEY missing, exiting...')
+  process.exit(1)
+}
+
 var sendgrid = require('sendgrid')(env.SENDGRID_API_KEY)
 
 module.exports = function(to, from, subject, content, mime) {
