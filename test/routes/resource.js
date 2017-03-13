@@ -343,8 +343,23 @@ describe('resource', function() {
   
   // 0 GET /resource
   describe(`${fetch.method.toUpperCase()} ${fetch.uri}`, function() {
+    it('should respond with an array of [entity, attribute, alias] values if using query option', function(done) {
+      fetch.callback.call(mock.express, {
+        query: {index: '1'},
+        user: {id: test_user1.id, did: test_user1.did}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body.length).to.equal(1)
+        expect(res.body[0]).to.deep.equal({entity: 'foo', attribute: 'bar', alias: 'baz'})
+        done()
+      }))
+    })
+
     it('should respond with a list of entities owned by the specified user', function(done) {
       fetch.callback.call(mock.express, {
+        query: {},
         user: {id: test_user1.id, did: test_user1.did}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)

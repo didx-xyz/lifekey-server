@@ -20,7 +20,7 @@ module.exports = function(instance, sqlize) {
     mime: {
       type: sqlize.STRING,
       allowNull: false,
-      defaultValue: 'application/json+ld'
+      defaultValue: 'text/plain'
     },
     encoding: {
       type: sqlize.STRING,
