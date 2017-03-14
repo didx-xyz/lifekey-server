@@ -274,6 +274,7 @@ module.exports = [
           }
         }).then(function(found) {
           if (found) {
+            found.value = found.value.toString(found.encoding)
             return Promise.resolve(
               res.status(200).json({
                 error: false,
