@@ -40,6 +40,7 @@ var CONNECTION_REQUEST_CTX = {
   }
 }
 
+var url = require('url')
 var crypto = require('crypto')
 
 var qr = require('qr-image')
