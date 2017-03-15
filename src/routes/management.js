@@ -76,7 +76,7 @@ module.exports = [
         console.log(req.body)
       }
       
-      var activation_code, created_user_id, key_buffers
+      var is_programmatic_user, activation_code, created_user_id, key_buffers
       
       // ensure all required args are present
       if (!(email &&
@@ -122,6 +122,8 @@ module.exports = [
               ),
               body: null
             })
+          } else {
+            is_programmatic_user = true
           }
         }
       }
@@ -260,7 +262,9 @@ module.exports = [
           created_user_id = created.id
           // now add the user's device so
           // we can communicate via firebase
-          return user_device.create({
+          return is_programmatic_user ? (
+            Promise.resolve(true)
+          ) : user_device.create({
             owner_id: created.id,
             platform: device_platform,
             device_id: device_id
@@ -280,7 +284,10 @@ module.exports = [
           // NOTE - we cannot guarantee message delivery
           // by returning from process#send's callback parameter
           // due to the promise pipeline we're sitting inside
-          return Promise.resolve(
+
+          return is_programmatic_user ? (
+            Promise.resolve()
+          ) : Promise.resolve(
             process.send({
               // webhook_request: {},
               push_notification_request: {
