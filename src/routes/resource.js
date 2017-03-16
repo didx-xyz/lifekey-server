@@ -12,46 +12,22 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      function get_index_or_entities() {
-        var db = this.get('db')
-        if (req.query.index) {
-          return db.query([
-            'SELECT entity, attribute, alias',
-            'FROM user_data',
-            'WHERE owner_id = :owner_id',
-            'ORDER BY entity, attribute, alias ASC'
-          ].join(' '), {
-            replacements: {owner_id: req.user.id},
-            type: db.QueryTypes.SELECT
-          }).then(function(found) {
-            return res.status(200).json({
-              error: false,
-              status: 200,
-              message: 'ok',
-              body: found.length ? found : []
-            })
-          })
-        }
-        // just list the entities
-        return db.query([
-          'SELECT DISTINCT entity',
-          'FROM user_data',
-          'WHERE owner_id = :owner_id'
-        ].join(' '), {
-          replacements: {owner_id: req.user.id},
-          type: db.QueryTypes.SELECT
-        }).then(function(found) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'ok',
-            body: found.length ? found.map(ud => ud.entity) : []
-          })
+      db.query([
+        'SELECT id, entity, attribute, alias',
+        'FROM user_data',
+        'WHERE owner_id = :owner_id',
+        'ORDER BY entity, attribute, alias ASC'
+      ].join(' '), {
+        replacements: {owner_id: req.user.id},
+        type: db.QueryTypes.SELECT
+      }).then(function(found) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: found.length ? found : []
         })
-      }
-      (
-        get_index_or_entities.call(this)
-      ).catch(function(err) {
+      }).catch(function(err) {
         return res.status(
           err.status || 500
         ).json({
