@@ -17,7 +17,7 @@ var CONNECTION_REQUEST_CTX = {
     cn: 'http://schema.cnsnt.io/',
     from: 'cn:from',
     to: 'cn:to',
-    resolution: 'cn:resolution',
+    accepted: 'cn:resolution',
     resolverSignature: 'cn:resolverSignature',
     dateAcknowledged: 'cn:dateAcknowledged',
     dateResolved: 'cn:dateResolved'
@@ -800,63 +800,29 @@ module.exports = [
     }
   },
 
-  // 5 PUT /management/connection/:user_connection_id
+  // 5 DELETE /management/connection/:user_connection_id
   {
-    uri: '/management/connection/:user_connection_id',
-    method: 'put',
+    uri: '/management/connection/:user_id',
+    method: 'delete',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_connection_id} = req.params
-      var {enabled} = req.body
-      var old_value, other_party, uc
-      var {user, user_device, user_connection} = this.get('models')
+      var {user_id} = req.params
+      var {user, user_connection} = this.get('models')
 
-      if (typeof enabled !== 'boolean') {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'missing request body parameters',
-          body: null
-        })
-      }
-
-      user_connection.findOne({
+      user_connection.destroy({
         where: {
-          id: user_connection_id,
-          $and: [
-            {
-              $or: [
-                {to_id: req.user.id},
-                {from_id: req.user.id},
-                {to_did: req.user.did},
-                {from_did: req.user.did}
-              ]
-            }
+          $or: [
+            {to_id: req.user.id},
+            {from_id: user_id},
+            {to_id: user_id},
+            {from_id: req.user.id},
           ]
         }
-      }).then(function(found) {
-        if (found) {
-          if (found.enabled !== enabled) {
-            uc = found
-            old_value = found.enabled
-            // figure out who the other party in the connection is
-            // DIDs take prescedence
-            other_party = ((
-              req.user.did === found.to_did ||
-              req.user.id === found.to_id
-            ) ? (
-              found.from_did || found.from_id
-            ) : (
-              found.to_did || found.to_id
-            ))
-            return found.update({enabled: enabled})
-          }
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'no-op',
-            body: null
+      }).then(function(destroyed) {
+        if (destroyed) {
+          return user.findOne({
+            where: {id: user_id}
           })
         }
         return Promise.reject({
@@ -865,25 +831,16 @@ module.exports = [
           message: 'user_connection record not found',
           body: null
         })
-      }).then(function() {
-        return user.findOne({where: {
-          $or: [
-            {did: other_party},
-            {id: other_party}
-          ]
-        }})
       }).then(function(found) {
         if (found) {
           process.send({
             // webhook_request: {url: found.webhook_url}
             push_notification_request: {
               user_id: found.id,
-              notification: {title: 'User Connection Update', body: 'Your connection has been updated!'},
+              notification: {title: 'User Connection Deleted', body: 'Your connection has been deleted'},
               data: {
-                type: 'user_connection_updated',
-                is_user_connection_update: true,
-                user_connection_id: uc.id,
-                new_value: enabled
+                type: 'user_connection_deleted',
+                user_connection_id: uc.id
               }
             }
           })
@@ -975,7 +932,7 @@ module.exports = [
 
       var {
         to,
-        requestedResourceUris,
+        requested_schemas,
         purpose,
         license
       } = req.body
@@ -989,14 +946,20 @@ module.exports = [
         })
       }
       
-      if (!(Array.isArray(requestedResourceUris) && requestedResourceUris.length)) {
+      if (!(Array.isArray(requested_schemas) && requested_schemas.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected lenghty arrayish type for requestedResourceUris field',
+          message: 'expected lenghty arrayish type for requested_schemas field',
           body: null
         })
       }
+
+      // requested_schemas
+      // [
+      //   {schema: 'Person', description: '...'},
+      //   {schema: 'PostalAddress', description: 'work'}
+      // ]
 
       var {
         user,
@@ -1070,7 +1033,7 @@ module.exports = [
             to_did: to_user.did,
             to_id: to_user.id,
             license: license,
-            requestedResourceUris: JSON.stringify(requestedResourceUris),
+            requested_schemas: JSON.stringify(requested_schemas),
             purpose: purpose
           })
         }
@@ -1135,22 +1098,22 @@ module.exports = [
       // this is the ISA reply endpoint
 
       var {isar_id} = req.params
-      var {resolution, permittedResourceUris} = req.body
+      var {accepted, permitted_resources} = req.body
       
-      if (typeof resolution !== 'boolean') {
+      if (typeof accepted !== 'boolean') {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected boolean type for resolution field',
+          message: 'expected boolean type for accepted field',
           body: null
         })
       }
 
-      if (resolution && !(Array.isArray(permittedResourceUris) && permittedResourceUris.length)) {
+      if (accepted && !(Array.isArray(permitted_resources) && permitted_resources.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected lenghty arrayish type for permittedResourceUris field',
+          message: 'expected lenghty arrayish type for permitted_resources field',
           body: null
         })
       }
@@ -1183,7 +1146,7 @@ module.exports = [
           return found.update({
             acknowledged: true,
             acknowledged_at: now,
-            resolution: resolution,
+            accepted: accepted,
             resolved_at: now
           })
         }
@@ -1194,37 +1157,39 @@ module.exports = [
           body: null
         })
       }).then(function(updated) {
-        if (updated && resolution) {
-          return information_sharing_agreement.create({
-            isar_id: updated.id,
-            from_id: updated.from_id,
-            from_did: updated.from_did,
-            from_url: updated.from_url,
-            to_id: updated.to_id,
-            to_did: updated.to_did,
-            to_url: updated.to_url
-          })
-        } else if (!updated) {
+        if (!updated) {
           return Promise.reject({
             error: true,
             status: 500,
             message: 'unable to update information_sharing_agreement_request record',
             body: null
           })
+        } else if (!accepted) {
+          return Promise.reject({
+            error: false,
+            status: 200,
+            message: 'information_sharing_agreement_request rejected',
+            body: null
+          })
         } else {
-          return Promise.resolve()
+          return information_sharing_agreement.create({
+            isar_id: updated.id,
+            from_id: updated.from_id,
+            from_did: updated.from_did,
+            to_id: updated.to_id,
+            to_did: updated.to_did
+          })
         }
       }).then(function(created) {
-        if (!resolution) {
-          return Promise.resolve({rejected: true})
-        } else if (created) {
+        if (created) {
           // TODO webhook to notify `from` party that the resources they requested are available
           isa = created
           return Promise.all(
-            permittedResourceUris.map(function(uri) {
+            permitted_resources.map(function(resource) {
               return information_sharing_permission.create({
                 isa_id: created.id,
-                resource_uri: uri
+                user_datum_id: resource.id,
+                schema: resource.schema
               })
             })
           )
@@ -1237,14 +1202,7 @@ module.exports = [
           })
         }
       }).then(function(created) {
-        if (created.rejected) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'information_sharing_agreement_request rejected',
-            body: null
-          })
-        } else if (created) {
+        if (created) {
           return res.status(201).json({
             error: false,
             status: 201,
@@ -1262,7 +1220,7 @@ module.exports = [
         return res.status(
           err.status || 500
         ).json({
-          error: err.error || true,
+          error: typeof err.error === 'boolean' || true,
           status: err.status || 500,
           message: err.message || 'internal server error',
           body: err.body || null
@@ -1538,6 +1496,225 @@ module.exports = [
         })
       })
       
+    }
+  },
+
+  // 13 PUT /management/isa/:isa_id
+  {
+    uri: '/management/isa/:isa_id',
+    method: 'put',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {permitted_resources} = req.body
+
+      // TODO send push notification or webhook when a user successfully calls this route
+
+      // permitted_resources
+      // [
+      //    {id: 5},
+      //    ...
+      // ]
+      if (!(Array.isArray(permitted_resources) && permitted_resources.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected lengthy arrayish type for permitted_resources field',
+          body: null
+        })
+      }
+
+      var {
+        information_sharing_agreement,
+        information_sharing_agreement_request,
+        information_sharing_permission
+      } = this.get('models')
+
+      var from_user
+
+      information_sharing_agreement.findOne({
+        where: {id: isa_id}
+      }).then(function(found) {
+        if (found && (
+          found.to_id === req.user.id ||
+          found.to_did === req.user.did
+        )) {
+          from_user = found.from_id
+          return Promise.resolve(found)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (!found.expired) {
+          return information_sharing_permission.destroy({
+            where: {isa_id: isa_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 400,
+          message: 'information_sharing_agreement record has expired',
+          body: null
+        })
+      }).then(function() {
+        return Promise.all(
+          permitted_resources.map(function(resource) {
+            return information_sharing_permission.create({
+              isa_id: created.id,
+              user_datum_id: resource.id
+            })
+          })
+        )
+      }).then(function(created) {
+        if (created.length && created.length === permitted_resources.length) {
+          process.send({
+            push_notification_request: {
+              user_id: from_user,
+              notification: {
+                title: 'Information Sharing Agreement Updated',
+                body: 'Click here to see any changes to the ISA'
+              },
+              data: {
+                type: 'information_sharing_agreement_update',
+                isa_id: isa_id
+              }
+            },
+            webhook_request: {
+              user_id: from_user,
+              notification: {
+                title: 'Information Sharing Agreement Updated',
+                body: 'Click here to see any changes to the ISA'
+              },
+              data: {
+                type: 'information_sharing_agreement_update',
+                isa_id: isa_id
+              }
+            }
+          })
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'information_sharing_permission records updated',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 14 GET /management/fulfill/:isa_id
+  {
+    uri: '/management/fulfill/:isa_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {
+        information_sharing_agreement,
+        information_sharing_permission,
+        user_datum
+      } = this.get('models')
+
+      var to_user, body = {}
+
+      information_sharing_agreement.findOne({
+        where: {isa_id: isa_id}
+      }).then(function(found) {
+        if (found && (
+          found.from_id === req.user.id ||
+          found.from_did === req.user.did
+        )) {
+          to_user = found.to_id
+          return Promise.resolve(found)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (!found.expired) {
+          return information_sharing_permission.findAll({
+            where: {isa_id: isa_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 400,
+          message: 'information_sharing_agreement record has expired',
+          body: null
+        })
+      }).then(function(found) {
+        if (found && found.length) {
+          return Promise.all(
+            found.map(function(isp) {
+              return user_datum.findOne({
+                where: {
+                  owner_id: to_user,
+                  id: isp.user_datum_id
+                }
+              })
+            })
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_permission records not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found && found.length) {
+          body.user_data = found.map(function(ud) {
+            return ud.toJSON()
+          })
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'user_datum records not found',
+          body: null
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: body
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   }
 ]
