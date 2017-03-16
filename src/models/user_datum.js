@@ -17,6 +17,14 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BLOB,
       allowNull: false
     },
+    schema: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
+    uri: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
     mime: {
       type: sqlize.STRING,
       allowNull: false,
