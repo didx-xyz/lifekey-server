@@ -11,10 +11,6 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
-    from_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
     to_id: {
       type: sqlize.INTEGER,
       allowNull: true
@@ -23,15 +19,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
-    to_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    requestedResourceUris: {
+    requested_schemas: {
       type: sqlize.TEXT,
       allowNull: false
     },
@@ -43,8 +35,12 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
-    resolution: {
+    accepted: {
       type: sqlize.BOOLEAN,
+      allowNull: true
+    },
+    expires_at: {
+      type: sqlize.DATE,
       allowNull: true
     },
     acknowledged_at: {

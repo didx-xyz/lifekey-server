@@ -14,24 +14,12 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
-    from_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
     to_id: {
       type: sqlize.INTEGER,
       allowNull: true
     },
     to_did: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    to_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    is_verifiable_claim: {
-      type: sqlize.BOOLEAN,
       allowNull: true
     },
     expired: {
