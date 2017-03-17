@@ -9,37 +9,6 @@
 var send_is_undefined = !process.send
 if (send_is_undefined) process.send = function() {}
 
-var CNSNT_SCHEMA_HOST = 'http://schema.cnsnt.io/'
-var CONNECTION_REQUEST_CTX = {
-  '@context': {
-    id: '@id',
-    type: '@type',
-    cn: 'http://schema.cnsnt.io/',
-    from: 'cn:from',
-    to: 'cn:to',
-    accepted: 'cn:resolution',
-    resolverSignature: 'cn:resolverSignature',
-    dateAcknowledged: 'cn:dateAcknowledged',
-    dateResolved: 'cn:dateResolved'
-  }
-}, INFORMATION_SHARING_AGREEMENT_CTX = {
-  '@context': {
-    id: '@id',
-    type: '@type',
-    cn: 'http://schema.cnsnt.io/',
-    from: 'cn:from',
-    to: 'cn:to',
-    resolution: 'cn:resolution',
-    dateAcknowledged: 'cn:dateAcknowledged',
-    dateResolved: 'cn:dateResolved',
-    dateExpires: 'cn:dateExpires',
-    requestedResourceUris: 'cn:requestedResourceUris',
-    permittedResourceUris: 'cn:permittedResourceUris',
-    purpose: 'cn:purpose',
-    license: 'cn:license'
-  }
-}
-
 var url = require('url')
 var crypto = require('crypto')
 
@@ -922,7 +891,7 @@ module.exports = [
     }
   },
 
-  // 7 POST /management/isa
+  // 7 POST /management/isa/request
   {
     uri: '/management/isa',
     method: 'post',
@@ -1087,7 +1056,7 @@ module.exports = [
     }
   },
 
-  // 8 POST /management/isa/:isar_id
+  // 8 POST /management/isa/respond/:isar_id
   {
     uri: '/management/isa/:isar_id',
     method: 'post',
@@ -1229,7 +1198,7 @@ module.exports = [
     }
   },
 
-  // 9 GET /management/isa
+  // 9 GET /management/isa/get
   {
     uri: '/management/isa',
     method: 'get',
@@ -1304,7 +1273,7 @@ module.exports = [
     }
   },
 
-  // 10 GET /management/isa/:isa_id
+  // 10 GET /management/isa/get/:isa_id
   {
     uri: '/management/isa/:isa_id',
     method: 'get',
@@ -1393,7 +1362,7 @@ module.exports = [
     }
   },
 
-  // 11 DELETE /management/isa/:isa_id
+  // 11 DELETE /management/isa/delete/:isa_id
   {
     uri: '/management/isa/:isa_id',
     method: 'delete',
@@ -1499,7 +1468,7 @@ module.exports = [
     }
   },
 
-  // 13 PUT /management/isa/:isa_id
+  // 13 PUT /management/isa/update/:isa_id
   {
     uri: '/management/isa/:isa_id',
     method: 'put',
@@ -1622,9 +1591,9 @@ module.exports = [
     }
   },
 
-  // 14 GET /management/fulfill/:isa_id
+  // 14 GET /management/isa/pull/:isa_id
   {
-    uri: '/management/fulfill/:isa_id',
+    uri: '/management/pull/:isa_id',
     method: 'get',
     secure: true,
     active: true,
@@ -1704,6 +1673,100 @@ module.exports = [
           status: 200,
           message: 'ok',
           body: body
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 15 POST /management/isa/push/:isa_id
+  {
+    uri: '/management/push/:isa_id',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      
+      var {isa_id} = req.params
+      
+      var {
+        name, description, 
+        encoding, mime,
+        value, uri, schema
+      } = req.body
+      
+      var {
+        information_sharing_agreement,
+        user_datum
+      } = this.get('models')
+      
+      information_sharing_agreement.findOne({
+        where: {
+          isa_id: isa_id,
+          $and: [
+            {
+              $or: [
+                {from_id: req.user.id},
+                {to_id: req.user.id}
+              ]
+            }
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          if (found.expired) {
+            return Promise.reject({
+              error: true,
+              status: 403,
+              message: 'information_sharing_agreement expired',
+              body: null
+            })
+          }
+          return user_datum.create({
+            owner_id: (
+              req.user.id === found.to_id ?
+              found.from_id :
+              found.to_id
+            ),
+            mime: mime,
+            value: value,
+            uri: uri,
+            from_user_id: req.user.id,
+            from_resource_name: name,
+            from_resource_description: description,
+            encoding: encoding,
+            schema: schema
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(created) {
+        if (created) {
+          // TODO send pushes
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'created',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
         })
       }).catch(function(err) {
         return res.status(
