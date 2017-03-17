@@ -30,6 +30,18 @@ module.exports = function(instance, sqlize) {
       allowNull: false,
       defaultValue: 'text/plain'
     },
+    from_user_id: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
+    from_resource_name: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
+    from_resource_description: {
+      type: sqlize.STRING,
+      allowNull: false
+    },
     encoding: {
       type: sqlize.STRING,
       allowNull: true,
