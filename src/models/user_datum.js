@@ -19,11 +19,11 @@ module.exports = function(instance, sqlize) {
     },
     schema: {
       type: sqlize.STRING,
-      allowNull: false
+      allowNull: true
     },
     uri: {
       type: sqlize.STRING,
-      allowNull: false
+      allowNull: true
     },
     mime: {
       type: sqlize.STRING,
@@ -31,16 +31,16 @@ module.exports = function(instance, sqlize) {
       defaultValue: 'text/plain'
     },
     from_user_id: {
-      type: sqlize.STRING,
-      allowNull: false
+      type: sqlize.INTEGER,
+      allowNull: true
     },
     from_resource_name: {
       type: sqlize.STRING,
-      allowNull: false
+      allowNull: true
     },
     from_resource_description: {
       type: sqlize.STRING,
-      allowNull: false
+      allowNull: true
     },
     encoding: {
       type: sqlize.STRING,
