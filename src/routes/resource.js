@@ -12,6 +12,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
+      var db = this.get('db')
       db.query([
         'SELECT id, entity, attribute, alias',
         'FROM user_data',
@@ -40,7 +41,7 @@ module.exports = [
     }
   },
 
-  // 3 GET /resource/:resource_id
+  // 1 GET /resource/:resource_id
   {
     uri: '/resource/:resource_id',
     method: 'get',
@@ -92,7 +93,7 @@ module.exports = [
     }
   },
 
-  // 4 POST /resource
+  // 2 POST /resource
   {
     uri: '/resource',
     method: 'post',
@@ -106,7 +107,7 @@ module.exports = [
         schema, is_default, is_archived
       } = req.body
 
-      if (!value) {
+      if (!(entity && attribute && alias && value)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -162,6 +163,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -174,7 +176,7 @@ module.exports = [
     }
   },
 
-  // 5 PUT /resource/:resource_id
+  // 3 PUT /resource/:resource_id
   {
     uri: '/resource/:resource_id',
     method: 'put',
@@ -184,9 +186,25 @@ module.exports = [
       
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
-      var {encoding, mime, value, is_default, is_archived} = req.body
+      var {
+        entity,
+        attribute,
+        alias,
+        schema,
+        uri,
+        encoding,
+        mime,
+        value,
+        is_default,
+        is_archived
+      } = req.body
       
       var updatefields = {}
+      if (typeof entity !== 'undefined') updatefields.entity = entity
+      if (typeof attribute !== 'undefined') updatefields.attribute = attribute
+      if (typeof alias !== 'undefined') updatefields.alias = alias
+      if (typeof schema !== 'undefined') updatefields.schema = schema
+      if (typeof uri !== 'undefined') updatefields.uri = uri
       if (typeof encoding !== 'undefined') updatefields.encoding = encoding
       if (typeof mime !== 'undefined') updatefields.mime = mime
       if (typeof value !== 'undefined') updatefields.value = value
@@ -199,19 +217,19 @@ module.exports = [
           id: resource_id
         }
       }).then(function(updated) {
-        if (updated) {
+        if (updated[0] > 0) {
           // TODO dispatch webhooks for concerned parties
           return res.status(200).json({
             error: false,
             status: 200,
             message: 'user_datum record updated',
-            body: updated.toJSON()
+            body: null
           })
         }
         return Promise.reject({
           error: true,
-          status: 500,
-          message: 'unable to update user_datum record',
+          status: 404,
+          message: 'user_datum record not found',
           body: null
         })
       }).catch(function(err) {
@@ -227,7 +245,7 @@ module.exports = [
     }
   },
 
-  // 6 DELETE /resource/:resource_id
+  // 4 DELETE /resource/:resource_id
   {
     uri: '/resource/:resource_id',
     method: 'delete',
@@ -240,10 +258,12 @@ module.exports = [
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
 
-      user_datum.destroy({where: {
-        owner_id: req.user.id,
-        id: resource_id
-      }}).then(function(destroyed) {
+      user_datum.destroy({
+        where: {
+          owner_id: req.user.id,
+          id: resource_id
+        }
+      }).then(function(destroyed) {
         if (destroyed) {
           return res.status(200).json({
             error: false,
@@ -271,7 +291,7 @@ module.exports = [
     }
   },
 
-  // 7 GET /profile/:user_id
+  // 5 GET /profile/:user_id
   {
     uri: '/profile/:user_id',
     method: 'get',
@@ -280,7 +300,6 @@ module.exports = [
     callback: function(req, res) {
       var {user_id} = req.params
       var {user} = this.get('models')
-      console.log(req.params)
       user.findOne({
         where: {
           $or: [
