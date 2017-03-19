@@ -21,6 +21,9 @@ var query = require('ld-query')
 
 module.exports = [
   
+  // TODO registration with fingerprint key, too
+  // TODO add route for posting new signing key (fingerprint authentication)
+
   // 0 POST /management/register
   {
     uri: '/management/register',
@@ -391,7 +394,7 @@ module.exports = [
       })
     }
   },
-  
+
   // 2 POST /management/connection
   {
     uri: '/management/connection',
@@ -771,28 +774,46 @@ module.exports = [
 
   // 5 DELETE /management/connection/:user_connection_id
   {
-    uri: '/management/connection/:user_id',
+    uri: '/management/connection/:user_connection_id',
     method: 'delete',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_id} = req.params
+      var {user_connection_id} = req.params
       var {user, user_connection} = this.get('models')
-
-      user_connection.destroy({
+      var uc
+      
+      // TODO ensure this only ever destroys one record
+      user_connection.findOne({
         where: {
-          $or: [
-            {to_id: req.user.id},
-            {from_id: user_id},
-            {to_id: user_id},
-            {from_id: req.user.id},
+          id: user_connection_id,
+          $and: [
+            {
+              $or: [
+                {to_id: req.user.id},
+                {from_id: req.user.id}
+              ]
+            }
           ]
         }
+      }).then(function(found) {
+        if (found) {
+          uc = found
+          return user_connection.destroy({
+            where: {id: user_connection_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_connection record not found',
+          body: null
+        })
       }).then(function(destroyed) {
         if (destroyed) {
-          return user.findOne({
-            where: {id: user_id}
-          })
+          return user.findOne(
+            {where: {id: uc.from_id}}
+          )
         }
         return Promise.reject({
           error: true,
@@ -826,7 +847,7 @@ module.exports = [
           res.status(200).json({
             error: false,
             status: 200,
-            message: 'user_connection record updated',
+            message: 'user_connection record deleted',
             body: null
           })
         )
@@ -919,7 +940,7 @@ module.exports = [
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected lenghty arrayish type for requested_schemas field',
+          message: 'expected lengthy arrayish type for requested_schemas field',
           body: null
         })
       }
@@ -955,32 +976,12 @@ module.exports = [
                 {
                   $or: [
                     {
-                      to_did: req.user.did,
-                      from_id: to
-                    },
-                    {
-                      to_did: req.user.did,
-                      from_did: to
-                    },
-                    {
-                      from_did: req.user.did,
-                      to_did: to
-                    },
-                    {
-                      from_did: req.user.did,
-                      to_id: to
-                    },
-                    {
                       to_id: req.user.id,
                       from_id: to
                     },
                     {
                       from_id: req.user.id,
                       to_id: to
-                    },
-                    {
-                      to_id: req.user.id,
-                      from_did: to
                     }
                   ]
                 }
@@ -1078,11 +1079,12 @@ module.exports = [
         })
       }
 
-      if (accepted && !(Array.isArray(permitted_resources) && permitted_resources.length)) {
+      if (accepted && !(Array.isArray(permitted_resources) &&
+          permitted_resources.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected lenghty arrayish type for permitted_resources field',
+          message: 'expected lengthy arrayish type for permitted_resources field',
           body: null
         })
       }
@@ -1189,7 +1191,7 @@ module.exports = [
         return res.status(
           err.status || 500
         ).json({
-          error: typeof err.error === 'boolean' || true,
+          error: typeof err.error === 'boolean' ? err.error : true,
           status: err.status || 500,
           message: err.message || 'internal server error',
           body: err.body || null
@@ -1233,7 +1235,7 @@ module.exports = [
           body.unacked = isars.map(isar => {
             return {
               id: isar.id,
-              requestedResourceUris: JSON.parse(isar.requestedResourceUris)
+              requested_schemas: JSON.parse(isar.requested_schemas)
             }
           })
         }
