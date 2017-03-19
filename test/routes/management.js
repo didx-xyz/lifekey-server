@@ -173,17 +173,22 @@ describe('management endpoints', function() {
                       // increase the timeout to cover for this
   
   var mgmt_register = routes[0]
-  var mgmt_device = routes[1]
-  var mgmt_connection_create = routes[2]
+  var mgmt_update_device = routes[1]
+  var mgmt_cxn_req_create = routes[2]
   var mgmt_connection_list = routes[3]
-  var mgmt_connection_respond = routes[4]
-  var mgmt_connection_update = routes[5]
+  var mgmt_cxn_req_res = routes[4]
+  var mgmt_cxn_delete = routes[5]
   var mgmt_app_activate = routes[6]
-  var mgmt_isar_create = routes[7]
-  var mgmt_isar_respond = routes[8]
+  var mgmt_isa_req_create = routes[7]
+  var mgmt_isa_req_res = routes[8]
   var mgmt_isa_list = routes[9]
-  var mgmt_isa_getone = routes[10]
-  var mgmt_isa_remove = routes[11]
+  var mgmt_isa_get_one = routes[10]
+  var mgmt_isa_delete = routes[11]
+  
+  // TODO test these!
+  var mgmt_isa_update = routes[13]
+  var mgmt_isa_pull_from = routes[14]
+  var mgmt_isa_push_to = routes[15]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -283,10 +288,10 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_device.method.toUpperCase()} ${mgmt_device.uri}`, function() {
+  describe(`${mgmt_update_device.method.toUpperCase()} ${mgmt_update_device.uri}`, function() {
     
     it('should not allow the upsertion of a user_device record if required arguments are missing', function(done) {
-      mgmt_device.callback.call(mock.express, {
+      mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {}
       }, mock.res(function(res) {
@@ -297,7 +302,7 @@ describe('management endpoints', function() {
     })
 
     it('should allow the upsertion of a user_device record if all required arguments are given', function(done) {
-      mgmt_device.callback.call(mock.express, {
+      mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
           device_id: Date.now() + 'abc1232342asd',
@@ -311,10 +316,10 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_connection_create.method.toUpperCase()} ${mgmt_connection_create.uri}`, function() {
+  describe(`${mgmt_cxn_req_create.method.toUpperCase()} ${mgmt_cxn_req_create.uri}`, function() {
     
     it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
+      mgmt_cxn_req_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {}
       }, mock.res(function(res) {
@@ -325,7 +330,7 @@ describe('management endpoints', function() {
     })
 
     it('should disallow self-association', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
+      mgmt_cxn_req_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {target: test_users[0].id}
       }, mock.res(function(res) {
@@ -336,7 +341,7 @@ describe('management endpoints', function() {
     })
 
     it('should create a user connection request', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
+      mgmt_cxn_req_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {target: test_users[1].id}
       }, mock.res(function(res) {
@@ -370,9 +375,10 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_connection_respond.method.toUpperCase()} ${mgmt_connection_respond.uri}`, function() {
+  describe(`${mgmt_cxn_req_res.method.toUpperCase()} ${mgmt_cxn_req_res.uri}`, function() {
+
     it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_respond.callback.call(mock.express, {
+      mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
         user: {id: test_users[1].id},
         body: {}
@@ -383,9 +389,8 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should accept the user connection request without error', function(done) {
-
-      mgmt_connection_respond.callback.call(mock.express, {
+    it('should 201 if the connection was created', function(done) {
+      mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
         user: {id: test_users[1].id},
         body: {accepted: true}
@@ -415,24 +420,11 @@ describe('management endpoints', function() {
     // TODO test case: should return not found if the user is not associated to the record
   })
 
-  describe(`${mgmt_connection_update.method.toUpperCase()} ${mgmt_connection_update.uri}`, function() {
-    it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
-        params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing request body parameters')
-        done()
-      }))
-    })
-
+  describe(`${mgmt_cxn_delete.method.toUpperCase()} ${mgmt_cxn_delete.uri}`, function() {
     it('should return not found if the user is not associated to the record', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
+      mgmt_cxn_delete.callback.call(mock.express, {
         params: {user_connection_id: update_uc},
-        user: {id: Number.MAX_VALUE},
-        body: {enabled: false}
+        user: {id: Number.MAX_VALUE}
       }, mock.res(function(res) {
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('user_connection record not found')
@@ -440,37 +432,14 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should return no-op if the request would not change the record', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
+    it('should delete the connection record if the caller is associated with the record', function(done) {
+      mgmt_cxn_delete.callback.call(mock.express, {
         params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {enabled: true}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('no-op')
-        done()
-      }))
-    })
-    
-    it('should update the user_connection record enabled bit to the given value', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
-        params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {enabled: false}
+        user: {id: test_users[1].id}
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
-        expect(res.message).to.equal('user_connection record updated')
-        
-        // reset the value for subsequent tests
-        mgmt_connection_update.callback.call(mock.express, {
-          params: {user_connection_id: update_uc},
-          user: {id: test_users[0].id},
-          body: {enabled: true}
-        }, mock.res(function(res) {
-          expect(res.status).to.equal(200)
-          expect(res.message).to.equal('user_connection record updated')
-          done()
-        }))
+        expect(res.message).to.equal('user_connection record deleted')
+        done()
       }))
     })
   })
@@ -520,10 +489,10 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isar_create.method.toUpperCase()} ${mgmt_isar_create.uri}`, function() {
+  describe(`${mgmt_isa_req_create.method.toUpperCase()} ${mgmt_isa_req_create.uri}`, function() {
 
     before(function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
+      mgmt_cxn_req_create.callback.call(mock.express, {
         user: {id: test_users[2].id},
         body: {target: test_users[3].id}
       }, mock.res(function(res) {
@@ -532,7 +501,7 @@ describe('management endpoints', function() {
         expect(typeof res.body.id).to.equal('number')
         expect(res.message).to.equal('user_connection_request record created')
         
-        mgmt_connection_respond.callback.call(mock.express, {
+        mgmt_cxn_req_res.callback.call(mock.express, {
           params: {user_connection_request_id: res.body.id},
           user: {id: test_users[3].id},
           body: {accepted: true}
@@ -541,16 +510,35 @@ describe('management endpoints', function() {
           expect(res.message).to.equal('user_connection created')
           expect(typeof res.body).to.equal('object')
           expect(typeof res.body.id).to.equal('number')
-
-          console.log('created user connection for isar test')
           
-          done()
+          mgmt_cxn_req_create.callback.call(mock.express, {
+            user: {id: test_users[0].id},
+            body: {target: test_users[1].id}
+          }, mock.res(function(res) {
+            expect(res.status).to.equal(201)
+            expect(typeof res.body).to.equal('object')
+            expect(typeof res.body.id).to.equal('number')
+            expect(res.message).to.equal('user_connection_request record created')
+            
+            mgmt_cxn_req_res.callback.call(mock.express, {
+              params: {user_connection_request_id: res.body.id},
+              user: {id: test_users[1].id},
+              body: {accepted: true}
+            }, mock.res(function(res) {
+              expect(res.status).to.equal(201)
+              expect(res.message).to.equal('user_connection created')
+              expect(typeof res.body).to.equal('object')
+              expect(typeof res.body.id).to.equal('number')
+              
+              done()
+            }))
+          }))
         }))
       }))
     })
 
     it('should respond with error if missing arguments', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {},
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
@@ -561,8 +549,8 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should respond with error if requestedResourceUris field is not arrayish or lengthy', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+    it('should respond with error if requested_schemas field is not arrayish or lengthy', function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {
           to: 'bar',
           purpose:'lolz',
@@ -572,32 +560,32 @@ describe('management endpoints', function() {
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
+        expect(res.message).to.equal('expected lengthy arrayish type for requested_schemas field')
         
-        mgmt_isar_create.callback.call(mock.express, {
+        mgmt_isa_req_create.callback.call(mock.express, {
           body: {
             to: 'bar',
             purpose:'lolz',
             license: 'none',
-            requestedResourceUris: []
+            requested_schemas: []
           },
           user: {id: 'foo', did: 'bar'}
         }, mock.res(function(res) {
           expect(res.error).to.equal(true)
           expect(res.status).to.equal(400)
-          expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
+          expect(res.message).to.equal('expected lengthy arrayish type for requested_schemas field')
           done()
         }))
       }))
     })
 
     it('should respond with error if the to user is not found', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {
           to: 'baz',
           purpose: 'lolz',
           license: 'none',
-          requestedResourceUris: ['/resource/foo/bar']
+          requested_schemas: ['/resource/foo/bar']
         },
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
@@ -609,12 +597,12 @@ describe('management endpoints', function() {
     })
 
     it('should respond with error if the calling agent and the to-user do not have an active connection', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {
           to: test_users[3].id,
           purpose: 'lolz',
           license: 'none',
-          requestedResourceUris: ['/resource/foo/bar']
+          requested_schemas: ['/resource/foo/bar']
         },
         user: {id: test_users[0].id, did: test_users[0].id}
       }, mock.res(function(res) {
@@ -626,12 +614,12 @@ describe('management endpoints', function() {
     })
 
     it('should create isar record if all arguments check out', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {
           to: test_users[3].id,
           purpose: 'lolz',
           license: 'none',
-          requestedResourceUris: ['/resource/foo/bar']
+          requested_schemas: ['/resource/foo/bar']
         },
         user: {id: test_users[2].id}
       }, mock.res(function(res) {
@@ -643,12 +631,12 @@ describe('management endpoints', function() {
 
         isar_respond1 = res.body.id
         
-        mgmt_isar_create.callback.call(mock.express, {
+        mgmt_isa_req_create.callback.call(mock.express, {
           body: {
             to: test_users[1].id,
             purpose: 'lolz',
             license: 'none',
-            requestedResourceUris: ['/resource/foo/bar']
+            requested_schemas: ['/resource/foo/bar']
           },
           user: {id: test_users[0].id, did: test_users[0].id}
         }, mock.res(function(res) {
@@ -689,7 +677,7 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isar_respond.method.toUpperCase()} ${mgmt_isar_respond.uri}`, function(done) {
+  describe(`${mgmt_isa_req_res.method.toUpperCase()} ${mgmt_isa_req_res.uri}`, function() {
     
     var requested1, requested2
     before(function(done) {
@@ -697,22 +685,22 @@ describe('management endpoints', function() {
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
         if (res.error) return done(new Error('should not have been called'))
-        requested1 = res.body.unacked[0].requestedResourceUris
+        requested1 = res.body.unacked[0].requested_schemas
         
         mgmt_isa_list.callback.call(mock.express, {
           user: {id: test_users[1].id, did: test_users[1].id}
         }, mock.res(function(res) {
           if (res.error) return done(new Error('should not have been called'))
-          requested2 = res.body.unacked[0].requestedResourceUris
+          requested2 = res.body.unacked[0].requested_schemas
           done()
         }))
       }))
     })
 
-    it('should respond with an error if a boolean is not given for the resolution field', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should respond with an error if a boolean is not given for the accepted field', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {resolution: 'foo'},
+        body: {accepted: 'foo'},
         user: {
           id: test_users[3].id, 
           did: test_users[3].id
@@ -720,18 +708,17 @@ describe('management endpoints', function() {
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected boolean type for resolution field')
+        expect(res.message).to.equal('expected boolean type for accepted field')
         done()
       }))
     })
 
-    it('should respond with an error if a truthy resolution is given but a non lengthy and/or non arrayish type is given for the permittedresourceuris field', function(done) {
-      
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should respond with an error if a truthy accepted is given but a non lengthy and/or non arrayish type is given for the permitted_resources field', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
         body: {
-          resolution: true,
-          permittedResourceUris: 'foo'
+          accepted: true,
+          permitted_resources: []
         },
         user: {
           id: test_users[3].id, 
@@ -740,32 +727,15 @@ describe('management endpoints', function() {
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
-
-        mgmt_isar_respond.callback.call(mock.express, {
-          params: {isar_id: 'foo'},
-          body: {
-            resolution: true,
-            permittedResourceUris: []
-          },
-          user: {
-            id: test_users[3].id, 
-            did: test_users[3].id
-          }
-        }, mock.res(function(res) {
-          expect(res.error).to.equal(true)
-          expect(res.status).to.equal(400)
-          expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
-          
-          done()
-        }))
+        expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
+        done()
       }))
     })
 
     it('should respond with an error if the isar record is not found', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {resolution: false},
+        body: {accepted: false},
         user: {
           id: test_users[3].id,
           did: test_users[3].id
@@ -778,10 +748,10 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should not create an isa and isp records if resolution is falsy', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should not create an isa and isp records if accepted is falsy', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: isar_respond2},
-        body: {resolution: false},
+        body: {accepted: false},
         user: {
           id: test_users[1].id,
           did: test_users[1].id
@@ -795,11 +765,13 @@ describe('management endpoints', function() {
     })
 
     it('should create an isa and isp records if all checks out', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: isar_respond1},
         body: {
-          resolution: true,
-          permittedResourceUris: requested1
+          accepted: true,
+          permitted_resources: [
+            {id: 1, schema: 'foo'}
+          ]
         },
         user: {
           id: test_users[3].id,
@@ -815,31 +787,23 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isa_getone.method.toUpperCase()} ${mgmt_isa_getone.uri}`, function() {
+  describe(`${mgmt_isa_get_one.method.toUpperCase()} ${mgmt_isa_get_one.uri}`, function() {
 
     it('should respond with an error if the isa record does not exist or does not belong to the calling agent', function(done) {
-      mgmt_isa_getone.callback.call(mock.express, {
-        params: {isa_id: 'foo'},
-        user: {id: test_users[3].id, did: test_users[3].id}
+      
+      mgmt_isa_get_one.callback.call(mock.express, {
+        params: {isa_id: created_isa_id},
+        user: {id: test_users[0].id, did: test_users[0].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('information_sharing_agreement record not found')
-        
-        mgmt_isa_getone.callback.call(mock.express, {
-          params: {isa_id: created_isa_id},
-          user: {id: test_users[0].id, did: test_users[0].id}
-        }, mock.res(function(res) {
-          expect(res.error).to.equal(true)
-          expect(res.status).to.equal(404)
-          expect(res.message).to.equal('information_sharing_agreement record not found')
-          done()
-        }))
+        done()
       }))
     })
 
     it('should respond with an object describing the isa, isp and isar', function(done) {
-      mgmt_isa_getone.callback.call(mock.express, {
+      mgmt_isa_get_one.callback.call(mock.express, {
         params: {isa_id: created_isa_id},
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
@@ -857,22 +821,10 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isa_remove.method.toUpperCase()} ${mgmt_isa_remove.uri}`, function() {
+  describe(`${mgmt_isa_delete.method.toUpperCase()} ${mgmt_isa_delete.uri}`, function() {
 
     it('should respond with an error if the isa record does not exist', function(done) {
-      mgmt_isa_remove.callback.call(mock.express, {
-        params: {isa_id: 'foo'},
-        user: {id: test_users[3].id, did: test_users[3].id}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(404)
-        expect(res.message).to.equal('information_sharing_agreement record not found')
-        done()
-      }))
-    })
-
-    it('should set the expired bit to true if given an id that corresponds to an existing record', function(done) {
-      mgmt_isa_remove.callback.call(mock.express, {
+      mgmt_isa_delete.callback.call(mock.express, {
         params: {isa_id: created_isa_id},
         user: {id: test_users[3].id, did: test_users[3].id}
       }, mock.res(function(res) {
