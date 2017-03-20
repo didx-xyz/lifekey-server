@@ -12,32 +12,63 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
+      var {pushed} = req.query
       var db = this.get('db')
-      db.query([
-        'SELECT id, entity, attribute, alias',
-        'FROM user_data',
-        'WHERE owner_id = :owner_id',
-        'ORDER BY entity, attribute, alias ASC'
-      ].join(' '), {
-        replacements: {owner_id: req.user.id},
-        type: db.QueryTypes.SELECT
-      }).then(function(found) {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: found.length ? found : []
+      if (pushed) {
+        db.query([
+          'SELECT id, entity, attribute, alias',
+          'FROM user_data',
+          'WHERE owner_id = :owner_id AND',
+          'from_user_id IS NOT NULL',
+          'ORDER BY entity, attribute, alias ASC'
+        ].join(' '), {
+          replacements: {owner_id: req.user.id},
+          type: db.QueryTypes.SELECT
+        }).then(function(found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.length ? found : []
+          })
+        }).catch(function(err) {
+          return res.status(
+            err.status || 500
+          ).json({
+            error: err.error || true,
+            status: err.status || 500,
+            message: err.message || 'internal server error',
+            body: err.body || null
+          })
         })
-      }).catch(function(err) {
-        return res.status(
-          err.status || 500
-        ).json({
-          error: err.error || true,
-          status: err.status || 500,
-          message: err.message || 'internal server error',
-          body: err.body || null
+      } else {
+        db.query([
+          'SELECT id, entity, attribute, alias',
+          'FROM user_data',
+          'WHERE owner_id = :owner_id AND',
+          'from_user_id IS NULL',
+          'ORDER BY entity, attribute, alias ASC'
+        ].join(' '), {
+          replacements: {owner_id: req.user.id},
+          type: db.QueryTypes.SELECT
+        }).then(function(found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.length ? found : []
+          })
+        }).catch(function(err) {
+          return res.status(
+            err.status || 500
+          ).json({
+            error: err.error || true,
+            status: err.status || 500,
+            message: err.message || 'internal server error',
+            body: err.body || null
+          })
         })
-      })
+      }
     }
   },
 
