@@ -77,9 +77,10 @@ require('./database')(
 ).then(function(database) {
   
   // attach database connection and models
-  var {db, models} = database
+  var {db, models, errors} = database
   server.set('env', env)
   server.set('db', db)
+  server.set('db_errors', errors)
   server.set('models', models)
   
   // enumerate all routes
