@@ -35,7 +35,7 @@ require('./database')(
       }).then(function(found) {
         if (found) {
           if (found.webhook_url) {
-            return Promise.resolve(found.webhook_url, true)
+            return Promise.resolve(found.webhook_url)
           }
           return models.user_device.findOne({
             where: {owner_id: user_id}
@@ -44,9 +44,9 @@ require('./database')(
         return Promise.reject(
           new Error('couldnt find user by id ' + user_id)
         )
-      }).then(function(value, is_webhook) {
-        if (is_webhook) {
-          webhook(
+      }).then(function(value) {
+        if (typeof value === 'string') {
+          return webhook(
             url.parse(value),
             data.type,
             notification,
@@ -61,16 +61,12 @@ require('./database')(
               }
             }
           )
-        } else if (value) {
-          fcm(
+        } else {
+          return fcm(
             value,
             notification,
             data,
             console.log
-          )
-        } else {
-          return Promise.reject(
-            new Error('couldnt find user by id ' + user_id)
           )
         }
       }).catch(console.log)
