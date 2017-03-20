@@ -21,6 +21,8 @@ var query = require('ld-query')
 
 module.exports = [
   
+  // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
+
   // TODO registration with fingerprint key, too
   // TODO add route for posting new signing key (fingerprint authentication)
 
@@ -626,7 +628,6 @@ module.exports = [
           })
         )
       }).catch(function(err) {
-        // console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1374,31 +1375,26 @@ module.exports = [
       // FROM and TO only
       // deactivate isa record
 
-      // TODO check for noop
       var {isa_id} = req.params
       var {information_sharing_agreement} = this.get('models')
 
-      information_sharing_agreement.findOne({
+      information_sharing_agreement.update({
+        expired: true
+      }, {
         where: {
           id: isa_id,
           expired: false,
-          $or: [
-            {to_id: req.user.id},
-            {to_did: req.user.did},
-            {from_id: req.user.id},
-            {from_did: req.user.did}
+          $and: [
+            {
+              $or: [
+                {to_id: req.user.id},
+                {from_id: req.user.id}
+              ]
+            }
           ]
         }
-      }).then(function(found) {
-        if (found) return found.update({expired: true})
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'information_sharing_agreement record not found',
-          body: null
-        })
       }).then(function(updated) {
-        if (updated) {
+        if (updated[0] > 0) {
           // TODO webhooks to notify concerned parties
           return res.status(200).json({
             error: false,
@@ -1409,8 +1405,8 @@ module.exports = [
         }
         return Promise.reject({
           error: true,
-          status: 500,
-          message: 'unable to update information_sharing_agreement record',
+          status: 404,
+          message: 'information_sharing_agreement record not found',
           body: null
         })
       }).catch(function(err) {
@@ -1428,7 +1424,7 @@ module.exports = [
 
   // 12 GET /demo/qr/:user_id
   {
-    uri: '/demo/qr/:user_id',
+    uri: '/qr/:user_id',
     method: 'get',
     secure: false,
     active: false,
@@ -1446,7 +1442,7 @@ module.exports = [
         if (found) {
           var {SERVER_HOSTNAME} = this.get('env')
           return qr.image(
-            `${SERVER_HOSTNAME}/profile/${found.did}`, // TODO use did instead
+            `${SERVER_HOSTNAME}/profile/${found.id}`,
             {type: 'png'}
           ).pipe(res)
         }
@@ -1505,7 +1501,17 @@ module.exports = [
       var from_user
 
       information_sharing_agreement.findOne({
-        where: {id: isa_id}
+        where: {
+          id: isa_id,
+          $and: [
+            {
+              $or: [
+                {from_id: req.user.id},
+                {to_id: req.user.id}
+              ]
+            }
+          ]
+        }
       }).then(function(found) {
         if (found && (
           found.to_id === req.user.id ||
@@ -1536,48 +1542,40 @@ module.exports = [
         return Promise.all(
           permitted_resources.map(function(resource) {
             return information_sharing_permission.create({
-              isa_id: created.id,
+              isa_id: isa_id,
               user_datum_id: resource.id
             })
           })
         )
       }).then(function(created) {
-        if (created.length && created.length === permitted_resources.length) {
-          process.send({
-            push_notification_request: {
-              user_id: from_user,
-              notification: {
-                title: 'Information Sharing Agreement Updated',
-                body: 'Click here to see any changes to the ISA'
-              },
-              data: {
-                type: 'information_sharing_agreement_update',
-                isa_id: isa_id
-              }
+        process.send({
+          push_notification_request: {
+            user_id: from_user,
+            notification: {
+              title: 'Information Sharing Agreement Updated',
+              body: 'Click here to see any changes to the ISA'
             },
-            webhook_request: {
-              user_id: from_user,
-              notification: {
-                title: 'Information Sharing Agreement Updated',
-                body: 'Click here to see any changes to the ISA'
-              },
-              data: {
-                type: 'information_sharing_agreement_update',
-                isa_id: isa_id
-              }
+            data: {
+              type: 'information_sharing_agreement_update',
+              isa_id: isa_id
             }
-          })
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'information_sharing_permission records updated',
-            body: null
-          })
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'internal server error',
+          },
+          webhook_request: {
+            user_id: from_user,
+            notification: {
+              title: 'Information Sharing Agreement Updated',
+              body: 'Click here to see any changes to the ISA'
+            },
+            data: {
+              type: 'information_sharing_agreement_update',
+              isa_id: isa_id
+            }
+          }
+        })
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'information_sharing_permission records updated',
           body: null
         })
       }).catch(function(err) {
@@ -1610,12 +1608,12 @@ module.exports = [
       var to_user, body = {}
 
       information_sharing_agreement.findOne({
-        where: {isa_id: isa_id}
+        where: {
+          id: isa_id,
+          from_id: req.user.id
+        }
       }).then(function(found) {
-        if (found && (
-          found.from_id === req.user.id ||
-          found.from_did === req.user.did
-        )) {
+        if (found) {
           to_user = found.to_id
           return Promise.resolve(found)
         }
@@ -1665,7 +1663,7 @@ module.exports = [
         }
         return Promise.reject({
           error: true,
-          status: 500,
+          status: 404,
           message: 'user_datum records not found',
           body: null
         })
@@ -1698,13 +1696,17 @@ module.exports = [
     callback: function(req, res) {
       
       var {isa_id} = req.params
+      var {resources} = req.body
       
-      var {
-        name, description, 
-        encoding, mime,
-        value, uri, schema
-      } = req.body
-      
+      if (!(Array.isArray(resources) && resources.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
       var {
         information_sharing_agreement,
         user_datum
@@ -1712,15 +1714,8 @@ module.exports = [
       
       information_sharing_agreement.findOne({
         where: {
-          isa_id: isa_id,
-          $and: [
-            {
-              $or: [
-                {from_id: req.user.id},
-                {to_id: req.user.id}
-              ]
-            }
-          ]
+          id: isa_id,
+          from_id: req.user.id
         }
       }).then(function(found) {
         if (found) {
@@ -1732,21 +1727,28 @@ module.exports = [
               body: null
             })
           }
-          return user_datum.create({
-            owner_id: (
-              req.user.id === found.to_id ?
-              found.from_id :
-              found.to_id
-            ),
-            mime: mime,
-            value: value,
-            uri: uri,
-            from_user_id: req.user.id,
-            from_resource_name: name,
-            from_resource_description: description,
-            encoding: encoding,
-            schema: schema
-          })
+          return Promise.all([
+            resources.map(function(resource, idx) {
+              return user_datum.create({
+                owner_id: (
+                  req.user.id === found.to_id ?
+                  found.from_id :
+                  found.to_id
+                ),
+                entity: req.user.id,
+                attribute: resource.name,
+                alias: idx + 1,
+                mime: resource.mime,
+                value: resource.value,
+                uri: resource.uri,
+                from_user_id: req.user.id,
+                from_resource_name: resource.name,
+                from_resource_description: resource.description,
+                encoding: resource.encoding,
+                schema: resource.schema
+              })
+            })
+          ])
         }
         return Promise.reject({
           error: true,
