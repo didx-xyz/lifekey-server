@@ -119,6 +119,8 @@ module.exports = [
         crypto_key,
         http_request_verification
       } = this.get('models')
+
+      var errors = this.get('db_errors')
       
       // first, make sure the given sig and
       // pubkey haven't been used before
@@ -337,6 +339,8 @@ module.exports = [
             message: 'non-signature value given',
             body: null
           }
+        } else {
+          err = errors(err)
         }
         return res.status(
           err.status || 500
@@ -359,6 +363,7 @@ module.exports = [
     callback: function(req, res) {
       var {user, user_device} = this.get('models')
       var {webhook_url, device_id, device_platform} = req.body
+      var errors = this.get('db_errors')
 
       function dispatch() {
         if (webhook_url) {
@@ -400,6 +405,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
