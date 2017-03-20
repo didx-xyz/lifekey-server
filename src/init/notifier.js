@@ -28,78 +28,54 @@ require('./database')(
 
   process.on('message', function(msg) {
 
-    if (msg.push_notification_request) {
-      console.log('new push request', msg.push_notification_request)
-      var {user_id, device_id, notification, data} = msg.push_notification_request
-      // FIXME wire up to retries (has prerequisite FIXME in messaging/fcm)
-
-      if (user_id && !device_id) {
-        models.user_device.findOne({
-          where: {owner_id: user_id}
-        }).then(function(found) {
-          if (found) {
-            fcm(
-              found.device_id,
-              notification,
-              data,
-              console.log
-            )
-          } else {
-            console.log('fatal - user_device record not found')
+    if (msg.notification_request) {
+      var {user_id, notification, data} = msg.notification_request
+      models.user.findOne({
+        where: {
+          user_id: user_id
+        }
+      }).then(function(found) {
+        if (found) {
+          if (found.webhook_url) {
+            return Promise.resolve(found.webhook_url, true)
           }
-        }).catch(console.log)
-      } else {
-        fcm(
-          device_id,
-          notification,
-          data,
-          console.log
+          return models.user_device.findOne({
+            where: {owner_id: user_id}
+          })
+        }
+        return Promise.reject(
+          new Error('couldnt find user by id ' + user_id)
         )
-      }
-    }
-
-    if (msg.webhook_request) {
-      
-      var {user_id, webhook_url, notification, data} = msg.webhook_request
-      var msg = {notification: notification, data: data}
-
-      var get_user_hook_addr = (function() {
-        if (webhook_url) return Promise.resolve(url.parse(webhook_url))
-        return database.models.user.findOne({
-          where: {id: user_id}
-        }).then(function(found) {
-          if (found && found.webhook_url) {
-            return Promise.resolve(
-              url.parse(found.webhook_url)
-            )
-          } else if (found && !found.webhook_url) {
-            return Promise.reject(
-              {webhook_err: 'user is not enrolled for webhook notifications'}
-            )
-          } else {
-            return Promise.reject(
-              {webhook_err: 'user record not found'}
-            )
-          }
-        })
-      })()
-
-      get_user_hook_addr.then(function(addr) {
-        webhook(addr, msg, function(err) {
-          if (err) {
-            failures.webhook.push({
-              uri: addr,
-              msg: msg,
-              ttl: 9
-            })
-          }
-        })
-      }).catch(function(err) {
-        // fatal error, cannot retry
-        // (could happen if user no longer exists)
-        console.log(err)
-      })
-
+      }).then(function(value, is_webhook) {
+        if (is_webhook) {
+          webhook(
+            url.parse(value),
+            data.type,
+            notification,
+            data,
+            function(err) {
+              if (err) {
+                failures.webhook.push({
+                  uri: addr,
+                  msg: msg,
+                  ttl: 9
+                })
+              }
+            }
+          )
+        } else if (value) {
+          fcm(
+            value,
+            notification,
+            data,
+            console.log
+          )
+        } else {
+          return Promise.reject(
+            new Error('couldnt find user by id ' + user_id)
+          )
+        }
+      }).catch(console.log)
     }
   }).send({ready: true})
 
