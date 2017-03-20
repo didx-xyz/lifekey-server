@@ -77,7 +77,7 @@ services.lifekey = cluster({
           worker_ready += 1
           if (worker_ready === worker_count) {
             service_init.call(OUTER, 'did', function(msg) {
-              if (msg.push_notification_request || msg.webhook_request) {
+              if (msg.notification_request) {
                 services.notifier.send(msg)
               }
             })
@@ -89,7 +89,7 @@ services.lifekey = cluster({
           // proxy the message to the DID service
           services.did.send(msg)
         }
-        if (msg.push_notification_request || msg.webhook_request) {
+        if (msg.notification_request) {
           // proxy the message to the notifier service
           services.notifier.send(msg)
         }
