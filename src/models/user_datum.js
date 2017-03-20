@@ -17,10 +17,30 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BLOB,
       allowNull: false
     },
+    schema: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    uri: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
     mime: {
       type: sqlize.STRING,
       allowNull: false,
       defaultValue: 'text/plain'
+    },
+    from_user_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
+    },
+    from_resource_name: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    from_resource_description: {
+      type: sqlize.STRING,
+      allowNull: true
     },
     encoding: {
       type: sqlize.STRING,

@@ -5,8 +5,8 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER,
       allowNull: false
     },
-    resource_uri: {
-      type: sqlize.TEXT,
+    user_datum_id: {
+      type: sqlize.INTEGER,
       allowNull: false
     }
   }, {

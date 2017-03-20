@@ -1,8 +1,10 @@
 
 module.exports = [
+  
+  // 0 GET /
   {
     uri: '/',
-    method: 'get',
+    method: 'all',
     secure: false,
     active: false,
     callback: function(req, res) {
@@ -14,6 +16,8 @@ module.exports = [
       })
     }
   },
+  
+  // 1 GET /robots.txt
   {
     uri: '/robots.txt',
     method: 'get',
@@ -24,6 +28,8 @@ module.exports = [
       return res.status(200).end('User-agent: *\nDisallow: /')
     }
   },
+  
+  // 2 GET /debug/unregister/:user_id
   {
     uri: '/debug/unregister/:user_id',
     method: 'get',
@@ -32,19 +38,22 @@ module.exports = [
     callback: function(req, res) {
       var {user_id} = req.params.user_id
       var {user, user_device, crypto_key, user_datum} = this.get('models')
-      user.destroy({
-        where: {id: user_id}
-      }).then(function() {
-        return user_device.destroy({where: {owner_id: user_id}})
-      }).then(function() {
-        return crypto_key.destroy({where: {owner_id: user_id}})
-      }).then(function() {
-        return user_datum.destroy({where: {owner_id: user_id}})
-      }).then(function() {
+      Promise.all([
+        user.destroy({where: {id: user_id}}),
+        user_device.destroy({where: {owner_id: user_id}}),
+        crypto_key.destroy({where: {owner_id: user_id}}),
+        user_datum.destroy({where: {owner_id: user_id}})
+      ]).then(function(deletes) {
+        var [
+          user_deleted,
+          user_device_deleted,
+          crypto_key_deleted,
+          user_datum_deleted
+        ] = deletes
         return res.status(200).json({
           error: false,
           status: 200,
-          message: 'deleted records, i think?',
+          message: `deleted {{ ${user_deleted} users, ${user_device_deleted} user_devices, ${crypto_key_deleted} crypto_keys, and ${user_datum_deleted} user_data`,
           body: null
         })
       }).catch(function(err) {
