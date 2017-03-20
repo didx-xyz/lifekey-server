@@ -31,9 +31,7 @@ require('./database')(
     if (msg.notification_request) {
       var {user_id, notification, data} = msg.notification_request
       models.user.findOne({
-        where: {
-          user_id: user_id
-        }
+        where: {id: user_id}
       }).then(function(found) {
         if (found) {
           if (found.webhook_url) {
