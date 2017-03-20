@@ -13,8 +13,6 @@ var resource_create = routes[2]
 var resource_update = routes[3]
 var resource_delete = routes[4]
 
-
-
 describe('resource', function() {
   
   var test_user
