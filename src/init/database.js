@@ -17,7 +17,6 @@ var instance
 module.exports = function(logging) {
   return new Promise(function(resolve, reject) {
     if (instance) return resolve(instance)
-    // memoise the connection and model definitions
     instance = {
       db: new sqlize(
         env.MYSQL_DATABASE,
@@ -28,7 +27,58 @@ module.exports = function(logging) {
           dialect: 'mysql',
           logging: logging === false ? false : console.log.bind(console)
         }
-      )
+      ),
+      errors: function(err) {
+        if (err instanceof sqlize.ValidationError) {
+          // message | string | An error message
+          // type | string | The type of the validation error
+          // path | string | The field that triggered the validation error
+          // value | string | The value that generated the error
+          var validation_errors = []
+          for (var i = 0, len = err.errors.length; i < len; i++) {
+            validation_errors.push({
+              message: err.errors[i].message,
+              type: err.errors[i].type,
+              path: err.errors[i].path,
+              value: err.errors[i].value
+            })
+          }
+          err.status = 400
+          err.message = 'validation error'
+          err.body = {
+            code: 'todo',
+            validation_errors: validation_errors
+          }
+        }
+        
+        if (err instanceof sqlize.UniqueConstraintError ||
+            err instanceof sqlize.ForeignKeyConstraintError ||
+            err instanceof sqlize.ExclusionConstraintError) {
+          err.status = 400
+          err.message = 'unique constraint error'
+          err.body = {
+            code: 'todo',
+            fields: err.fields,
+            index: err.index,
+            value: err.value
+          }
+        }
+        
+        if (err instanceof sqlize.TimeoutError ||
+            err instanceof sqlize.ConnectionRefusedError ||
+            err instanceof sqlize.AccessDeniedError ||
+            err instanceof sqlize.HostNotFoundError ||
+            err instanceof sqlize.HostNotReachableError ||
+            err instanceof sqlize.InvalidConnectionError ||
+            err instanceof sqlize.ConnectionTimedOutError ||
+            err instanceof sqlize.InstanceError) {
+          err.status = 503
+          err.message = 'service unavailable'
+          err.body = {code: 'todo'}
+        }
+        
+        return err
+      }
     }
     
     instance.db.authenticate().then(function() {
