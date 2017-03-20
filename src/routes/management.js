@@ -746,16 +746,10 @@ module.exports = [
             type: 'user_connection_created',
             is_user_connection_created: true,
             user_connection_id: created.id,
+            uc_id: created.id,
             to_id: ucr.to_id,
             from_id: ucr.from_id
           }
-          process.send({
-            notification_request: {
-              user_id: ucr.to_id,
-              notification: pnr_notif,
-              data: pnr_data
-            }
-          })
           process.send({
             notification_request: {
               user_id: ucr.from_id,
@@ -855,7 +849,8 @@ module.exports = [
               },
               data: {
                 type: 'user_connection_deleted',
-                user_connection_id: uc.id
+                user_connection_id: uc.id,
+                uc_id: uc.id
               }
             }
           })
@@ -917,8 +912,13 @@ module.exports = [
         process.send({
           notification_request: {
             user_id: user_id,
-            notification: {title: 'LifeKey is now activated!', body: 'Thank you for activating!'},
-            data: {type: 'app_activation_link_clicked'}
+            notification: {
+              title: 'LifeKey is now activated!',
+              body: 'Thank you for activating!'
+            },
+            data: {
+              type: 'app_activation_link_clicked'
+            }
           }
         })
         res.set('Content-Type', 'text/html')
@@ -1053,6 +1053,7 @@ module.exports = [
               },
               data: {
                 type: 'information_sharing_agreement_request',
+                from_id: req.user.id,
                 isar_id: created.id
               }
             }
