@@ -185,7 +185,6 @@ describe('management endpoints', function() {
   var mgmt_isa_get_one = routes[10]
   var mgmt_isa_delete = routes[11]
   
-  // TODO test these!
   var resource_create = require('../../src/routes/resource')[2]
   var mgmt_isa_update = routes[13]
   var mgmt_isa_pull_from = routes[14]
@@ -291,7 +290,7 @@ describe('management endpoints', function() {
 
   describe(`${mgmt_update_device.method.toUpperCase()} ${mgmt_update_device.uri}`, function() {
     
-    it('should not allow the upsertion of a user_device record if required arguments are missing', function(done) {
+    it('should not allow the update of a hook record if required arguments are missing', function(done) {
       mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {}
@@ -302,7 +301,18 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should allow the upsertion of a user_device record if all required arguments are given', function(done) {
+    it('should allow the update of a webhook url if all required arguments are given', function(done) {
+      mgmt_update_device.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {webhook_url: 'http://example.com/myhook'}
+      }, mock.res(function(res) {
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('updated')
+        done()
+      }))
+    })
+
+    it('should allow the update of a user_device record if all required arguments are given', function(done) {
       mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
@@ -311,7 +321,7 @@ describe('management endpoints', function() {
         }
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
-        expect(res.message).to.equal('device_id saved')
+        expect(res.message).to.equal('updated')
         done()
       }))
     })
