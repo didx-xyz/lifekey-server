@@ -186,6 +186,7 @@ describe('management endpoints', function() {
   var mgmt_isa_delete = routes[11]
   
   // TODO test these!
+  var resource_create = require('../../src/routes/resource')[2]
   var mgmt_isa_update = routes[13]
   var mgmt_isa_pull_from = routes[14]
   var mgmt_isa_push_to = routes[15]
@@ -770,7 +771,7 @@ describe('management endpoints', function() {
         body: {
           accepted: true,
           permitted_resources: [
-            {id: 1, schema: 'foo'}
+            {id: 10e2, schema: 'foo'}
           ]
         },
         user: {
@@ -823,6 +824,8 @@ describe('management endpoints', function() {
 
   describe(`${mgmt_isa_delete.method.toUpperCase()} ${mgmt_isa_delete.uri}`, function() {
 
+    // TODO cover error branches
+
     it('should respond with an error if the isa record does not exist', function(done) {
       mgmt_isa_delete.callback.call(mock.express, {
         params: {isa_id: created_isa_id},
@@ -831,6 +834,355 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_update.method.toUpperCase()} ${mgmt_isa_update.uri}`, function() {
+
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          requested_schemas: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        expect(typeof res.body.id).to.equal('number')
+
+        mgmt_isa_req_res.callback.call(mock.express, {
+          user: {id: test_users[3].id},
+          params: {isar_id: res.body.id},
+          body: {
+            accepted: true,
+            permitted_resources: [
+              {id: 10e2, schema: 'bar'}
+            ]
+          }
+        }, mock.res(function(res) {
+          expect(typeof res.body.id).to.equal('number')
+          
+          created_isa = res.body.id
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if permitted_resources array is not given', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {id: test_users[3].id},
+        params: {isa_id: 'foo'},
+        body: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
+        
+        mgmt_isa_update.callback.call(mock.express, {
+          user: {id: test_users[3].id},
+          params: {isa_id: 'foo'},
+          body: {permitted_resources: []}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {id: test_users[3].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {
+          permitted_resources: [
+            {id: 10e2, schema: 'bar'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_update.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa},
+    //     body: {
+    //       permitted_resources: [
+    //         {id: 10e2, schema: 'bar'}
+    //       ]
+    //     }
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement record has expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should destroy and recreated the isp records associated with the specified isa record', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {id: test_users[3].id},
+        params: {isa_id: created_isa},
+        body: {
+          permitted_resources: [
+            {id: 10e2, schema: 'bar'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('information_sharing_permission records updated')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_pull_from.method.toUpperCase()} ${mgmt_isa_pull_from.uri}`, function() {
+    
+    var created_resource
+    var expired_isa_2
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+      console.log('pull_from#before')
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          requested_schemas: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        console.log(res)
+        expect(typeof res.body.id).to.equal('number')
+
+        var isar_id = res.body.id
+        resource_create.callback.call(mock.express, {
+          user: {id: test_users[3].id},
+          body: {
+            entity: 'foo',
+            attribute: 'bar',
+            alias: 'bazqux',
+            value: 'foo bar'
+          }
+        }, mock.res(function(res) {
+          console.log(res)
+          expect(res.error).to.equal(false)
+
+          created_resource = res.body.id
+
+          mgmt_isa_req_res.callback.call(mock.express, {
+            user: {id: test_users[3].id},
+            params: {isar_id: isar_id},
+            body: {
+              accepted: true,
+              permitted_resources: [
+                {id: created_resource, schema: 'bar'}
+              ]
+            }
+          }, mock.res(function(res) {
+            console.log(res)
+            expect(typeof res.body.id).to.equal('number')
+            
+            created_isa = res.body.id
+            
+            mgmt_isa_req_create.callback.call(mock.express, {
+              user: {id: test_users[2].id},
+              body: {
+                to: test_users[3].id,
+                purpose: 'lolz',
+                license: 'none',
+                requested_schemas: ['/resource/foo/bar']
+              }
+            }, mock.res(function(res) {
+              console.log(res)
+              expect(typeof res.body.id).to.equal('number')
+
+              mgmt_isa_req_res.callback.call(mock.express, {
+                user: {id: test_users[3].id},
+                params: {isar_id: res.body.id},
+                body: {
+                  accepted: true,
+                  permitted_resources: [
+                    {id: created_resource, schema: 'bar'}
+                  ]
+                }
+              }, mock.res(function(res) {
+                console.log(res)
+                expect(typeof res.body.id).to.equal('number')
+                
+                expired_isa_2 = res.body.id
+                mgmt_isa_delete.callback.call(mock.express, {
+                  params: {isa_id: res.body.id},
+                  user: {id: test_users[3].id}
+                }, mock.res(function(res) {
+                  expect(res.error).to.equal(false)
+                  expect(res.status).to.equal(200)
+                  expect(res.message).to.equal('ok')
+                  done()
+                }))
+              }))
+            }))
+          }))
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_pull_from.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        params: {isa_id: 10e2}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_pull_from.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa_2}
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should respond with an object containing records referenced by isp records associated with the specified isa record', function(done) {
+      mgmt_isa_pull_from.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        params: {isa_id: created_isa}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect('user_data' in res.body).to.equal(true)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_push_to.method.toUpperCase()} ${mgmt_isa_push_to.uri}`, function() {
+    
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          requested_schemas: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        expect(typeof res.body.id).to.equal('number')
+
+        mgmt_isa_req_res.callback.call(mock.express, {
+          user: {id: test_users[3].id},
+          params: {isar_id: res.body.id},
+          body: {
+            accepted: true,
+            permitted_resources: [
+              {id: 10e2, schema: 'bar'}
+            ]
+          }
+        }, mock.res(function(res) {
+          expect(typeof res.body.id).to.equal('number')
+          
+          created_isa = res.body.id
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if required arguments are missing', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {id: test_users[1].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        
+        mgmt_isa_push_to.callback.call(mock.express, {
+          user: {id: test_users[1].id},
+          params: {isa_id: Number.MAX_VALUE},
+          body: {resources: []}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing required arguments')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {id: test_users[1].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {
+          resources: [
+            {value: 'foobar'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_push_to.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa_2},
+    //     body: {
+    //       resources: [
+    //         {value: 'foo'}
+    //       ]
+    //     }
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should respond affirmatively if all given resource descriptions are written to database', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        params: {isa_id: created_isa},
+        body: {
+          resources: [
+            {name: 'foo', description: 'baz', value: 'foo bar'},
+            {name: 'bar', description: 'qux', value: 'baz qux'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
         done()
       }))
     })
