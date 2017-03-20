@@ -249,7 +249,6 @@ module.exports = [
         }
       }).then(function(updated) {
         if (updated[0] > 0) {
-          // TODO dispatch webhooks for concerned parties
           return res.status(200).json({
             error: false,
             status: 200,
