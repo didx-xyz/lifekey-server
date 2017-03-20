@@ -102,6 +102,18 @@ var test_users_fail_cases = [
     plaintext_proof: 'qux',
     signable_proof: 'qux',
     signed_proof: 'qux'
+  },
+
+  // mgmt_register - no email
+  {
+    email: 'foofa',
+    nickname: `u_5${now}`,
+    webhook_url: 'http://example.com/abc123' + now,
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`foofa_1${now}`).digest(),
+    signed_proof: 'qux'
   }
 ]
 
@@ -117,6 +129,7 @@ before(function(done) {
       SERVER_HOSTNAME: 'localhost'
     })
     mock.express.set('models', database.models)
+    mock.express.set('db_errors', database.errors)
     console.log('✓ initialised database models')
     return Promise.resolve()
   }).then(function() {
@@ -124,6 +137,7 @@ before(function(done) {
     test_users[1].private_key = crypto.randomBytes(32)
     test_users[2].private_key = rsa.generatePrivateKey()
     test_users[3].private_key = rsa.generatePrivateKey()
+    test_users_fail_cases[3].private_key = rsa.generatePrivateKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
   }).then(function() {
@@ -131,7 +145,8 @@ before(function(done) {
       ec.getPublic(test_users[0].private_key),
       ec.getPublic(test_users[1].private_key),
       test_users[2].private_key.toPublicPem().toString('utf8'),
-      test_users[3].private_key.toPublicPem().toString('utf8')
+      test_users[3].private_key.toPublicPem().toString('utf8'),
+      test_users_fail_cases[3].private_key.toPublicPem().toString('utf8')
     ])
   }).then(function(public_keys) {
     console.log('✓ calculated public keys')
@@ -139,6 +154,7 @@ before(function(done) {
     test_users[1].public_key = public_keys[1].toString('base64')
     test_users[2].public_key = public_keys[2]
     test_users[3].public_key = public_keys[3]
+    test_users_fail_cases[3].public_key = public_keys[4]
     console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
@@ -146,7 +162,8 @@ before(function(done) {
       ec.sign(test_users[0].private_key, test_users[0].signable_proof),
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
       test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', false),
-      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false)
+      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false),
+      test_users_fail_cases[3].private_key.hashAndSign('sha256', test_users_fail_cases[3].plaintext_proof, 'utf8', 'base64', false)
     ])
   }).then(function(signatures) {
     console.log('✓ signed initial key proofs')
@@ -154,6 +171,7 @@ before(function(done) {
     test_users[1].signed_proof = signatures[1].toString('base64')
     test_users[2].signed_proof = signatures[2]
     test_users[3].signed_proof = signatures[3]
+    test_users_fail_cases[3].signed_proof = signatures[4]
     console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
@@ -161,6 +179,7 @@ before(function(done) {
     test_users[1].signable_proof = test_users[1].signable_proof.toString('hex')
     test_users[2].signable_proof = test_users[2].signable_proof.toString('hex')
     test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
+    test_users_fail_cases[3].signable_proof = test_users_fail_cases[3].signable_proof.toString('hex')
     console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
     done()
@@ -286,6 +305,16 @@ describe('management endpoints', function() {
         done()
       }))
     })
+    
+    it('should fail if an attempting to create a user without an email address', function(done) {
+      mgmt_register.callback.call(mock.express, {
+        body: test_users_fail_cases[3]
+      }, mock.res(function(res) {
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('validation error')
+        done()
+      }))
+    })
   })
 
   describe(`${mgmt_update_device.method.toUpperCase()} ${mgmt_update_device.uri}`, function() {
@@ -304,7 +333,7 @@ describe('management endpoints', function() {
     it('should allow the update of a webhook url if all required arguments are given', function(done) {
       mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
-        body: {webhook_url: 'http://example.com/myhook'}
+        body: {webhook_url: 'http://example.com/myhook' + Date.now()}
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('updated')
