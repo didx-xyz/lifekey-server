@@ -54,7 +54,7 @@ require('./database')(
             function(err) {
               if (err) {
                 failures.webhook.push({
-                  uri: addr,
+                  uri: value,
                   msg: msg,
                   ttl: 9
                 })
@@ -81,6 +81,6 @@ var retryTimer = setInterval(function() {
   for (var i = failures.webhook.length - 1; i >= 0; i--) {
     var icur = failures.webhook[i]
     if (icur.ttl === 0) failures.webhook.splice(i, 1)
-    webhook(icur.uri, icur.msg, retryonsent.bind({arr: 'webhook', idx: i}))
+    webhook(url.parse(icur.uri), icur.msg.data.type, icur.msg.notification, icur.msg.data, retryonsent.bind({arr: 'webhook', idx: i}))
   }
 }, 20 * 1000)
