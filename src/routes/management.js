@@ -263,10 +263,8 @@ module.exports = [
             Promise.resolve()
           ) : Promise.resolve(
             process.send({
-              // webhook_request: {},
-              push_notification_request: {
+              notification_request: {
                 user_id: created_user_id,
-                device_id: created.device_id,
                 notification: {
                   title: 'Your registration with LifeKey is nearly complete!',
                   body: 'Check your email to conclude registration...'
@@ -274,8 +272,7 @@ module.exports = [
                 data: {type: 'sent_activation_email'}
               },
               did_allocation_request: {
-                user_id: created_user_id,
-                device_id: created.device_id
+                user_id: created_user_id
                 // TODO add more message parameters
               }
             })
@@ -520,7 +517,7 @@ module.exports = [
         if (created) {
           ucr = created
           process.send({
-            push_notification_request: {
+            notification_request: {
               user_id: created.to_id,
               notification: {
                 title: 'New Connection Request',
@@ -728,14 +725,14 @@ module.exports = [
             from_id: ucr.from_id
           }
           process.send({
-            push_notification_request: {
+            notification_request: {
               user_id: ucr.to_id,
               notification: pnr_notif,
               data: pnr_data
             }
           })
           process.send({
-            push_notification_request: {
+            notification_request: {
               user_id: ucr.from_id,
               notification: pnr_notif,
               data: pnr_data
@@ -825,10 +822,12 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           process.send({
-            // webhook_request: {url: found.webhook_url}
-            push_notification_request: {
+            notification_request: {
               user_id: found.id,
-              notification: {title: 'User Connection Deleted', body: 'Your connection has been deleted'},
+              notification: {
+                title: 'User Connection Deleted',
+                body: 'Your connection has been deleted'
+              },
               data: {
                 type: 'user_connection_deleted',
                 user_connection_id: uc.id
@@ -890,11 +889,13 @@ module.exports = [
         // update the record
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
-        process.send({push_notification_request: {
-          user_id: user_id,
-          notification: {title: 'LifeKey is now activated!', body: 'Thank you for activating!'},
-          data: {type: 'app_activation_link_clicked'}
-        }})
+        process.send({
+          notification_request: {
+            user_id: user_id,
+            notification: {title: 'LifeKey is now activated!', body: 'Thank you for activating!'},
+            data: {type: 'app_activation_link_clicked'}
+          }
+        })
         res.set('Content-Type', 'text/html')
         res.status(200).end(
           '<p>LifeKey is now activated!</p>' +
@@ -923,6 +924,7 @@ module.exports = [
 
       var {
         to,
+        optional_schemas,
         requested_schemas,
         purpose,
         license
@@ -1004,6 +1006,7 @@ module.exports = [
             to_did: to_user.did,
             to_id: to_user.id,
             license: license,
+            optional_schemas: JSON.stringify(optional_schemas),
             requested_schemas: JSON.stringify(requested_schemas),
             purpose: purpose
           })
@@ -1017,15 +1020,15 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           process.send({
-            // TODO webhook
-            push_notification_request: {
+            notification_request: {
               user_id: to_user.id,
               notification: {
                 title: 'New Information Sharing Agreement',
                 body: 'New information sharing agreement'
               },
               data: {
-                type: 'information_sharing_agreement_request'
+                type: 'information_sharing_agreement_request',
+                isar_id: created.id
               }
             }
           })
@@ -1096,7 +1099,7 @@ module.exports = [
         information_sharing_agreement_request
       } = this.get('models')
 
-      var isar, isa
+      var isar, isa, from_id
 
       information_sharing_agreement_request.findOne({
         where: {
@@ -1114,6 +1117,7 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           isar = found
+          from_id = found.from_id
           var now = new Date
           return found.update({
             acknowledged: true,
@@ -1137,6 +1141,19 @@ module.exports = [
             body: null
           })
         } else if (!accepted) {
+          process.send({
+            notification_request: {
+              user_id: from_id,
+              notification: {
+                title: 'Information Sharing Agreement Request Rejected',
+                body: 'Your ISA request was rejected'
+              },
+              data: {
+                type: 'information_sharing_agreement_request_rejected',
+                isar_id: isar_id
+              }
+            }
+          })
           return Promise.reject({
             error: false,
             status: 200,
@@ -1154,7 +1171,19 @@ module.exports = [
         }
       }).then(function(created) {
         if (created) {
-          // TODO webhook to notify `from` party that the resources they requested are available
+          process.send({
+            notification_request: {
+              user_id: from_id,
+              notification: {
+                title: 'Information Sharing Agreement Request Accepted',
+                body: 'Your ISA request was accepted'
+              },
+              data: {
+                type: 'information_sharing_agreement_request_accepted',
+                isa_id: created.id
+              }
+            }
+          })
           isa = created
           return Promise.all(
             permitted_resources.map(function(resource) {
@@ -1549,25 +1578,14 @@ module.exports = [
         )
       }).then(function(created) {
         process.send({
-          push_notification_request: {
+          notification_request: {
             user_id: from_user,
             notification: {
               title: 'Information Sharing Agreement Updated',
               body: 'Click here to see any changes to the ISA'
             },
             data: {
-              type: 'information_sharing_agreement_update',
-              isa_id: isa_id
-            }
-          },
-          webhook_request: {
-            user_id: from_user,
-            notification: {
-              title: 'Information Sharing Agreement Updated',
-              body: 'Click here to see any changes to the ISA'
-            },
-            data: {
-              type: 'information_sharing_agreement_update',
+              type: 'information_sharing_agreement_updated',
               isa_id: isa_id
             }
           }
