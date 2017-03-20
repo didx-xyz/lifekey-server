@@ -1407,9 +1407,7 @@ module.exports = [
       var {isa_id} = req.params
       var {information_sharing_agreement} = this.get('models')
 
-      information_sharing_agreement.update({
-        expired: true
-      }, {
+      information_sharing_agreement.findOne({
         where: {
           id: isa_id,
           expired: false,
@@ -1422,9 +1420,44 @@ module.exports = [
             }
           ]
         }
+      }).then(function(found) {
+        if (found) {
+          process.send({
+            notification_request: {
+              user_id: found.to_id,
+              notification: {
+                title: 'Information Sharing Agreement Deleted',
+                body: 'Your ISA has been deleted'
+              },
+              data: {
+                type: 'information_sharing_agreement_deleted',
+                isa_id: found.id
+              }
+            }
+          })
+          process.send({
+            notification_request: {
+              user_id: found.from_id,
+              notification: {
+                title: 'Information Sharing Agreement Deleted',
+                body: 'Your ISA has been deleted'
+              },
+              data: {
+                type: 'information_sharing_agreement_deleted',
+                isa_id: found.id
+              }
+            }
+          })
+          return found.update({expired: true})
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
       }).then(function(updated) {
-        if (updated[0] > 0) {
-          // TODO webhooks to notify concerned parties
+        if (updated) {
           return res.status(200).json({
             error: false,
             status: 200,
@@ -1434,8 +1467,8 @@ module.exports = [
         }
         return Promise.reject({
           error: true,
-          status: 404,
-          message: 'information_sharing_agreement record not found',
+          status: 500,
+          message: 'unable to update information_sharing_agreement record',
           body: null
         })
       }).catch(function(err) {
