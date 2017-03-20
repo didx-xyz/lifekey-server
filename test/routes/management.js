@@ -955,7 +955,7 @@ describe('management endpoints', function() {
     var expired_isa = created_isa_id
     var created_isa
     before(function(done) {
-      console.log('pull_from#before')
+      
       mgmt_isa_req_create.callback.call(mock.express, {
         user: {id: test_users[2].id},
         body: {
@@ -965,7 +965,6 @@ describe('management endpoints', function() {
           requested_schemas: ['/resource/foo/bar']
         }
       }, mock.res(function(res) {
-        console.log(res)
         expect(typeof res.body.id).to.equal('number')
 
         var isar_id = res.body.id
@@ -978,7 +977,7 @@ describe('management endpoints', function() {
             value: 'foo bar'
           }
         }, mock.res(function(res) {
-          console.log(res)
+          
           expect(res.error).to.equal(false)
 
           created_resource = res.body.id
@@ -993,7 +992,6 @@ describe('management endpoints', function() {
               ]
             }
           }, mock.res(function(res) {
-            console.log(res)
             expect(typeof res.body.id).to.equal('number')
             
             created_isa = res.body.id
@@ -1007,7 +1005,6 @@ describe('management endpoints', function() {
                 requested_schemas: ['/resource/foo/bar']
               }
             }, mock.res(function(res) {
-              console.log(res)
               expect(typeof res.body.id).to.equal('number')
 
               mgmt_isa_req_res.callback.call(mock.express, {
@@ -1020,7 +1017,6 @@ describe('management endpoints', function() {
                   ]
                 }
               }, mock.res(function(res) {
-                console.log(res)
                 expect(typeof res.body.id).to.equal('number')
                 
                 expired_isa_2 = res.body.id

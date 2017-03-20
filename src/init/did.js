@@ -49,11 +49,13 @@ require('./database')(false).then(function(database) {
       did = crypto.rng(32).toString('hex')
       return user.update({did: did}, {where: {id: user_id}})
     }).then(function() {
-      process.send({push_notification_request: {
-        user_id: user_id,
-        device_id: device_id,
-        data: {type: 'received_did', received_did: true, did_value: did}
-      }})
+      process.send({
+        notification_request: {
+          user_id: user_id,
+          data: {type: 'received_did', received_did: true, did_value: did},
+          notification: {title: 'You have been allocated a decentralised identifier', body: 'foo'}
+        }
+      })
     }).catch(function(err) {
       console.log('error occurred during eis registration', err)
     })

@@ -218,15 +218,9 @@ module.exports = [
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
       var {
-        entity,
-        attribute,
-        alias,
-        schema,
-        uri,
-        encoding,
-        mime,
-        value,
-        is_default,
+        entity, attribute, alias,
+        schema, uri, encoding,
+        mime, value, is_default,
         is_archived
       } = req.body
       
@@ -249,7 +243,6 @@ module.exports = [
         }
       }).then(function(updated) {
         if (updated[0] > 0) {
-          // TODO dispatch webhooks for concerned parties
           return res.status(200).json({
             error: false,
             status: 200,

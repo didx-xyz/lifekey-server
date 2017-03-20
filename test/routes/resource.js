@@ -235,9 +235,10 @@ describe('resource', function() {
 
   // 0 GET /resource
   describe(`${resource_index.method.toUpperCase()} ${resource_index.uri}`, function() {
-    it('should respond with an array of [entity, attribute, alias] values if using query option', function(done) {
+    it('should respond with an array of [entity, attribute, alias] values if not using query option', function(done) {
       resource_index.callback.call(mock.express, {
-        user: {id: test_user.id, did: test_user.did}
+        user: {id: test_user.id, did: test_user.did},
+        query: {}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
