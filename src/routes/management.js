@@ -358,27 +358,45 @@ module.exports = [
     active: true,
     callback: function(req, res) {
       var {user, user_device} = this.get('models')
-      var {device_id, device_platform} = req.body
+      var {webhook_url, device_id, device_platform} = req.body
 
-      if (!(device_id && device_platform)) {
-        res.status(400)
-        return res.json({
-          error: true,
-          status: 400,
-          message: 'missing request body parameters',
-          body: null
-        })
+      function dispatch() {
+        if (webhook_url) {
+          return user.update({
+            webhook_url: webhook_url
+          }, {
+            where: {id: req.user.id}
+          })
+        } else if (device_id && device_platform) {
+          return user_device.update({
+            device_id: device_id,
+            platform: device_platform
+          }, {
+            where: {owner_id: req.user.id}
+          })
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'missing request body parameters',
+            body: null
+          })
+        }
       }
 
-      user_device.upsert({
-        owner_id: req.user.id,
-        device_id: device_id,
-        platform: device_platform
-      }).then(function(created) {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'device_id saved',
+      dispatch().then(function(updated) {
+        if (updated) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'updated',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update record',
           body: null
         })
       }).catch(function(err) {
@@ -1850,4 +1868,15 @@ module.exports = [
       })
     }
   }
+
+  // example
+  // 
+  // N METHOD /:VERSION/:URI
+  // {
+  //   uri: '/:VERSION/:URI',
+  //   method: 'METHOD',
+  //   secure: true, // authenticated?
+  //   active: true, // activated?
+  //   callback: function(req, res) {}
+  // }
 ]
