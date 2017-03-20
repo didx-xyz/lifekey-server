@@ -551,6 +551,7 @@ module.exports = [
                 type: 'user_connection_request',
                 is_user_connection_request: true,
                 user_connection_request_id: created.id,
+                ucr_id: created.id,
                 from_id: req.user.id,
                 from_did: req.user.did,
                 from_nickname: req.user.nickname
