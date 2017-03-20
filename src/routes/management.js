@@ -1538,8 +1538,6 @@ module.exports = [
       var {isa_id} = req.params
       var {permitted_resources} = req.body
 
-      // TODO send push notification or webhook when a user successfully calls this route
-
       // permitted_resources
       // [
       //    {id: 5},
@@ -1748,6 +1746,7 @@ module.exports = [
       
       var {isa_id} = req.params
       var {resources} = req.body
+      var other_user_id
       
       if (!(Array.isArray(resources) && resources.length)) {
         return res.status(400).json({
@@ -1778,14 +1777,15 @@ module.exports = [
               body: null
             })
           }
+          other_user_id = (
+            req.user.id === found.to_id ?
+            found.from_id :
+            found.to_id
+          )
           return Promise.all([
             resources.map(function(resource, idx) {
               return user_datum.create({
-                owner_id: (
-                  req.user.id === found.to_id ?
-                  found.from_id :
-                  found.to_id
-                ),
+                owner_id: other_user_id,
                 entity: req.user.id,
                 attribute: resource.name,
                 alias: idx + 1,
@@ -1809,7 +1809,22 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
-          // TODO send pushes
+          process.send({
+            notification_request: {
+              user_id: other_user_id,
+              notification: {
+                title: 'ISA Resources Pushed',
+                body: 'One or more resources were pushed to you'
+              },
+              data: {
+                type: 'resource_pushed',
+                isa_id: isa_id,
+                resource_ids: created.map(function(c) {
+                  return c.id
+                })
+              }
+            }
+          })
           return res.status(201).json({
             error: false,
             status: 201,
