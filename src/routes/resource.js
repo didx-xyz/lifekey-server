@@ -218,15 +218,9 @@ module.exports = [
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
       var {
-        entity,
-        attribute,
-        alias,
-        schema,
-        uri,
-        encoding,
-        mime,
-        value,
-        is_default,
+        entity, attribute, alias,
+        schema, uri, encoding,
+        mime, value, is_default,
         is_archived
       } = req.body
       
