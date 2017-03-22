@@ -1808,7 +1808,7 @@ module.exports = [
             found.from_id :
             found.to_id
           )
-          return Promise.all([
+          return Promise.all(
             resources.map(function(resource, idx) {
               return user_datum.create({
                 owner_id: other_user_id,
@@ -1825,7 +1825,7 @@ module.exports = [
                 schema: resource.schema
               })
             })
-          ])
+          )
         }
         return Promise.reject({
           error: true,
