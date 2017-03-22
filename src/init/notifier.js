@@ -6,16 +6,20 @@ var url = require('url')
 var fcm = require('../messaging/fcm')
 var webhook = require('../messaging/webhook')
 
+var MAX_RETRIES = 9
+
 var failures = {
   fcm: [],
   webhook: []
 }
 
-function retryonsent(err) {
+function retryonsent(arr, idx, err) {
+  var retry = failures[arr][idx]
   if (err) {
-    failures[this.arr][this.idx].ttl -= 1
+    failures[arr][idx].ttl -= 1
   } else {
-    failures[this.arr].splice(this.idx, 1)
+    failures[arr].splice(idx, 1)
+    console.log('reached', retry.uri, 'after', (MAX_RETRIES - retry.ttl), 'attempts')
   }
 }
 
@@ -56,7 +60,7 @@ require('./database')(
                 failures.webhook.push({
                   uri: value,
                   msg: msg.notification_request,
-                  ttl: 9
+                  ttl: MAX_RETRIES
                 })
               }
             }
