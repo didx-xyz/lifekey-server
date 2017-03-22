@@ -55,7 +55,7 @@ require('./database')(
               if (err) {
                 failures.webhook.push({
                   uri: value,
-                  msg: msg,
+                  msg: msg.notification_request,
                   ttl: 9
                 })
               }
