@@ -12,9 +12,8 @@ var failures = {
 }
 
 function retryonsent(err) {
-  var retry = failures[this.arr][this.idx]
   if (err) {
-    retry.ttl -= 1
+    failures[this.arr][this.idx].ttl -= 1
   } else {
     failures[this.arr].splice(this.idx, 1)
   }
@@ -53,6 +52,7 @@ require('./database')(
             data,
             function(err) {
               if (err) {
+                console.log('notifier service retry for', value)
                 failures.webhook.push({
                   uri: value,
                   msg: msg.notification_request,
@@ -81,6 +81,12 @@ var retryTimer = setInterval(function() {
   for (var i = failures.webhook.length - 1; i >= 0; i--) {
     var icur = failures.webhook[i]
     if (icur.ttl === 0) failures.webhook.splice(i, 1)
-    webhook(url.parse(icur.uri), icur.msg.data.type, icur.msg.notification, icur.msg.data, retryonsent.bind({arr: 'webhook', idx: i}))
+    webhook(
+      url.parse(icur.uri),
+      icur.msg.data.type,
+      icur.msg.notification,
+      icur.msg.data,
+      retryonsent.bind({arr: 'webhook', idx: i})
+    )
   }
 }, 20 * 1000)
