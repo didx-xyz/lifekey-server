@@ -1875,6 +1875,22 @@ module.exports = [
         })
       })
     }
+  },
+
+  // 16 GET /management/thanks/balance
+  {
+    uri: '/management/thanks/balance',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      return res.status(200).json({
+        error: false,
+        status: 200,
+        message: 'ok',
+        body: {balance: 0} // we can only pretend for now
+      })
+    }
   }
 
   // example
