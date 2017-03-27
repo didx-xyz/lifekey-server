@@ -23,7 +23,6 @@ module.exports = [
   
   // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
-  // TODO registration with fingerprint key, too
   // TODO add route for posting new signing key (fingerprint authentication)
 
   // 0 POST /management/register
@@ -43,14 +42,17 @@ module.exports = [
         public_key_algorithm,
         public_key,
         plaintext_proof,
-        signed_proof
+        signed_proof,
+        fingerprint
       } = req.body
       
       if (!~this.get('env')._.indexOf('istanbul')) {
         console.log(req.body)
       }
       
-      var is_programmatic_user, activation_code, created_user_id, key_buffers
+      var using_fingerprint = false
+      var is_programmatic_user, activation_code,
+          created_user_id, key_buffers
       
       // ensure all required args are present
       if (!(email &&
@@ -77,7 +79,6 @@ module.exports = [
         })
       }
 
-      // TODO write a test to cover this branch
       if (webhook_url) {
         var caught = false
         try {
@@ -102,7 +103,9 @@ module.exports = [
         }
       }
 
+      // FIXME this'll throw if string not given
       var lower_algo = public_key_algorithm.toLowerCase()
+      
       var supported_algo = !!~['secp256k1', 'rsa'].indexOf(lower_algo)
       if (!supported_algo) {
         return res.status(400).json({
@@ -111,6 +114,19 @@ module.exports = [
           message: 'unsupported key algorithm',
           body: null
         })
+      }
+
+      if (typeof fingerprint === 'object' && fingerprint !== null) {
+        if (!(fingerprint.public_key_algorithm && fingerprint.public_key &&
+              fingerprint.plaintext_proof && fingerprint.signed_proof)) {
+          return res.status(400).json({
+            error: true,
+            status: 400,
+            message: 'missing required fingerprint arguments',
+            body: null
+          })
+        }
+        using_fingerprint = true
       }
 
       var {
@@ -126,8 +142,7 @@ module.exports = [
       // pubkey haven't been used before
       http_request_verification.findOne({
         where: {
-          public_key: public_key,
-          plaintext: plaintext_proof,
+          algorithm: lower_algo,
           signature: signed_proof
         }
       }).then(function(found) {
@@ -164,16 +179,12 @@ module.exports = [
           })
         }
         return Promise.resolve([b_public_key, b_signable_proof, b_signed_proof])
-      }).then(function(keys) {
+      }).then(function(verify_parameters) {
         // optimistically make them available in outer function context
-        key_buffers = keys
-
-        // and then verify ownership of given public key
-        if (lower_algo === 'secp256k1') {
-          return secp.verify(...keys)
-        } else if (lower_algo === 'rsa') {
+        key_buffers = verify_parameters
+        if (lower_algo === 'secp256k1') return secp.verify(...verify_parameters)
+        if (lower_algo === 'rsa') {
           try {
-            // var rsa_public_key = ursa.coercePublicKey(keys[0].toString('utf8'))
             var rsa_public_key = ursa.coercePublicKey(public_key)
             return (
               rsa_public_key.hashAndVerify(
@@ -199,13 +210,6 @@ module.exports = [
               body: null
             })
           }
-        } else {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'unsupported key algorithm',
-            body: null
-          })
         }
       }).then(function() {
         // now store the key and sig for posterity
@@ -216,22 +220,83 @@ module.exports = [
           signature: signed_proof
         })
       }).then(function(created) {
-        if (created) {
-          activation_code = cuid()
-          // add the user if we stored
-          // the verification successfully
-          return user.create({
-            email: email,
-            nickname: nickname,
-            webhook_url: webhook_url,
-            app_activation_code: activation_code
+        if (!created) {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'unable to create http_request_verification record',
+            body: null
           })
         }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create http_request_verification record',
-          body: null
+        return Promise.resolve()
+      }).then(function() {
+        if (using_fingerprint) {
+          return Promise.all([
+            (function() {
+              try {
+                var rsa_public_key = ursa.coercePublicKey(fingerprint.public_key)
+                return (
+                  rsa_public_key.hashAndVerify(
+                    'sha256',
+                    Buffer(fingerprint.plaintext_proof),
+                    fingerprint.signed_proof,
+                    'base64',
+                    false
+                  )
+                ) ? Promise.resolve() : (
+                  Promise.reject({
+                    error: true,
+                    status: 400,
+                    message: 'signature verification failed',
+                    body: null
+                  })
+                )
+              } catch (e) {
+                return Promise.reject({
+                  error: true,
+                  status: 400,
+                  message: e.toString(),
+                  body: null
+                })
+              }
+            })(),
+            (function() {
+              return http_request_verification.findOne({
+                where: {
+                  public_key: fingerprint.public_key,
+                  algorithm: fingerprint.public_key_algorithm,
+                  plaintext: fingerprint.plaintext_proof,
+                  signature: fingerprint.signed_proof
+                }
+              }).then(function(found) {
+                if (found) {
+                  return Promise.reject({
+                    error: true,
+                    status: 400,
+                    message: 'detected known signature',
+                    body: null
+                  })
+                }
+                return http_request_verification.create({
+                  public_key: fingerprint.public_key,
+                  algorithm: fingerprint.public_key_algorithm,
+                  plaintext: fingerprint.plaintext_proof,
+                  signature: fingerprint.signed_proof
+                })
+              })
+            })()
+          ])
+        }
+        return Promise.resolve()
+      }).then(function() {
+        activation_code = cuid()
+        // add the user if we stored
+        // the verification successfully
+        return user.create({
+          email: email,
+          nickname: nickname,
+          webhook_url: webhook_url,
+          app_activation_code: activation_code
         })
       }).then(function(created) {
         if (created) {
@@ -256,11 +321,6 @@ module.exports = [
         if (created) {
           // send a task to the did service
           // to allocate a did to the new user
-          
-          // NOTE - we cannot guarantee message delivery
-          // by returning from process#send's callback parameter
-          // due to the promise pipeline we're sitting inside
-
           return is_programmatic_user ? (
             Promise.resolve()
           ) : Promise.resolve(
@@ -287,36 +347,35 @@ module.exports = [
           body: null
         })
       }).then(function() {
-        // next, create a crypto_key record
-        // for the user's given signing key
-        return crypto_key.create({
-          algorithm: public_key_algorithm,
-          purpose: 'sign',
-          alias: 'client-server-http',
-          public_key: key_buffers[0],
-          owner_id: created_user_id
-        })
-      }).then(function(created) {
-        if (created) {
-          return Promise.resolve(
-            // send an activation email
-            process.send({
-              // TODO this kinda stuff needs to be wrapped up and i18n'ed
-              send_email_request: {
-                to: email,
-                subject: 'LifeKey Account Activation',
-                content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
-                mime: 'text/html'
-              }
-            })
-          )
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create crypto_key record',
-          body: null
-        })
+        return Promise.all([
+          crypto_key.create({
+            owner_id: created_user_id,
+            algorithm: public_key_algorithm,
+            purpose: 'sign',
+            alias: 'client-server-http',
+            public_key: key_buffers[0]
+          }),
+          using_fingerprint ? crypto_key.create({
+            owner_id: created_user_id,
+            algorithm: fingerprint.public_key_algorithm.toLowerCase(),
+            purpose: 'sign',
+            alias: 'fingerprint',
+            public_key: Buffer.from(fingerprint.public_key, 'utf8')
+          }) : null
+        ])
+      }).then(function() {
+        return Promise.resolve(
+          // send an activation email
+          process.send({
+            // TODO this kinda stuff needs to be wrapped up and i18n'ed
+            send_email_request: {
+              to: email,
+              subject: 'LifeKey Account Activation',
+              content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
+              mime: 'text/html'
+            }
+          })
+        )
       }.bind(this)).then(function() {
         // and finally respond affirmatively
         // to the calling agent
@@ -331,7 +390,6 @@ module.exports = [
           })
         )
       }).catch(function(err) {
-        // TODO catch email validation and unique validation errors here
         if (err.toString() === 'Error: couldn\'t parse DER signature') {
           err = {
             error: true,
@@ -1890,6 +1948,192 @@ module.exports = [
         message: 'ok',
         body: {balance: 0} // we can only pretend for now
       })
+    }
+  },
+
+  // 17 POST /management/key
+  {
+    uri: '/management/key',
+    method: 'post',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+
+      var {
+        plaintext_proof,
+        signed_proof,
+        public_key,
+        public_key_algorithm,
+        alias,
+        purpose
+      } = req.body
+
+      if (!(plaintext_proof &&
+            signed_proof &&
+            public_key &&
+            public_key_algorithm &&
+            alias &&
+            purpose)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var {
+        crypto_key,
+        http_request_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var lower_algo = public_key_algorithm.toLowerCase()
+      if (!~['rsa', 'secp256k1'].indexOf(lower_algo)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'unsupported key algorithm'
+        })
+      }
+
+      var key_buffers
+
+      http_request_verification.findOne({
+        where: {
+          algorithm: lower_algo,
+          signature: signed_proof
+        }
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'detected known signature',
+            body: null
+          })
+        }
+        return crypto_key.findOne({
+          where: {
+            owner_id: req.user.id,
+            alias: alias
+          }
+        })
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'duplicate key alias',
+            body: null
+          })
+        }
+        return Promise.resolve()
+      }).then(function() {
+        // TODO cover this branch
+        var b_public_key = Buffer.from(public_key, lower_algo === 'rsa' ? 'utf8' : 'base64')
+        var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
+        var b_signed_proof = Buffer.from(signed_proof, 'base64')
+        if (!(b_public_key.length && b_signable_proof.length && b_signed_proof.length)) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'base64 parsing or shasum error in any of: public_key, plaintext_proof signed_proof',
+            body: null
+          })
+        }
+        return Promise.resolve([b_public_key, b_signable_proof, b_signed_proof])
+      }).then(function(keys) {
+        key_buffers = keys
+        if (lower_algo === 'secp256k1') return secp.verify(...keys)
+        if (lower_algo === 'rsa') {
+          try {
+            var rsa_public_key = ursa.coercePublicKey(public_key)
+            return (
+              rsa_public_key.hashAndVerify(
+                'sha256',
+                Buffer(plaintext_proof),
+                signed_proof,
+                'base64',
+                false
+              )
+            ) ? Promise.resolve() : (
+              Promise.reject({
+                error: true,
+                status: 400,
+                message: 'signature verification failed',
+                body: null
+              })
+            )
+          } catch (e) {
+            return Promise.reject({
+              error: true,
+              status: 400,
+              message: e.toString(),
+              body: null
+            })
+          }
+        }
+      }).then(function() {
+        // now store the key and sig for posterity
+        return http_request_verification.create({
+          public_key: public_key,
+          algorithm: public_key_algorithm,
+          plaintext: plaintext_proof,
+          signature: signed_proof
+        })
+      }).then(function(created) {
+        if (created) {
+          return crypto_key.create({
+            algorithm: public_key_algorithm,
+            purpose: purpose || 'sign',
+            alias: alias,
+            public_key: key_buffers[0],
+            owner_id: req.user.id
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create http_request_verification record',
+          body: null
+        })
+      }).then(function(created) {
+        if (created) {
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'crypto_key record created',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create crypto_key record',
+          body: null
+        })
+      }).catch(function(err) {
+        if (err.toString() === 'Error: couldn\'t parse DER signature') {
+          err = {
+            error: true,
+            status: 400,
+            message: 'non-signature value given',
+            body: null
+          }
+        } else {
+          err = errors(err)
+        }
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+
     }
   }
 
