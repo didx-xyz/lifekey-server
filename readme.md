@@ -3,9 +3,12 @@
 
 ## running
 
-- `cp ect/env/blank.env.json etc/env/dev.env.json && nano etc/env/dev.env.json`
+- ensure you have docker installed
+- `cp ect/env/blank.env.json etc/env/development.env.json`
+- `nano etc/env/development.env.json`
 - `npm install`
-- `npm run db:reset && npm test && NODE_ENV=dev npm start`
+- `npm run db:update && npm run db:start && sleep 10`
+- `npm run db:reset && npm test && echo "GOTIME"`
 
 ## todos
 
