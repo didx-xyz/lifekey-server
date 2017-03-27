@@ -96,12 +96,8 @@ module.exports = [
           }
         }
       }
-
-      // FIXME this'll throw if string not given
-      var lower_algo = public_key_algorithm.toLowerCase()
       
-      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(lower_algo)
-      if (!supported_algo) {
+      if (!our_crypto.asymmetric.is_supported_algorithm(public_key_algorithm)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -110,6 +106,9 @@ module.exports = [
         })
       }
 
+      // FIXME this'll throw if string not given
+      var lower_algo = public_key_algorithm.toLowerCase()
+      
       if (typeof fingerprint === 'object' && fingerprint !== null) {
         if (!(fingerprint.public_key_algorithm && fingerprint.public_key &&
               fingerprint.plaintext_proof && fingerprint.signed_proof)) {
@@ -1916,15 +1915,16 @@ module.exports = [
       } = this.get('models')
       var errors = this.get('db_errors')
 
-      var lower_algo = public_key_algorithm.toLowerCase()
-      if (!~['rsa', 'secp256k1'].indexOf(lower_algo)) {
+      if (!our_crypto.asymmetric.is_supported_algorithm(public_key_algorithm)) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'unsupported key algorithm'
+          message: 'unsupported key algorithm',
+          body: null
         })
       }
 
+      var lower_algo = public_key_algorithm.toLowerCase()
       var key_buffers
 
       http_request_verification.findOne({

@@ -18,6 +18,14 @@ function buffers_for_verify(algorithm, public_key, plaintext, signature) {
 
 module.exports = {
   asymmetric: {
+    is_supported_algorithm: function(algorithm) {
+      return !!~[
+        'rsa',
+        'secp256k1'
+      ].indexOf(
+        algorithm.toLowerCase()
+      )
+    },
     get_buffers: function(algorithm, public_key, plaintext, signature) {
       try {
         var buffers = buffers_for_verify(algorithm, public_key, plaintext, signature)
@@ -29,7 +37,6 @@ module.exports = {
           body: null
         })
       }
-      
       if (!buffers) {
         return Promise.reject({
           error: true,
