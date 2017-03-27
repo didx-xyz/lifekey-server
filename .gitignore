@@ -1,4 +1,7 @@
 
+# docker development
+.containers
+
 # third party binaries
 bin/cloud_sql_proxy
 
