@@ -19,6 +19,8 @@ var ursa = require('ursa')
 var jsonld = require('jsonld')
 var query = require('ld-query')
 
+var our_crypto = require('../crypto')
+
 module.exports = [
   
   // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
@@ -167,50 +169,20 @@ module.exports = [
         }
         return Promise.resolve()
       }).then(function() {
-        var b_public_key = Buffer.from(public_key, lower_algo === 'rsa' ? 'utf8' : 'base64')
-        var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
-        var b_signed_proof = Buffer.from(signed_proof, 'base64')
-        if (!(b_public_key.length && b_signable_proof.length && b_signed_proof.length)) {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'base64 parsing or shasum error in any of: public_key, plaintext_proof signed_proof',
-            body: null
-          })
-        }
-        return Promise.resolve([b_public_key, b_signable_proof, b_signed_proof])
+        return our_crypto.asymmetric.get_buffers(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
       }).then(function(verify_parameters) {
-        // optimistically make them available in outer function context
         key_buffers = verify_parameters
-        if (lower_algo === 'secp256k1') return secp.verify(...verify_parameters)
-        if (lower_algo === 'rsa') {
-          try {
-            var rsa_public_key = ursa.coercePublicKey(public_key)
-            return (
-              rsa_public_key.hashAndVerify(
-                'sha256',
-                Buffer(plaintext_proof),
-                signed_proof,
-                'base64',
-                false
-              )
-            ) ? Promise.resolve() : (
-              Promise.reject({
-                error: true,
-                status: 400,
-                message: 'signature verification failed',
-                body: null
-              })
-            )
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: e.toString(),
-              body: null
-            })
-          }
-        }
+        return our_crypto.asymmetric.verify(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
       }).then(function() {
         // now store the key and sig for posterity
         return http_request_verification.create({
@@ -232,34 +204,7 @@ module.exports = [
       }).then(function() {
         if (using_fingerprint) {
           return Promise.all([
-            (function() {
-              try {
-                var rsa_public_key = ursa.coercePublicKey(fingerprint.public_key)
-                return (
-                  rsa_public_key.hashAndVerify(
-                    'sha256',
-                    Buffer(fingerprint.plaintext_proof),
-                    fingerprint.signed_proof,
-                    'base64',
-                    false
-                  )
-                ) ? Promise.resolve() : (
-                  Promise.reject({
-                    error: true,
-                    status: 400,
-                    message: 'signature verification failed',
-                    body: null
-                  })
-                )
-              } catch (e) {
-                return Promise.reject({
-                  error: true,
-                  status: 400,
-                  message: e.toString(),
-                  body: null
-                })
-              }
-            })(),
+            our_crypto.asymmetric.verify('rsa', fingerprint.public_key, fingerprint.plaintext_proof, fingerprint.signed_proof),
             (function() {
               return http_request_verification.findOne({
                 where: {
@@ -350,14 +295,14 @@ module.exports = [
         return Promise.all([
           crypto_key.create({
             owner_id: created_user_id,
-            algorithm: public_key_algorithm,
+            algorithm: lower_algo,
             purpose: 'sign',
             alias: 'client-server-http',
             public_key: key_buffers[0]
           }),
           using_fingerprint ? crypto_key.create({
             owner_id: created_user_id,
-            algorithm: fingerprint.public_key_algorithm.toLowerCase(),
+            algorithm: 'rsa',
             purpose: 'sign',
             alias: 'fingerprint',
             public_key: Buffer.from(fingerprint.public_key, 'utf8')
@@ -390,16 +335,7 @@ module.exports = [
           })
         )
       }).catch(function(err) {
-        if (err.toString() === 'Error: couldn\'t parse DER signature') {
-          err = {
-            error: true,
-            status: 400,
-            message: 'non-signature value given',
-            body: null
-          }
-        } else {
-          err = errors(err)
-        }
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2028,52 +1964,10 @@ module.exports = [
             body: null
           })
         }
-        return Promise.resolve()
-      }).then(function() {
-        // TODO cover this branch
-        var b_public_key = Buffer.from(public_key, lower_algo === 'rsa' ? 'utf8' : 'base64')
-        var b_signable_proof = crypto.createHash('sha256').update(plaintext_proof).digest()
-        var b_signed_proof = Buffer.from(signed_proof, 'base64')
-        if (!(b_public_key.length && b_signable_proof.length && b_signed_proof.length)) {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'base64 parsing or shasum error in any of: public_key, plaintext_proof signed_proof',
-            body: null
-          })
-        }
-        return Promise.resolve([b_public_key, b_signable_proof, b_signed_proof])
+        return our_crypto.asymmetric.get_buffers(lower_algo, public_key, plaintext_proof, signed_proof)
       }).then(function(keys) {
         key_buffers = keys
-        if (lower_algo === 'secp256k1') return secp.verify(...keys)
-        if (lower_algo === 'rsa') {
-          try {
-            var rsa_public_key = ursa.coercePublicKey(public_key)
-            return (
-              rsa_public_key.hashAndVerify(
-                'sha256',
-                Buffer(plaintext_proof),
-                signed_proof,
-                'base64',
-                false
-              )
-            ) ? Promise.resolve() : (
-              Promise.reject({
-                error: true,
-                status: 400,
-                message: 'signature verification failed',
-                body: null
-              })
-            )
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: e.toString(),
-              body: null
-            })
-          }
-        }
+        return our_crypto.asymmetric.verify(lower_algo, public_key, plaintext_proof, signed_proof)
       }).then(function() {
         // now store the key and sig for posterity
         return http_request_verification.create({
@@ -2114,16 +2008,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        if (err.toString() === 'Error: couldn\'t parse DER signature') {
-          err = {
-            error: true,
-            status: 400,
-            message: 'non-signature value given',
-            body: null
-          }
-        } else {
-          err = errors(err)
-        }
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
