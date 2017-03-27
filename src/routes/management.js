@@ -25,8 +25,6 @@ module.exports = [
   
   // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
-  // TODO add route for posting new signing key (fingerprint authentication)
-
   // 0 POST /management/register
   {
     uri: '/management/register',
