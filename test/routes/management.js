@@ -63,6 +63,24 @@ var test_users = [
     plaintext_proof: `u_4${now}`,
     signable_proof: crypto.createHash('sha256').update(`u_4${now}`).digest(),
     signed_proof: ''
+  },
+  {
+    email: `u_5${now}@example.com`,
+    nickname: `u_5${now}`,
+    device_id: `u_5${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: '',
+    plaintext_proof: `u_5${now}`,
+    signable_proof: crypto.createHash('sha256').update(`u_5${now}`).digest(),
+    signed_proof: '',
+    fingerprint: {
+      public_key_algorithm: 'rsa',
+      public_key: '',
+      signable_proof: crypto.createHash('sha256').update(`u_5${now}`).digest(),
+      plaintext_proof: `u_5${now}`,
+      signed_proof: ''
+    }
   }
 ]
 
@@ -81,9 +99,9 @@ var test_users_fail_cases = [
   },
   // mgmt_register - non-hex case
   {
-    email: `u_5${now}@example.com`,
-    nickname: `u_5${now}`,
-    device_id: `u_5${now}2`,
+    email: `u_8${now}@example.com`,
+    nickname: `u_8${now}`,
+    device_id: `u_8${now}`,
     device_platform: 'android',
     public_key_algorithm: 'secp256k1',
     public_key: 'qux',
@@ -114,7 +132,45 @@ var test_users_fail_cases = [
     plaintext_proof: 'qux',
     signable_proof: crypto.createHash('sha256').update(`foofa_1${now}`).digest(),
     signed_proof: 'qux'
-  }
+  },
+
+  // mgmt_register - no string for webhook_url
+  {
+    email: `u_6${now}@example.com`,
+    nickname: `u_6${now}`,
+    webhook_url: 1234,
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_6${now}`).digest(),
+    signed_proof: 'qux'
+  },
+
+  // mgmt_register - no url given for webhook_url
+  {
+    email: `u_7${now}@example.com`,
+    nickname: `u_7${now}`,
+    webhook_url: 'i hope this isnt a real url',
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_7${now}`).digest(),
+    signed_proof: 'qux'
+  },
+
+  // mgmt_register - missing fingerprint args
+  {
+    email: `u_8${now}@example.com`,
+    nickname: `u_8${now}`,
+    device_id: `u_8${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_8${now}`).digest(),
+    signed_proof: 'qux',
+    fingerprint: {}
+  },
 ]
 
 before(function(done) {
@@ -137,6 +193,8 @@ before(function(done) {
     test_users[1].private_key = crypto.randomBytes(32)
     test_users[2].private_key = rsa.generatePrivateKey()
     test_users[3].private_key = rsa.generatePrivateKey()
+    test_users[4].private_key = rsa.generatePrivateKey()
+    test_users[4].fingerprint.private_key = rsa.generatePrivateKey()
     test_users_fail_cases[3].private_key = rsa.generatePrivateKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
@@ -146,6 +204,8 @@ before(function(done) {
       ec.getPublic(test_users[1].private_key),
       test_users[2].private_key.toPublicPem().toString('utf8'),
       test_users[3].private_key.toPublicPem().toString('utf8'),
+      test_users[4].private_key.toPublicPem().toString('utf8'),
+      test_users[4].fingerprint.private_key.toPublicPem().toString('utf8'),
       test_users_fail_cases[3].private_key.toPublicPem().toString('utf8')
     ])
   }).then(function(public_keys) {
@@ -154,7 +214,9 @@ before(function(done) {
     test_users[1].public_key = public_keys[1].toString('base64')
     test_users[2].public_key = public_keys[2]
     test_users[3].public_key = public_keys[3]
-    test_users_fail_cases[3].public_key = public_keys[4]
+    test_users[4].public_key = public_keys[4]
+    test_users[4].fingerprint.public_key = public_keys[5]
+    test_users_fail_cases[3].public_key = public_keys[6]
     console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
@@ -163,6 +225,8 @@ before(function(done) {
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
       test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', false),
       test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false),
+      test_users[4].private_key.hashAndSign('sha256', test_users[4].plaintext_proof, 'utf8', 'base64', false),
+      test_users[4].fingerprint.private_key.hashAndSign('sha256', test_users[4].fingerprint.plaintext_proof, 'utf8', 'base64', false),
       test_users_fail_cases[3].private_key.hashAndSign('sha256', test_users_fail_cases[3].plaintext_proof, 'utf8', 'base64', false)
     ])
   }).then(function(signatures) {
@@ -171,7 +235,9 @@ before(function(done) {
     test_users[1].signed_proof = signatures[1].toString('base64')
     test_users[2].signed_proof = signatures[2]
     test_users[3].signed_proof = signatures[3]
-    test_users_fail_cases[3].signed_proof = signatures[4]
+    test_users[4].signed_proof = signatures[4]
+    test_users[4].fingerprint.signed_proof = signatures[5]
+    test_users_fail_cases[3].signed_proof = signatures[6]
     console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
@@ -179,6 +245,8 @@ before(function(done) {
     test_users[1].signable_proof = test_users[1].signable_proof.toString('hex')
     test_users[2].signable_proof = test_users[2].signable_proof.toString('hex')
     test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
+    test_users[4].signable_proof = test_users[4].signable_proof.toString('hex')
+    test_users[4].fingerprint.signable_proof = test_users[4].fingerprint.signable_proof.toString('hex')
     test_users_fail_cases[3].signable_proof = test_users_fail_cases[3].signable_proof.toString('hex')
     console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
@@ -208,6 +276,10 @@ describe('management endpoints', function() {
   var mgmt_isa_update = routes[13]
   var mgmt_isa_pull_from = routes[14]
   var mgmt_isa_push_to = routes[15]
+
+  var mgmt_thanks_balance_get = routes[16]
+
+  var mgmt_key_create = routes[17]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -244,14 +316,94 @@ describe('management endpoints', function() {
       }))
     })
     
-    it('should fail if required parameters are missing', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: {}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing request body parameters')
-        done()
-      }))
+    describe('-- failure cases --', function() {
+      
+      it('should fail if required parameters are missing', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: {}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing request body parameters')
+          done()
+        }))
+      })
+
+      it('should fail if an attempt to create a user with a duplicate signature is used', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users[0]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('known signature detected')
+          done()
+        }))
+      })
+
+      it('should fail if an attempt to create a duplicate user is made', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[0]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('user already exists')
+          done()
+        }))
+      })
+
+      it('should fail if non-signature key parameters are given', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[1]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('non-signature value given')
+          done()
+        }))
+      })
+
+      it('should fail if an unsupported algorithm is used', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[2]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('unsupported key algorithm')
+          done()
+        }))
+      })
+      
+      it('should fail if an attempting to create a user without an email address', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[3]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('validation error')
+          done()
+        }))
+      })
+
+      it('should fail if attempting to create a user without a device id and an invalid webhook address', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[4]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected string type for webhook_url')
+          
+          mgmt_register.callback.call(mock.express, {
+            body: test_users_fail_cases[5]
+          }, mock.res(function(res) {
+            expect(res.status).to.equal(400)
+            expect(res.message).to.equal('url not given for webhook_url')
+            done()
+          }))
+        }))
+      })
+
+      it('should fail if missing required fingerprint args', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[6]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing required fingerprint arguments')
+          done()
+        }))
+      })
     })
 
     it('should insert a new user record if required arguments are given and respond with basic identifier', function(done) {
@@ -266,52 +418,14 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should fail if an attempt to create a user with a duplicate signature is used', function(done) {
+    it('should insert a new user record if using fingerprint signing parameters and respond with a basic identifier', function(done) {
       mgmt_register.callback.call(mock.express, {
-        body: test_users[0]
+        body: test_users[4]
       }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('known signature detected')
-        done()
-      }))
-    })
-
-    it('should fail if an attempt to create a duplicate user is made', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[0]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('user already exists')
-        done()
-      }))
-    })
-
-    it('should fail if non-signature key parameters are given', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[1]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('non-signature value given')
-        done()
-      }))
-    })
-
-    it('should fail if an unsupported algorithm is used', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[2]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('unsupported key algorithm')
-        done()
-      }))
-    })
-    
-    it('should fail if an attempting to create a user without an email address', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[3]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('validation error')
+        expect(res.status).to.equal(201)
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+        test_users[4].id = res.body.id
         done()
       }))
     })
@@ -1221,5 +1335,117 @@ describe('management endpoints', function() {
         done()
       }))
     })
+  })
+
+  describe(`${mgmt_key_create.method.toUpperCase()} ${mgmt_key_create.uri}`, function() {
+    
+    var known_signature
+
+    it('should fail if missing required arguments', function(done) {
+      mgmt_key_create.callback.call(mock.express, {
+        body: {
+          // plaintext_proof: '',
+          // signed_proof: '',
+          // public_key: '',
+          // public_key_algorithm: '',
+          // alias: '',
+          // purpose: ''
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        done()
+      }))
+    })
+
+    it('should fail if an unsupported key algo is specified', function(done) {
+      mgmt_key_create.callback.call(mock.express, {
+        body: {
+          plaintext_proof: 'foo',
+          signed_proof: 'foo',
+          public_key: 'foo',
+          public_key_algorithm: 'unsupported',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('unsupported key algorithm')
+        done()
+      }))
+    })
+
+    it.skip('should fail if unparsable signature parameters are given', function(done) {})
+
+    it('should create a new crypto key record if all arguments check-out', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u10_${now}`
+      var private_key = rsa.generatePrivateKey()
+      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      known_signature = signed_proof
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: signed_proof,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        done()
+      }))
+    })
+
+    it('should fail if a known signature is given', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u11_${now}`
+      var private_key = rsa.generatePrivateKey()
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: known_signature,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('detected known signature')
+        done()
+      }))
+    })
+
+    it('should fail if a duplicate alias is given', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u10_${now}`
+      var private_key = rsa.generatePrivateKey()
+      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: signed_proof,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('duplicate key alias')
+        done()
+      }))
+    })
+
   })
 })
