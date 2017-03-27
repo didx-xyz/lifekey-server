@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+if [[ $NODE_ENV == "" ]]; then
+  echo "NODE_ENV not given, exiting..."
+  exit 1
+fi
+
+NODE_ENV="etc/env/${NODE_ENV}.env.json"
+
+mysql_root_password=$(jq -M -r -c '.MYSQL_PASSWORD' "$NODE_ENV")
+mysql_user=$(jq -M -r -c '.MYSQL_USER' "$NODE_ENV")
+mysql_password=$(jq -M -r -c '.MYSQL_PASSWORD' "$NODE_ENV")
+mysql_database=lifekey
+
+mysql_container_id=$(
+  docker run \
+    --name mysql \
+    -v "$HOME/mysql/data/:/var/lib/mysql" \
+    -d \
+    -p 3306:3306 \
+    -e MYSQL_ROOT_PWD="$mysql_root_password" \
+    -e MYSQL_USER="$mysql_user" \
+    -e MYSQL_USER_PWD="$mysql_password" \
+    -e MYSQL_USER_DB="$mysql_database" \
+    leafney/docker-alpine-mysql
+)
+
+echo $mysql_container_id >> .containers

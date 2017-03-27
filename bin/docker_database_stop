@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+docker stop "$(cat .containers)"
+
+rm .containers
