@@ -18,9 +18,7 @@ module.exports = function(req, res, next) {
 
   http_request_verification.findOne({
     where: {
-      public_key: b64_public_key,
       algorithm: req.user.crypto.algorithm,
-      plaintext: req.headers['x-cnsnt-plain'],
       signature: req.headers['x-cnsnt-signed']
     }
   }).then(function(found) {
