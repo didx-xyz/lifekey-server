@@ -3,8 +3,8 @@
 
 // TODO check server.get('did_service_ready') before posting a message to the service
 // TODO add retries if did service is unavailable
-// TODO resolve this data structure dynamically (over the network)
 // TODO some of the procedures (like registration) are not atomic - if they fail at any point, the state of the database might be partially corrupt
+// TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
 var send_is_undefined = !process.send
 if (send_is_undefined) process.send = function() {}
@@ -14,17 +14,11 @@ var crypto = require('crypto')
 
 var qr = require('qr-image')
 var cuid = require('cuid')
-var secp = require('eccrypto')
-var ursa = require('ursa')
-var jsonld = require('jsonld')
-var query = require('ld-query')
 
 var our_crypto = require('../crypto')
 
 module.exports = [
   
-  // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
-
   // 0 POST /management/register
   {
     uri: '/management/register',
