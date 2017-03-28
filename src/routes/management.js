@@ -1806,6 +1806,7 @@ module.exports = [
                 from_user_id: req.user.id,
                 from_resource_name: resource.name,
                 from_resource_description: resource.description,
+                is_verifiable_claim: resource.is_verifiable_claim,
                 encoding: resource.encoding,
                 schema: resource.schema
               })
