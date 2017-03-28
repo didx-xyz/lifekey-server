@@ -280,6 +280,7 @@ describe('management endpoints', function() {
   var mgmt_thanks_balance_get = routes[16]
 
   var mgmt_key_create = routes[17]
+  var mgmt_key_get = routes[18]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -1447,5 +1448,58 @@ describe('management endpoints', function() {
       }))
     })
 
+  })
+
+  describe(`${mgmt_key_get.method.toUpperCase()} ${mgmt_key_get.uri}`, function() {
+    
+    it('should respond with an error if the specified user has no key', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_id: Date.now()},
+        query: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with an error if the specified user has no key aliased with given alias', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_id: '1'},
+        query: {alias: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with key data if the specified user has a key', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_id: '1'},
+        query: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(typeof res.body).to.equal('object')
+        expect(!!res.body.public_key).to.equal(true)
+        done()
+      }))
+    })
+
+    it('should respond with key data if the specified user has a key aliased with the given alias', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_id: test_users[4].id},
+        query: {alias: 'fingerprint'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(typeof res.body).to.equal('object')
+        expect(!!res.body.public_key).to.equal(true)
+        done()
+      }))
+    })
   })
 })
