@@ -42,6 +42,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
+    is_verifiable_claim: {
+      type: sqlize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false
+    },
     encoding: {
       type: sqlize.STRING,
       allowNull: true,

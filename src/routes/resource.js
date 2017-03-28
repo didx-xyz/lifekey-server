@@ -135,6 +135,7 @@ module.exports = [
       var {
         entity, attribute, alias,
         encoding, mime, value, uri,
+        is_verifiable_claim,
         schema, is_default, is_archived
       } = req.body
 
@@ -176,6 +177,7 @@ module.exports = [
           mime: mime,
           encoding: encoding,
           is_default: is_default,
+          is_verifiable_claim: is_verifiable_claim,
           is_archived: is_archived
         })
       }).then(function(created) {
@@ -220,6 +222,7 @@ module.exports = [
         entity, attribute, alias,
         schema, uri, encoding,
         mime, value, is_default,
+        is_verifiable_claim,
         is_archived
       } = req.body
       
@@ -233,6 +236,7 @@ module.exports = [
       if (typeof mime !== 'undefined') updatefields.mime = mime
       if (typeof value !== 'undefined') updatefields.value = value
       if (typeof is_default !== 'undefined') updatefields.is_default = is_default
+      if (typeof is_verifiable_claim !== 'undefined') updatefields.is_verifiable_claim = is_verifiable_claim
       if (typeof is_archived !== 'undefined') updatefields.is_archived = is_archived
       
       return user_datum.update(updatefields, {
