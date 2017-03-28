@@ -68,7 +68,8 @@ describe('resource', function() {
           value: 'qux',
           entity: 'foo',
           attribute: 'bar',
-          alias: 'baz'
+          alias: 'baz',
+          is_verifiable_claim: true
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)

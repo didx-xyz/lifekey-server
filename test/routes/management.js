@@ -1131,7 +1131,6 @@ describe('management endpoints', function() {
             value: 'foo bar'
           }
         }, mock.res(function(res) {
-          
           expect(res.error).to.equal(false)
 
           created_resource = res.body.id
@@ -1325,7 +1324,7 @@ describe('management endpoints', function() {
         params: {isa_id: created_isa},
         body: {
           resources: [
-            {name: 'foo', description: 'baz', value: 'foo bar'},
+            {name: 'foo', description: 'baz', value: 'foo bar', is_verifiable_claim: true},
             {name: 'bar', description: 'qux', value: 'baz qux'}
           ]
         }
