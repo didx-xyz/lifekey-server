@@ -2012,6 +2012,59 @@ module.exports = [
       })
 
     }
+  },
+
+  // 18 GET /management/key/:id?alias
+  {
+    uri: '/management/key/:user_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {alias} = req.query
+      var {crypto_key} = this.get('models')
+      var query = {
+        owner_id: user_id,
+        alias: 'client-server-http'
+      }
+      if (alias) query.alias = alias
+      crypto_key.findOne({
+        where: query
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              public_key_algorithm: found.algorithm,
+              public_key: found.public_key.toString(
+                found.algorithm === 'rsa' ?
+                'utf8' :
+                'base64'
+              )
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).catch(function(err) {
+
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 
   // example
