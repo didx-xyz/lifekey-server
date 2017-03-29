@@ -31,19 +31,28 @@ module.exports = [
   
   // 2 GET /debug/unregister/:user_id
   {
-    uri: '/debug/unregister/:user_id',
+    uri: '/debug/unregister',
     method: 'get',
     secure: false,
     active: false,
     callback: function(req, res) {
-      var {user_id} = req.params.user_id
+      var {user_id, email} = req.query
       var {user, user_device, crypto_key, user_datum} = this.get('models')
-      Promise.all([
-        user.destroy({where: {id: user_id}}),
-        user_device.destroy({where: {owner_id: user_id}}),
-        crypto_key.destroy({where: {owner_id: user_id}}),
-        user_datum.destroy({where: {owner_id: user_id}})
-      ]).then(function(deletes) {
+      user.findOne({
+        where: (
+          user_id ?
+          {id: user_id} :
+          {email: email}
+        )
+      }).then(function(found) {
+        return Promise.all([
+          user.destroy({where: {id: found.id}}),
+          user_action.destroy({where: {owner_id: found.id}}),
+          user_device.destroy({where: {owner_id: found.id}}),
+          crypto_key.destroy({where: {owner_id: found.id}}),
+          user_datum.destroy({where: {owner_id: found.id}})
+        ])
+      }).then(function(deletes) {
         var [
           user_deleted,
           user_device_deleted,
