@@ -51,9 +51,7 @@ module.exports = function(recipient, notification, data, onsent) {
 
   // attach listeners
   request.on('response', function(res) {
-    if (res.statusCode !== 200) {
-      return onsent(new Error(res.statusCode))
-    }
+    
     
     var response = ''
     res.on('data', function(d) {
@@ -65,7 +63,11 @@ module.exports = function(recipient, notification, data, onsent) {
         return onsent(e)
       }
 
-      console.log('FCM response', response)
+      console.log('FCM recipient and response', recipient, response)
+
+      if (res.statusCode !== 200) {
+        return onsent(new Error(res.statusCode))
+      }
       
       if (response.failure === 0 || response.canonical_ids === 0) {
         // success, message sent
