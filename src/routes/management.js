@@ -286,6 +286,13 @@ module.exports = [
         return Promise.all([
           crypto_key.create({
             owner_id: created_user_id,
+            algorithm: 'secp256k1',
+            purpose: 'sign,verify',
+            alias: 'eis',
+            private_key: crypto.rng(32)
+          }),
+          crypto_key.create({
+            owner_id: created_user_id,
             algorithm: lower_algo,
             purpose: 'sign',
             alias: 'client-server-http',
@@ -320,9 +327,15 @@ module.exports = [
             error: false,
             status: 201,
             message: 'created user record',
-            body: {id: created_user_id}
-            // until the user's DID has been allocated
-            // this is all we can give back to the calling agent
+            body: {
+              id: created_user_id,
+              activation: (is_programmatic_user ? (
+                'http://' +
+                this.get('env').SERVER_HOSTNAME +
+                '/management/activation/' +
+                activation_code
+              ) : null)
+            }
           })
         )
       }).catch(function(err) {
@@ -1200,8 +1213,7 @@ module.exports = [
             permitted_resources.map(function(resource) {
               return information_sharing_permission.create({
                 isa_id: created.id,
-                user_datum_id: resource.id,
-                schema: resource.schema
+                user_datum_id: resource.id
               })
             })
           )
@@ -1495,7 +1507,7 @@ module.exports = [
     }
   },
 
-  // 12 GET /demo/qr/:user_id
+  // 12 GET /qr/:user_id
   {
     uri: '/qr/:user_id',
     method: 'get',
@@ -2056,6 +2068,358 @@ module.exports = [
         })
       }).catch(function(err) {
 
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 19 POST /management/action
+  {
+    uri: '/management/action',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {
+        purpose, license, entities,
+        optional_entities, duration_days
+      } = req.body
+
+      var has_optional = false
+
+      if (!(purpose &&
+            license &&
+            Array.isArray(entities) &&
+            entities.length &&
+            duration_days)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      if (Array.isArray(optional_entities) && optional_entities.length) {
+        has_optional = true
+      }
+
+      var errors = this.get('db_errors')
+      var {user_action} = this.get('models')
+      
+      user_action.create({
+        owner_id: req.user.id,
+        purpose: purpose,
+        license: license,
+        entities: JSON.stringify(entities),
+        duration_days: duration_days,
+        optional_entities: has_optional ? JSON.stringify(optional_entities) : null
+      }).then(function(created) {
+        if (created) {
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'created',
+            body: {id: created.id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create user_action record',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 20 GET /management/action/:user_id
+  {
+    uri: '/management/action/:user_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user_action} = this.get('models')
+      user_action.findAll({
+        where: {owner_id: user_id}
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.map(function(action) {
+              return {
+                id: action.id,
+                purpose: action.purpose
+              }
+            })
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to query user_action records',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 21 GET /management/action/:user_id/:action_id
+  {
+    uri: '/management/action/:user_id/:action_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_id, action_id} = req.params
+      var {crypto_key, user_action} = this.get('models')
+      var blank
+
+      user_action.findOne({
+        where: {
+          owner_id: user_id,
+          id: action_id
+        }
+      }).then(function(found) {
+        if (found) {
+          blank = {
+            '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
+            isa: {
+              requestSignatureValue: null,
+              request: {
+                purpose: found.purpose,
+                license: found.license,
+                entities: JSON.parse(found.entities),
+                optionalEntities: JSON.parse(found.optional_entities),
+                durationDays: found.duration_days,
+                requestedBy: user_id,
+                action: found.id
+              }
+            }
+          }
+          return crypto_key.findOne({
+            where: {
+              owner_id: user_id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(blank.isa.request)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        blank.isa.requestSignatureValue = signature.toString('base64')
+        return Promise.resolve()
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {document: blank}
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 22 POST /management/isa/:user_id/:action_id
+  {
+    uri: '/management/isa/:user_id/:action_id',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      
+      // NOTE
+      // the client shouldn't have to post the action document that they're accepting
+      // they should only have to reference the user and action id
+
+      var {user_id, action_id} = req.params
+      var {
+        crypto_key,
+        user_action,
+        user_connection,
+        information_sharing_agreement_request,
+        information_sharing_agreement,
+        information_sharing_permission,
+        information_sharing_agreement_receipt
+      } = this.get('models')
+
+      var errors = this.get('db_errors')
+
+      var isar_id, isa_id, {document} = req.body
+
+
+      if (!document) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var {isa} = document
+
+      // TODO add more guards: ensure the document being posted matches the user/action ids
+
+      if (typeof isa !== 'object' ||
+          isa === null ||
+          typeof isa.response !== 'object' ||
+          isa.response === null ||
+          (Array.isArray(isa.entities) && isa.entities.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var expires_at = new Date
+      expires_at.setDate(expires_at.getDate() + isa.request.durationDays)
+
+      // TODO check for existing connection before continuing
+
+      information_sharing_agreement_request.create({
+        from_id: user_id,
+        to_id: req.user.id,
+        acknowledged: true,
+        optional_schemas: JSON.stringify(isa.request.optionalEntities || []),
+        requested_schemas: JSON.stringify(isa.request.entities),
+        purpose: isa.request.purpose,
+        license: isa.request.license,
+        accepted: true,
+        expires_at: expires_at,
+        acknowledged_at: new Date,
+        resolved_at: new Date
+      }).then(function(created) {
+        isar_id = created.id
+        return information_sharing_agreement.create({
+          isar_id: created.id,
+          from_id: user_id,
+          to_id: req.user.id
+        })
+      }).then(function(created) {
+        isa_id = created.id
+        return Promise.all(
+          isa.response.entities.map(function(resource_id) {
+            return information_sharing_permission.create({
+              isa_id: created.id,
+              user_datum_id: resource_id
+            })
+          })
+        )
+      }).then(function(created) {
+        return crypto_key.findOne({
+          where: {
+            owner_id: req.user.id,
+            alias: 'eis'
+          }
+        })
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(isa)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        document.isaSignature = signature.toString('base64')
+        document.isa.response.respondedBy = req.user.id
+        document.isa.response.respondedAt = new Date
+        document.isa.response.expiresAt = expires_at
+        return information_sharing_agreement_receipt.create({
+          isa_id: isa_id,
+          isar_id: isar_id,
+          receipt: JSON.stringify(document)
+        })
+      }).then(function(created) {
+        process.send({
+          notification_request: {
+            user_id: user_id,
+            notification: {
+              title: 'Information Sharing Agreement Request Accepted',
+              body: 'Your ISA request was accepted'
+            },
+            data: {
+              type: 'information_sharing_agreement_request_accepted',
+              isa_id: isa_id
+            }
+          }
+        })
+        return Promise.resolve()
+      }).then(function() {
+        return res.status(201).json({
+          error: false,
+          status: 201,
+          message: 'created information_sharing_agreement record',
+          body: {id: isa_id}
+        })
+      }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
