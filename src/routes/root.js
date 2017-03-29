@@ -47,12 +47,9 @@ module.exports = [
       } = this.get('models')
       var errors = this.get('db_errors')
       user.findOne({
-        where: {
-          id: user_id,
-          $or: [
-            {email: email}
-          ]
-        }
+        where: email ?
+        {email: email} :
+        {id: user_id}
       }).then(function(found) {
         if (found) {
           return Promise.all([
