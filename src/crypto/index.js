@@ -47,7 +47,16 @@ module.exports = {
       }
       return Promise.resolve(buffers)
     },
-    // TODO sign: function() {},
+    sign: function(algorithm, private_key, plaintext) {
+      if (algorithm === 'secp256k1') {
+        return secp.sign(
+          private_key,
+          crypto.createHash('sha256').update(plaintext).digest()
+        )
+      }
+      // TODO rsa signing
+      throw new Error('unsupported algorithm')
+    },
     verify: function(algorithm, public_key, plaintext, signature) {
       var [b_public_key, b_signable, b_signature] = buffers_for_verify(algorithm, public_key, plaintext, signature)
       if (!b_public_key) {
