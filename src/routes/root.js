@@ -37,6 +37,7 @@ module.exports = [
     active: false,
     callback: function(req, res) {
       var {user_id, email} = req.query
+      console.log('from query', user_id, email)
       var {
         user,
         user_action,
