@@ -52,7 +52,6 @@ module.exports = function(recipient, notification, data, onsent) {
   // attach listeners
   request.on('response', function(res) {
     
-    
     var response = ''
     res.on('data', function(d) {
       response += d
@@ -60,6 +59,7 @@ module.exports = function(recipient, notification, data, onsent) {
       try {
         response = JSON.parse(response)
       } catch (e) {
+        console.log('json parse failed', response)
         return onsent(e)
       }
 
