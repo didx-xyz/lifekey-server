@@ -338,7 +338,7 @@ module.exports = [
             }
           })
         )
-      }).catch(function(err) {
+      }.bind(this)).catch(function(err) {
         err = errors(err)
         return res.status(
           err.status || 500
