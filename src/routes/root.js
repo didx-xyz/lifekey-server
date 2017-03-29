@@ -55,6 +55,7 @@ module.exports = [
       }).then(function(deletes) {
         var [
           user_deleted,
+          user_action_deleted,
           user_device_deleted,
           crypto_key_deleted,
           user_datum_deleted
@@ -62,7 +63,7 @@ module.exports = [
         return res.status(200).json({
           error: false,
           status: 200,
-          message: `deleted {{ ${user_deleted} users, ${user_device_deleted} user_devices, ${crypto_key_deleted} crypto_keys, and ${user_datum_deleted} user_data`,
+          message: `deleted {{ ${user_deleted} users, ${user_action_deleted} user_actions, ${user_device_deleted} user_devices, ${crypto_key_deleted} crypto_keys, and ${user_datum_deleted} user_data`,
           body: null
         })
       }).catch(function(err) {
