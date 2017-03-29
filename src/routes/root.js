@@ -37,7 +37,13 @@ module.exports = [
     active: false,
     callback: function(req, res) {
       var {user_id, email} = req.query
-      var {user, user_device, crypto_key, user_datum} = this.get('models')
+      var {
+        user,
+        user_action,
+        user_device,
+        crypto_key,
+        user_datum
+      } = this.get('models')
       var errors = this.get('db_errors')
       user.findOne({
         where: (
@@ -46,13 +52,21 @@ module.exports = [
           {email: email}
         )
       }).then(function(found) {
-        return Promise.all([
-          user.destroy({where: {id: found.id}}),
-          user_action.destroy({where: {owner_id: found.id}}),
-          user_device.destroy({where: {owner_id: found.id}}),
-          crypto_key.destroy({where: {owner_id: found.id}}),
-          user_datum.destroy({where: {owner_id: found.id}})
-        ])
+        if (found) {
+          return Promise.all([
+            user.destroy({where: {id: found.id}}),
+            user_action.destroy({where: {owner_id: found.id}}),
+            user_device.destroy({where: {owner_id: found.id}}),
+            crypto_key.destroy({where: {owner_id: found.id}}),
+            user_datum.destroy({where: {owner_id: found.id}})
+          ])
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(deletes) {
         var [
           user_deleted,
