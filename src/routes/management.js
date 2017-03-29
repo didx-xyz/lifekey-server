@@ -2336,18 +2336,33 @@ module.exports = [
 
       // TODO check for existing connection before continuing
 
-      information_sharing_agreement_request.create({
-        from_id: user_id,
-        to_id: req.user.id,
-        acknowledged: true,
-        optional_schemas: JSON.stringify(isa.request.optionalEntities || []),
-        requested_schemas: JSON.stringify(isa.request.entities),
-        purpose: isa.request.purpose,
-        license: isa.request.license,
-        accepted: true,
-        expires_at: expires_at,
-        acknowledged_at: new Date,
-        resolved_at: new Date
+      user_action.findOne({
+        where: {
+          owner_id: user_id,
+          id: action_id
+        }
+      }).then(function(found) {
+        if (found) {
+          return information_sharing_agreement_request.create({
+            from_id: user_id,
+            to_id: req.user.id,
+            acknowledged: true,
+            optional_schemas: JSON.stringify(isa.request.optionalEntities || []),
+            requested_schemas: JSON.stringify(isa.request.entities),
+            purpose: isa.request.purpose,
+            license: isa.request.license,
+            accepted: true,
+            expires_at: expires_at,
+            acknowledged_at: new Date,
+            resolved_at: new Date
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
       }).then(function(created) {
         isar_id = created.id
         return information_sharing_agreement.create({

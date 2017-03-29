@@ -1625,11 +1625,14 @@ describe('management endpoints', function() {
       }))
     })
 
+    it.skip('should respond with an error if it cannot find the specified action', function(done) {})
+
     it('should establish a new isa', function(done) {
 
       mgmt_action_get_all.callback.call(mock.express, {
         params: {user_id: test_users[4].id}
       }, mock.res(function(res) {
+        
         var action_id = res.body[0].id
         
         mgmt_action_get_one.callback.call(mock.express, {
@@ -1638,9 +1641,9 @@ describe('management endpoints', function() {
             action_id: action_id
           }
         }, mock.res(function(res) {
+
           var document = res.body.document
           document.isa.response = {entities: [1, 2, 3, 4]}
-
           mgmt_isa_by_action.callback.call(mock.express, {
             user: {id: test_users[0].id},
             params: {user_id: test_users[4].id, action_id: action_id},
