@@ -38,6 +38,7 @@ module.exports = [
     callback: function(req, res) {
       var {user_id, email} = req.query
       var {user, user_device, crypto_key, user_datum} = this.get('models')
+      var errors = this.get('db_errors')
       user.findOne({
         where: (
           user_id ?
@@ -67,7 +68,10 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        return res.status(err.status || 500).json({
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
           error: err.error || true,
           status: err.status || 500,
           message: err.message || 'internal server error',
