@@ -47,8 +47,8 @@ module.exports = [
       var errors = this.get('db_errors')
       user.findOne({
         where: {
+          id: user_id,
           $or: [
-            {id: user_id},
             {email: email}
           ]
         }
