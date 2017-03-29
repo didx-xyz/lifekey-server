@@ -6,28 +6,20 @@ var url = require('url')
 var fcm = require('../messaging/fcm')
 var webhook = require('../messaging/webhook')
 
-var MAX_RETRIES = 9
-
 var failures = {
   fcm: [],
-  webhook: []
+  webhook: [],
+  retries: 9
 }
 
-function retryonsent(arr, idx, err) {
-  var retry = failures[arr][idx]
-  if (err) {
-    failures[arr][idx].ttl -= 1
-  } else {
-    failures[arr].splice(idx, 1)
-    console.log('reached', retry.uri, 'after', (MAX_RETRIES - retry.ttl), 'attempts')
-  }
-}
+var db, models
 
 require('./database')(
   false // disable logging
 ).then(function(database) {
 
-  var {db, models} = database
+  db = database.db
+  models = database.models
 
   process.on('message', function(msg) {
 
@@ -54,15 +46,13 @@ require('./database')(
             data.type,
             notification,
             data,
-            function(err) {
-              if (err) {
-                console.log('notifier service retry for', value)
-                failures.webhook.push({
-                  uri: value,
-                  msg: msg.notification_request,
-                  ttl: MAX_RETRIES
-                })
-              }
+            function() {
+              console.log('notifier retry', value)
+              failures.webhook.push({
+                uri: value,
+                msg: msg.notification_request,
+                ttl: failures.retries
+              })
             }
           )
         } else {
@@ -82,15 +72,43 @@ require('./database')(
 var retryTimer = setInterval(function() {
   // TODO fcm retries
   
-  for (var i = failures.webhook.length - 1; i >= 0; i--) {
-    var icur = failures.webhook[i]
-    if (icur.ttl === 0) failures.webhook.splice(i, 1)
-    webhook(
-      url.parse(icur.uri),
-      icur.msg.data.type,
-      icur.msg.notification,
-      icur.msg.data,
-      retryonsent.bind({arr: 'webhook', idx: i})
-    )
-  }
-}, 20 * 1000)
+  Promise.all(
+    failures.webhook.map(function(hook) {
+      return webhook(
+        url.parse(hook.uri),
+        hook.msg.data.type,
+        hook.msg.notification,
+        hook.msg.data
+      )
+    })
+  ).then(function(res) {
+    for (var i = res.length - 1; i >= 0; i--) {
+      if (res[i]) {
+        console.log('msg sent')
+        failures.webhook.splice(i, 1)
+        continue
+      }
+      if (failures.webhook[i]) {
+        if (failures.webhook[i].ttl === 0) {
+          console.log('msg dropped')
+          var dropped = failures.webhook.splice(i, 1)
+          models.dropped_message.create({
+            owner_id: dropped.msg.user_id,
+            dropped_at: new Date,
+            contents: JSON.stringify(dropped.msg)
+          }).catch(
+            console.log.bind(
+              console,
+              'ERROR SAVING DROPPED MESSAGE'
+            )
+          )
+        } else {
+          failures.webhook[i].ttl -= 1
+          console.log('retrying', failures.webhook[i].ttl)
+        }
+      } else {
+        console.log('this is weird')
+      }
+    }
+  }).catch(console.log)
+}, 2 * 1000)
