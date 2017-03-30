@@ -19,6 +19,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
+    action_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
+    },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
