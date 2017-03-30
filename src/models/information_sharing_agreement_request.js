@@ -27,11 +27,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    optional_schemas: {
+    optional_entities: {
       type: sqlize.TEXT,
       allowNull: true
     },
-    requested_schemas: {
+    required_entities: {
       type: sqlize.TEXT,
       allowNull: false
     },
