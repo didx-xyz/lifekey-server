@@ -254,10 +254,23 @@ describe('resource', function() {
   })
 
   describe(`${profile_colour_update.method.toUpperCase()} ${profile_colour_update.uri}`, function() {
-    it('should allow the update of the colour field', function(done) {
+    it('should not allow the update of the colour field if non hex colour code given', function(done) {
       profile_colour_update.callback.call(mock.express, {
         user: {id: test_user.id},
         body: {colour: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('invalid hex colour code given')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+      
+    })
+    it('should allow the update of the colour field', function(done) {
+      profile_colour_update.callback.call(mock.express, {
+        user: {id: test_user.id},
+        body: {colour: '#f00'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
