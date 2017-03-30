@@ -24,14 +24,17 @@ module.exports = function(uri, type, notification, data, onfailure) {
         clearTimeout(deadlineTimer)
         resolve(true)
       } else {
+        console.log('got non-200 response code from', uri.hostname)
         if (typeof onfailure === 'function') onfailure()
         resolve()
       }
     }).on('abort', function() {
       if (typeof onfailure === 'function') onfailure()
-      resovle()
+      console.log('aborted webhook to', uri.hostname)
+      resolve()
     }).on('error', function(err) {
       clearTimeout(deadlineTimer)
+      console.log('error reaching', uri.hostname, err)
       if (typeof onfailure === 'function') onfailure()
       resolve()
     }).end(
