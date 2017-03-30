@@ -2541,7 +2541,7 @@ module.exports = [
     callback: function(req, res) {
       var {action_id} = req.params
       var {user_action} = this.get('models')
-      var errors = this.get('db_models')
+      var errors = this.get('db_errors')
 
       user_action.destroy({
         where: {
