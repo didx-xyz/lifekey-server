@@ -342,6 +342,8 @@ module.exports = [
             message: 'ok',
             body: {
               user: {
+                branding_colour: found.branding_colour_code,
+                branding_image_uri: found.branding_image_uri,
                 nickname: found.nickname,
                 id: found.id,
                 did: found.did
