@@ -22,6 +22,11 @@ module.exports = function(instance, sqlize) {
       allowNull: true,
       unique: true
     },
+    actions_url: {
+      type: sqlize.STRING,
+      allowNull: true,
+      unique: true
+    },
     app_activation_code: {
       type: sqlize.STRING,
       allowNull: false
