@@ -29,7 +29,7 @@ module.exports = function(instance, sqlize) {
     branding_colour_code: {
       type: sqlize.STRING,
       allowNull: true,
-      defaultValue: '#00beef'
+      defaultValue: '#1A7BFF'
     },
     app_activation_code: {
       type: sqlize.STRING,
