@@ -380,6 +380,15 @@ module.exports = [
       var {user} = this.get('models')
       var errors = this.get('db_errors')
       var {colour} = req.body
+      var hex_colour = /^#(?:[0-9a-f]{3}){1,2}$/i
+      if (!hex_colour.test(colour)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'invalid hex colour code given',
+          body: null
+        })
+      }
       user.update(
         {branding_colour_code: colour},
         {where: {id: req.user.id}}
