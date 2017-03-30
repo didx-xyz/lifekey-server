@@ -22,6 +22,15 @@ module.exports = function(instance, sqlize) {
       allowNull: true,
       unique: true
     },
+    branding_image_uri: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
+    branding_colour_code: {
+      type: sqlize.STRING,
+      allowNull: true,
+      defaultValue: '#1A7BFF'
+    },
     app_activation_code: {
       type: sqlize.STRING,
       allowNull: false
