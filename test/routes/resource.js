@@ -13,6 +13,9 @@ var resource_create = routes[2]
 var resource_update = routes[3]
 var resource_delete = routes[4]
 
+var profile_colour_update = routes[6]
+var profile_image_update = routes[7]
+
 describe('resource', function() {
   
   var test_user
@@ -245,6 +248,36 @@ describe('resource', function() {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
         expect(res.body.length).to.equal(4)
+        done()
+      }))
+    })
+  })
+
+  describe(`${profile_colour_update.method.toUpperCase()} ${profile_colour_update.uri}`, function() {
+    it('should allow the update of the colour field', function(done) {
+      profile_colour_update.callback.call(mock.express, {
+        user: {id: test_user.id},
+        body: {colour: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${profile_image_update.method.toUpperCase()} ${profile_image_update.uri}`, function() {
+    it('should allow the update of the image field', function(done) {
+      profile_image_update.callback.call(mock.express, {
+        user: {id: test_user.id},
+        body: {image_uri: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
         done()
       }))
     })

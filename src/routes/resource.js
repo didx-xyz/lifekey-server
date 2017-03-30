@@ -342,8 +342,8 @@ module.exports = [
             message: 'ok',
             body: {
               user: {
-                branding_colour: found.branding_colour_code,
-                branding_image_uri: found.branding_image_uri,
+                colour: found.branding_colour_code,
+                image_uri: found.branding_image_uri,
                 nickname: found.nickname,
                 id: found.id,
                 did: found.did
@@ -358,6 +358,74 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 6 PUT /profile/colour
+  {
+    uri: '/profile/colour',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {colour} = req.body
+      user.update(
+        {branding_colour_code: colour},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 7 PUT /profile/image
+  {
+    uri: '/profile/image',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {image_uri} = req.body
+      user.update(
+        {branding_image_uri: image_uri},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
