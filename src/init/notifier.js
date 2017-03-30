@@ -85,13 +85,11 @@ var retryTimer = setInterval(function() {
   ).then(function(res) {
     for (var i = res.length - 1; i >= 0; i--) {
       if (res[i]) {
-        console.log('msg sent')
         failures.webhook.splice(i, 1)
         continue
       }
       if (failures.webhook[i]) {
         if (failures.webhook[i].ttl === 0) {
-          console.log('msg dropped')
           var dropped = failures.webhook.splice(i, 1)
           models.dropped_message.create({
             owner_id: dropped.user_id,
@@ -105,10 +103,9 @@ var retryTimer = setInterval(function() {
           )
         } else {
           failures.webhook[i].ttl -= 1
-          console.log('retrying', failures.webhook[i].ttl)
         }
       } else {
-        console.log('this is weird')
+        console.log('this should never happen :3')
       }
     }
   }).catch(console.log)
