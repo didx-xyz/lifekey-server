@@ -33,6 +33,7 @@ module.exports = [
         device_id,
         device_platform,
         webhook_url,
+        actions_url,
         public_key_algorithm,
         public_key,
         plaintext_proof,
@@ -93,6 +94,27 @@ module.exports = [
             })
           } else {
             is_programmatic_user = true
+          }
+        }
+
+        if (actions_url) {
+          try {
+            var actionhook = url.parse(actions_url)
+          } catch (e) {
+            caught = true
+          } finally {
+            if (caught || !actionhook.host) {
+              return res.status(400).json({
+                error: true,
+                status: 400,
+                message: (
+                  caught ?
+                  'expected string type for actions_url' :
+                  'url not given for actions_url'
+                ),
+                body: null
+              })
+            }
           }
         }
       }
@@ -668,7 +690,7 @@ module.exports = [
     active: true,
     callback: function(req, res) {
 
-      var {user_connection_request_id} = req.params
+      var {user, user_connection_request_id} = req.params
       var {accepted} = req.body
       var uc, ucr, requested_id // user id of target
 
@@ -718,34 +740,41 @@ module.exports = [
           body: null
         })
       }).then(function(updated) {
-        if (updated) {
+        if (updated && accepted) {
           // update the associated uc record
-          return user_connection.create({
-            to_id: updated.to_id,
-            from_id: updated.from_id,
-            to_did: updated.to_did,
-            from_did: updated.from_did,
-            enabled: accepted
+          return Promise.all([
+            user_connection.create({
+              to_id: updated.to_id,
+              from_id: updated.from_id,
+              to_did: updated.to_did,
+              from_did: updated.from_did,
+              enabled: accepted
+            }),
+            user.findOne({where: {id: updated.from_id}})
+          ])
+        } else if (updated && !accepted) {
+          return Promise.resolve(false)
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'update failed',
+            body: null
           })
         }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'update failed',
-          body: null
-        })
-      }).then(function(created) {
-        if (created) {
-          uc = created
+      }).then(function(create_and_find) {
+        if (create_and_find) {
+          uc = create_and_find[0]
           var pnr_notif = {
             title: 'User Connection',
             body: 'User connection successfully created!'
           }, pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
-            user_connection_id: created.id,
-            uc_id: created.id,
+            user_connection_id: create_and_find[0].id,
+            uc_id: create_and_find[0].id,
             to_id: ucr.to_id,
+            actions_url: create_and_find[1].actions_url,
             from_id: ucr.from_id
           }
           process.send({
@@ -755,24 +784,32 @@ module.exports = [
               data: pnr_data
             }
           })
-          return Promise.resolve()
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create user_connection record',
-          body: null
-        })
-      }).then(function() {
-        // node generates a warning if this res.json
-        // call is NOT wrapped in a promise O_o
-        return Promise.resolve(
-          res.status(201).json({
-            error: false,
-            status: 201,
-            message: 'user_connection created',
-            body: {id: uc.id}
+          process.send({
+            notification_request: {
+              user_id: ucr.to_id,
+              notification: pnr_notif,
+              data: pnr_data
+            }
           })
+        }
+        return Promise.resolve()
+      }).then(function() {
+        return Promise.resolve(
+          accepted ? (
+            res.status(201).json({
+              error: false,
+              status: 201,
+              message: 'user_connection created',
+              body: {id: uc.id}
+            })
+          ) : (
+            res.status(200).json({
+              error: false,
+              status: 200,
+              message: 'user_connection rejected',
+              body: null
+            })
+          )
         )
       }).catch(function(err) {
         return res.status(
@@ -947,8 +984,8 @@ module.exports = [
 
       var {
         to,
-        optional_schemas,
-        requested_schemas,
+        optional_entities,
+        required_entities,
         purpose,
         license
       } = req.body
@@ -962,16 +999,16 @@ module.exports = [
         })
       }
       
-      if (!(Array.isArray(requested_schemas) && requested_schemas.length)) {
+      if (!(Array.isArray(required_entities) && required_entities.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'expected lengthy arrayish type for requested_schemas field',
+          message: 'expected lengthy arrayish type for required_entities field',
           body: null
         })
       }
 
-      // requested_schemas
+      // required_entities
       // [
       //   {schema: 'Person', description: '...'},
       //   {schema: 'PostalAddress', description: 'work'}
@@ -1029,8 +1066,8 @@ module.exports = [
             to_did: to_user.did,
             to_id: to_user.id,
             license: license,
-            optional_schemas: JSON.stringify(optional_schemas),
-            requested_schemas: JSON.stringify(requested_schemas),
+            optional_entities: JSON.stringify(optional_entities),
+            required_entities: JSON.stringify(required_entities),
             purpose: purpose
           })
         }
@@ -1073,6 +1110,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1288,7 +1326,7 @@ module.exports = [
           body.unacked = isars.map(isar => {
             return {
               id: isar.id,
-              requested_schemas: JSON.parse(isar.requested_schemas)
+              required_entities: JSON.parse(isar.required_entities)
             }
           })
         }
@@ -2202,9 +2240,7 @@ module.exports = [
     active: true,
     callback: function(req, res) {
       var {user_id, action_id} = req.params
-      var {crypto_key, user_action} = this.get('models')
-      var blank
-
+      var {user_action} = this.get('models')
       user_action.findOne({
         where: {
           owner_id: user_id,
@@ -2212,25 +2248,18 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
-          blank = {
-            '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
-            isa: {
-              requestSignatureValue: null,
-              request: {
-                purpose: found.purpose,
-                license: found.license,
-                entities: JSON.parse(found.entities),
-                optionalEntities: JSON.parse(found.optional_entities),
-                durationDays: found.duration_days,
-                requestedBy: user_id,
-                action: found.id
-              }
-            }
-          }
-          return crypto_key.findOne({
-            where: {
-              owner_id: user_id,
-              alias: 'eis'
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              purpose: found.purpose,
+              license: found.license,
+              entities: JSON.parse(found.entities),
+              optionalEntities: JSON.parse(found.optional_entities),
+              durationDays: found.duration_days,
+              requestedBy: user_id,
+              action: found.id
             }
           })
         }
@@ -2240,31 +2269,8 @@ module.exports = [
           message: 'user_action record not found',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          return our_crypto.asymmetric.sign(
-            'secp256k1',
-            found.private_key,
-            JSON.stringify(blank.isa.request)
-          )
-        }
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'crypto_key record not found',
-          body: null
-        })
-      }).then(function(signature) {
-        blank.isa.requestSignatureValue = signature.toString('base64')
-        return Promise.resolve()
-      }).then(function() {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: {document: blank}
-        })
       }).catch(function(err) {
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2284,7 +2290,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       // NOTE
       // the client shouldn't have to post the action document that they're accepting
       // they should only have to reference the user and action id
@@ -2301,11 +2307,9 @@ module.exports = [
       } = this.get('models')
 
       var errors = this.get('db_errors')
-
-      var isar_id, isa_id, {document} = req.body
-
-
-      if (!document) {
+      var isar_id, isa_id, {entities, optional_entities} = req.body
+      
+      if (!(Array.isArray(entities) && entities.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -2313,29 +2317,8 @@ module.exports = [
           body: null
         })
       }
-
-      var {isa} = document
-
-      // TODO add more guards: ensure the document being posted matches the user/action ids
-
-      if (typeof isa !== 'object' ||
-          isa === null ||
-          typeof isa.response !== 'object' ||
-          isa.response === null ||
-          (Array.isArray(isa.entities) && isa.entities.length)) {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'missing required arguments',
-          body: null
-        })
-      }
-
-      var expires_at = new Date
-      expires_at.setDate(expires_at.getDate() + isa.request.durationDays)
-
+      
       // TODO check for existing connection before continuing
-
       user_action.findOne({
         where: {
           owner_id: user_id,
@@ -2343,14 +2326,18 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
+          var expires_at = new Date
+          expires_at.setDate(expires_at.getDate() + found.duration_days)
           return information_sharing_agreement_request.create({
             from_id: user_id,
             to_id: req.user.id,
+            action_id: action_id,
             acknowledged: true,
-            optional_schemas: JSON.stringify(isa.request.optionalEntities || []),
-            requested_schemas: JSON.stringify(isa.request.entities),
-            purpose: isa.request.purpose,
-            license: isa.request.license,
+            optional_entities: JSON.stringify(optional_entities || []),
+            required_entities: JSON.stringify(entities),
+            duration_days: found.duration_days,
+            purpose: found.purpose,
+            license: found.license,
             accepted: true,
             expires_at: expires_at,
             acknowledged_at: new Date,
@@ -2373,44 +2360,13 @@ module.exports = [
       }).then(function(created) {
         isa_id = created.id
         return Promise.all(
-          isa.response.entities.map(function(resource_id) {
+          entities.map(function(resource_id) {
             return information_sharing_permission.create({
               isa_id: created.id,
               user_datum_id: resource_id
             })
           })
         )
-      }).then(function(created) {
-        return crypto_key.findOne({
-          where: {
-            owner_id: req.user.id,
-            alias: 'eis'
-          }
-        })
-      }).then(function(found) {
-        if (found) {
-          return our_crypto.asymmetric.sign(
-            'secp256k1',
-            found.private_key,
-            JSON.stringify(isa)
-          )
-        }
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'crypto_key record not found',
-          body: null
-        })
-      }).then(function(signature) {
-        document.isaSignature = signature.toString('base64')
-        document.isa.response.respondedBy = req.user.id
-        document.isa.response.respondedAt = new Date
-        document.isa.response.expiresAt = expires_at
-        return information_sharing_agreement_receipt.create({
-          isa_id: isa_id,
-          isar_id: isar_id,
-          receipt: JSON.stringify(document)
-        })
       }).then(function(created) {
         process.send({
           notification_request: {
@@ -2432,6 +2388,180 @@ module.exports = [
           status: 201,
           message: 'created information_sharing_agreement record',
           body: {id: isa_id}
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 23 GET /management/receipt/:isa_id
+  {
+    uri: '/management/receipt/:isa_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {
+        crypto_key,
+        information_sharing_agreement,
+        information_sharing_agreement_request
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var isar, receipt
+
+      information_sharing_agreement.findOne({
+        where: {id: isa_id}
+      }).then(function(found) {
+        if (found) {
+          if (found.to_id === req.user.id || found.from_id === req.user.id) {
+            return information_sharing_agreement_request.findOne({
+              where: {id: found.isar_id}
+            })
+          }
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          isar = found
+          receipt = {
+            '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
+            isaSignatureValue: null,
+            isa: {
+              requestSignatureValue: null,
+              request: {
+                purpose: isar.purpose,
+                license: isar.license,
+                entities: JSON.parse(isar.required_entities),
+                optionalEntities: JSON.parse(isar.optional_entities),
+
+                // TODO requires data model change
+                // durationDays: isar.duration_days,
+                requestedBy: isar.from_id,
+                action: isar.action_id
+              },
+              response: {
+                respondedBy: isar.to_id
+              }
+            }
+          }
+          return crypto_key.findOne({
+            where: {
+              owner_id: isar.from_id,
+              alias: 'eis'
+            }
+          })
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'information_sharing_agreement_request record not found',
+            body: null
+          })
+        }
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(receipt.isa.request)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        receipt.isa.requestSignatureValue = signature.toString('base64')
+        return crypto_key.findOne({
+          where: {
+            owner_id: isar.from_id,
+            alias: 'eis'
+          }
+        })
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(receipt.isa)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        receipt.isaSignatureValue = signature.toString('base64')
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: receipt
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 24 DELETE /management/action/:action_id
+  {
+    uri: '/management/action/:action_id',
+    method: 'delete',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {action_id} = req.params
+      var {user_action} = this.get('models')
+      var errors = this.get('db_models')
+
+      user_action.destroy({
+        where: {
+          owner_id: req.user.id,
+          id: action_id
+        }
+      }).then(function(deleted) {
+        if (deleted) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {user_action: deleted}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
         })
       }).catch(function(err) {
         err = errors(err)
