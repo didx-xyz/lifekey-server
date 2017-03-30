@@ -50,6 +50,7 @@ require('./database')(
               console.log('notifier retry', value)
               failures.webhook.push({
                 uri: value,
+                user_id: user_id,
                 msg: msg.notification_request,
                 ttl: failures.retries
               })
@@ -93,7 +94,7 @@ var retryTimer = setInterval(function() {
           console.log('msg dropped')
           var dropped = failures.webhook.splice(i, 1)
           models.dropped_message.create({
-            owner_id: dropped.msg.user_id,
+            owner_id: dropped.user_id,
             dropped_at: new Date,
             contents: JSON.stringify(dropped.msg)
           }).catch(
