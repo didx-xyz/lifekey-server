@@ -29,7 +29,7 @@ module.exports = function(uri, type, notification, data, onfailure) {
       }
     }).on('abort', function() {
       if (typeof onfailure === 'function') onfailure()
-      resovle()
+      resolve()
     }).on('error', function(err) {
       clearTimeout(deadlineTimer)
       if (typeof onfailure === 'function') onfailure()
