@@ -17,6 +17,7 @@ var routes = require('../../src/routes/management')
 var now = Date.now()
 var respondid, respondid2 // sender of connection requests
 var actions_receipts_isa_id
+var action_delete_id
 var isar_respond1, isar_respond2
 var created_isa_id
 var update_uc, update_uc2
@@ -1541,6 +1542,7 @@ describe('management endpoints', function() {
         expect(res.message).to.equal('created')
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.id).to.equal('number')
+        action_delete_id = res.body.id
         done()
       }))
     })
@@ -1698,6 +1700,37 @@ describe('management endpoints', function() {
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.isaSignatureValue).to.equal('string')
         expect(typeof res.body.isa.requestSignatureValue).to.equal('string')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_delete.method.toUpperCase()} ${mgmt_action_delete.uri}`, function() {
+
+    it('should respond with an error if the action was not found', function(done) {
+      mgmt_action_delete.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        params: {action_id: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user_action record not found')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with a number if the record was deleted', function(done) {
+      mgmt_action_delete.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        params: {action_id: action_delete_id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.user_action).to.equal('number')
+        expect(res.body.user_action).to.equal(1)
         done()
       }))
     })
