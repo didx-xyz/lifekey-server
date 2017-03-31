@@ -454,17 +454,17 @@ module.exports = [
           enabled: true,
           $and: [
             {
-              $or: [
-                {to_id: req.user.id},
-                {to_did: req.user.did},
-                {from_id: req.user.id},
-                {from_did: req.user.did},
-                {to_id: target},
-                {to_did: target},
-                {from_id: target},
-                {from_did: target}
-              ]
-            }
+                $or: [
+                  {from_id: req.user.id},
+                  {from_did: req.user.did}
+                ]
+              },
+              {
+                $or: [
+                  {to_id: target},
+                  {to_did: target}
+                ]
+              }
           ]
         }
       }).then(function(found) {
@@ -487,14 +487,14 @@ module.exports = [
             $and: [
               {
                 $or: [
-                  {to_id: req.user.id},
-                  {to_did: req.user.did},
                   {from_id: req.user.id},
-                  {from_did: req.user.did},
+                  {from_did: req.user.did}
+                ]
+              },
+              {
+                $or: [
                   {to_id: target},
-                  {to_did: target},
-                  {from_id: target},
-                  {from_did: target}
+                  {to_did: target}
                 ]
               }
             ]
