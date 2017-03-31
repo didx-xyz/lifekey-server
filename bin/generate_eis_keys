@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+
+var fs = require('fs')
+var crypto = require('crypto')
+
+try {
+  fs.writeFileSync(
+    __dirname + '/../etc/keys/EIS_SIGNER_KEY.json',
+    JSON.stringify({private_key: crypto.rng(32).toString('hex')})
+  )
+} catch (e) {
+  console.log('unable to write private key to disk', e)
+  process.exit(1)
+}
+
+
+try {
+  fs.writeFileSync(
+    __dirname + '/../etc/keys/EIS_ADMIN_KEY.json',
+    JSON.stringify({private_key: crypto.rng(32).toString('hex')})
+  )
+} catch (e) {
+  console.log('unable to write private key to disk', e)
+  process.exit(1)
+}
+
+console.log('wrote eis private keys to disk')
+process.exit(0)

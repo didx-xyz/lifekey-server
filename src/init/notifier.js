@@ -91,10 +91,11 @@ var retryTimer = setInterval(function() {
       if (failures.webhook[i]) {
         if (failures.webhook[i].ttl === 0) {
           var dropped = failures.webhook.splice(i, 1)
+          console.log('about to save droped message', dropped)
           models.dropped_message.create({
             owner_id: dropped.user_id,
             dropped_at: new Date,
-            contents: JSON.stringify(dropped.msg)
+            contents: JSON.stringify(dropped.msg || '{}')
           }).catch(
             console.log.bind(
               console,
