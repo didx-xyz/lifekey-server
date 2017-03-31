@@ -633,9 +633,7 @@ module.exports = [
       }).then(function(user_connection_requests) {
         if (user_connection_requests) {
           // append to data structure
-          body.unacked = user_connection_requests.map(ucr => {
-            return {id: ucr.id, document: ucr.document}
-          })
+          body.unacked = user_connection_requests.map(ucr => ucr.id)
         }
 
         // respond!
