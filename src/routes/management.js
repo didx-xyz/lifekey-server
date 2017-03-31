@@ -455,14 +455,10 @@ module.exports = [
           $and: [
             {
               $or: [
-                {to_id: req.user.id},
-                {to_did: req.user.did},
                 {from_id: req.user.id},
                 {from_did: req.user.did},
                 {to_id: target},
-                {to_did: target},
-                {from_id: target},
-                {from_did: target}
+                {to_did: target}
               ]
             }
           ]
@@ -487,14 +483,10 @@ module.exports = [
             $and: [
               {
                 $or: [
-                  {to_id: req.user.id},
-                  {to_did: req.user.did},
                   {from_id: req.user.id},
                   {from_did: req.user.did},
                   {to_id: target},
-                  {to_did: target},
-                  {from_id: target},
-                  {from_did: target}
+                  {to_did: target}
                 ]
               }
             ]
