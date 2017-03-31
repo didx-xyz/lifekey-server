@@ -18,16 +18,26 @@ DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
 # stop the sevice and remove current source code
 ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
-    "stop lifekey-server; rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io"
+    "stop lifekey-server || echo 'lifekey-server not running'
+    rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io || echo 'lifekey-server source code does not exist'"
 
 # copy new source code
 scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" \
     "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
 
-# copy service configurations to respective locations and restart the service
+# copy service configurations to respective locations
+# ensure required keys exist
+# and restart the service
 ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
     "cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/cloud_sql_proxy.conf /etc/init
     cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/lifekey-server.conf /etc/init
     cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io /etc/nginx/sites-available
+    if [ -e /root/lifekey/EIS_ADMIN_KEY.json ]; then
+      cp -R ~/lifekey/*.json /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys
+    else
+      source /opt/nvm/nvm.sh
+      /srv/$SERVER_ENV.api.lifekey.cnsnt.io/bin/generate_eis_keys
+      cp /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys/*.json /root/lifekey
+    fi
     start lifekey-server
     service nginx restart"

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+'use strict'
+
 var fs = require('fs')
 var crypto = require('crypto')
 
@@ -12,7 +14,6 @@ try {
   console.log('unable to write private key to disk', e)
   process.exit(1)
 }
-
 
 try {
   fs.writeFileSync(
