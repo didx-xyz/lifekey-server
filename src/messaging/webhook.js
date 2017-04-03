@@ -20,8 +20,8 @@ module.exports = function(uri, type, notification, data, onfailure) {
     }, 5000)
     
     request.on('response', function(r) {
+      clearTimeout(deadlineTimer)
       if (r.statusCode === 200) {
-        clearTimeout(deadlineTimer)
         resolve(true)
       } else {
         console.log('got non-200 response code from', uri.hostname)
