@@ -8,7 +8,7 @@ apt-get update && apt-get install -y \
     build-essential libssl-dev nginx git jq
 
 # workspaces
-mkdir -p /srv /usr/local/opt /etc/lifekey
+mkdir -p /root/lifekey /srv /usr/local/opt /etc/lifekey
 
 echo -n $ENVIRONMENT > /etc/lifekey/environment
 

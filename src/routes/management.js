@@ -278,26 +278,29 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
-          // send a task to the did service
-          // to allocate a did to the new user
-          return is_programmatic_user ? (
-            Promise.resolve()
-          ) : Promise.resolve(
-            process.send({
-              notification_request: {
-                user_id: created_user_id,
-                notification: {
-                  title: 'Your registration with LifeKey is nearly complete!',
-                  body: 'Check your email to conclude registration...'
-                },
-                data: {type: 'sent_activation_email'}
-              },
-              did_allocation_request: {
-                user_id: created_user_id
-                // TODO add more message parameters
-              }
-            })
-          )
+          return Promise.all([
+            crypto_key.create({
+              owner_id: created_user_id,
+              algorithm: 'secp256k1',
+              purpose: 'sign,verify',
+              alias: 'eis',
+              private_key: crypto.rng(32)
+            }),
+            crypto_key.create({
+              owner_id: created_user_id,
+              algorithm: lower_algo,
+              purpose: 'verify',
+              alias: 'client-server-http',
+              public_key: key_buffers[0]
+            }),
+            using_fingerprint ? crypto_key.create({
+              owner_id: created_user_id,
+              algorithm: 'rsa',
+              purpose: 'verify',
+              alias: 'fingerprint',
+              public_key: Buffer.from(fingerprint.public_key, 'utf8')
+            }) : null
+          ])
         }
         return Promise.reject({
           error: true,
@@ -306,42 +309,28 @@ module.exports = [
           body: null
         })
       }).then(function() {
-        return Promise.all([
-          crypto_key.create({
-            owner_id: created_user_id,
-            algorithm: 'secp256k1',
-            purpose: 'sign,verify',
-            alias: 'eis',
-            private_key: crypto.rng(32)
-          }),
-          crypto_key.create({
-            owner_id: created_user_id,
-            algorithm: lower_algo,
-            purpose: 'sign',
-            alias: 'client-server-http',
-            public_key: key_buffers[0]
-          }),
-          using_fingerprint ? crypto_key.create({
-            owner_id: created_user_id,
-            algorithm: 'rsa',
-            purpose: 'sign',
-            alias: 'fingerprint',
-            public_key: Buffer.from(fingerprint.public_key, 'utf8')
-          }) : null
-        ])
-      }).then(function() {
-        return Promise.resolve(
-          // send an activation email
-          process.send({
-            // TODO this kinda stuff needs to be wrapped up and i18n'ed
-            send_email_request: {
-              to: email,
-              subject: 'LifeKey Account Activation',
-              content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
-              mime: 'text/html'
-            }
-          })
-        )
+        process.send({
+          notification_request: {
+            user_id: created_user_id,
+            notification: {
+              title: 'Your registration with LifeKey is nearly complete!',
+              body: 'Check your email to conclude registration...'
+            },
+            data: {type: 'sent_activation_email'}
+          },
+          did_allocation_request: {
+            user_id: created_user_id
+            // TODO add more message parameters
+          },
+          // TODO this kinda stuff needs to be wrapped up and i18n'ed
+          send_email_request: {
+            to: email,
+            subject: 'LifeKey Account Activation',
+            content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
+            mime: 'text/html'
+          }
+        })
+        return Promise.resolve()
       }.bind(this)).then(function() {
         // and finally respond affirmatively
         // to the calling agent

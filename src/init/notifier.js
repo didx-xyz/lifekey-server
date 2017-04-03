@@ -22,50 +22,53 @@ require('./database')(
   models = database.models
 
   process.on('message', function(msg) {
-
-    if (msg.notification_request) {
-      var {user_id, notification, data} = msg.notification_request
-      models.user.findOne({
-        where: {id: user_id}
-      }).then(function(found) {
-        if (found) {
-          if (found.webhook_url) {
-            return Promise.resolve(found.webhook_url)
-          }
-          return models.user_device.findOne({
-            where: {owner_id: user_id}
-          })
-        }
-        return Promise.reject(
-          new Error('couldnt find user by id ' + user_id)
-        )
-      }).then(function(value) {
-        if (typeof value === 'string') {
-          return webhook(
-            url.parse(value),
-            data.type,
-            notification,
-            data,
-            function() {
-              console.log('notifier retry', value)
-              failures.webhook.push({
-                uri: value,
-                user_id: user_id,
-                msg: msg.notification_request,
-                ttl: failures.retries
-              })
-            }
-          )
-        } else {
-          return fcm(
-            value.device_id,
-            notification,
-            data,
-            console.log
-          )
-        }
-      }).catch(console.log)
+    if (!msg.notification_request) {
+      return console.log(
+        'ERROR',
+        'received a message with an unknown type',
+        Object.keys(msg)
+      )
     }
+    var {user_id, notification, data} = msg.notification_request
+    models.user.findOne({
+      where: {id: user_id}
+    }).then(function(found) {
+      if (found) {
+        if (found.webhook_url) {
+          return Promise.resolve(found.webhook_url)
+        }
+        return models.user_device.findOne({
+          where: {owner_id: user_id}
+        })
+      }
+      return Promise.reject(
+        new Error('couldnt find user by id ' + user_id)
+      )
+    }).then(function(value) {
+      if (typeof value === 'string') {
+        return webhook(
+          url.parse(value),
+          data.type,
+          notification,
+          data,
+          function() {
+            console.log('WEBHOOK RETRY', value)
+            failures.webhook.push({
+              uri: value,
+              user_id: user_id,
+              msg: msg.notification_request,
+              ttl: failures.retries
+            })
+          }
+        )
+      }
+      return fcm(
+        value.device_id,
+        notification,
+        data,
+        console.log
+      )
+    }).catch(console.log)
   }).send({ready: true})
 
 })
@@ -105,6 +108,8 @@ var retryTimer = setInterval(function() {
           failures.webhook[i].ttl -= 1
         }
       } else {
+        // this branch will execute if we
+        // clobber the array into being sparse
         console.log('this should never happen :3')
       }
     }
