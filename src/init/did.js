@@ -30,8 +30,6 @@ require('./database')(false).then(function(database) {
       }
     }).then(function(found) {
       if (!found) {
-        // this should never happen cause eis
-        // key is created during registration
         return console.log(
           'fatal error: user has no eis key'
         )
@@ -44,8 +42,8 @@ require('./database')(false).then(function(database) {
         found.private_key.toString('hex'),
         env.EIS_SIGNER_KEY,
         function(err, res) {
-          if (err) console.log('eis uh oh', err)
-          else console.log('eis result', res)
+          if (err) console.log('EIS error', err)
+          else console.log('EIS result', res)
           // user.update(
           //   {did: did},
           //   {where: {id: user_id}}
