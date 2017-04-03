@@ -14,8 +14,8 @@ function load(refresh) {
   }
 
   try {
-    env.EIS_SIGNER_KEY = require(`../../etc/keys/${env.EIS_SIGNER_KEY}`).private_key
-    env.EIS_ADMIN_KEY = require(`../../etc/keys/${env.EIS_ADMIN_KEY}`).private_key
+    env.EIS_SIGNER_KEY = require(env.EIS_SIGNER_KEY).private_key
+    env.EIS_ADMIN_KEY = require(env.EIS_ADMIN_KEY).private_key
   } catch (e) {
     throw new Error('unable to load private keys for eis registry')
   }
