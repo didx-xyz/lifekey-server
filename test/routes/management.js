@@ -1514,6 +1514,7 @@ describe('management endpoints', function() {
       mgmt_action_create.callback.call(mock.express, {
         user: {id: test_users[4].id},
         body: {
+          name: '',
           purpose: '',
           license: '',
           entities: [],
@@ -1527,10 +1528,30 @@ describe('management endpoints', function() {
       }))
     })
 
+    it('should respond with an error if name contains whitespace', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: ' ',
+          purpose: 'foo',
+          license: 'bar',
+          entities: ['baz'],
+          duration_days: 1
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('name cannot contain whitespace')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
     it('should respond with the id of the action that is created', function(done) {
       mgmt_action_create.callback.call(mock.express, {
         user: {id: test_users[4].id},
         body: {
+          name: 'foo',
           purpose: 'foo',
           license: 'bar',
           entities: ['baz'],
@@ -1540,9 +1561,27 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('created')
-        expect(typeof res.body).to.equal('object')
-        expect(typeof res.body.id).to.equal('number')
-        action_delete_id = res.body.id
+        expect(res.body).to.equal(null)
+        action_delete_id = 'foo'
+        done()
+      }))
+    })
+
+    it('should respond with an error if attempting to use a name that already exists', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: 'foo',
+          purpose: 'foo',
+          license: 'bar',
+          entities: ['baz'],
+          duration_days: 1
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_action record already exists')
+        expect(res.body).to.equal(null)
         done()
       }))
     })
@@ -1570,7 +1609,7 @@ describe('management endpoints', function() {
       mgmt_action_get_one.callback.call(mock.express, {
         params: {
           user_id: test_users[4].id,
-          action_id: 'foo'
+          action_name: 'bar'
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -1584,12 +1623,12 @@ describe('management endpoints', function() {
       mgmt_action_get_all.callback.call(mock.express, {
         params: {user_id: test_users[4].id}
       }, mock.res(function(res) {
-        var action_id = res.body[0].id
+        var action_name = res.body[0].name
 
         mgmt_action_get_one.callback.call(mock.express, {
           params: {
             user_id: test_users[4].id,
-            action_id: action_id
+            action_name: action_name
           }
         }, mock.res(function(res) {
           expect(res.error).to.equal(false)
@@ -1607,7 +1646,7 @@ describe('management endpoints', function() {
 
     it('should respond with an error if missing required arguments', function(done) {
       mgmt_isa_by_action.callback.call(mock.express, {
-        params: {action_id: 'foo', user_id: 'foo'},
+        params: {action_name: 'foo', user_id: 'foo'},
         body: {}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -1615,7 +1654,7 @@ describe('management endpoints', function() {
         expect(res.message).to.equal('missing required arguments')
 
         mgmt_isa_by_action.callback.call(mock.express, {
-          params: {action_id: 'foo', user_id: 'foo'},
+          params: {action_name: 'foo', user_id: 'foo'},
           body: {entities: []}
         }, mock.res(function(res) {
           expect(res.error).to.equal(true)
@@ -1634,18 +1673,18 @@ describe('management endpoints', function() {
         params: {user_id: test_users[4].id}
       }, mock.res(function(res) {
         
-        var action_id = res.body[0].id
+        var action_name = res.body[0].name
         
         mgmt_action_get_one.callback.call(mock.express, {
           params: {
             user_id: test_users[4].id,
-            action_id: action_id
+            action_name: action_name
           }
         }, mock.res(function(res) {
           
           mgmt_isa_by_action.callback.call(mock.express, {
             user: {id: test_users[0].id},
-            params: {user_id: test_users[4].id, action_id: action_id},
+            params: {user_id: test_users[4].id, action_name: action_name},
             body: {entities: [1, 2, 3, 4]}
           }, mock.res(function(res) {
             expect(res.error).to.equal(false)
@@ -1710,7 +1749,7 @@ describe('management endpoints', function() {
     it('should respond with an error if the action was not found', function(done) {
       mgmt_action_delete.callback.call(mock.express, {
         user: {id: test_users[4].id},
-        params: {action_id: 'foo'}
+        params: {action_name: 'bar'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
@@ -1723,7 +1762,7 @@ describe('management endpoints', function() {
     it('should respond with a number if the record was deleted', function(done) {
       mgmt_action_delete.callback.call(mock.express, {
         user: {id: test_users[4].id},
-        params: {action_id: action_delete_id}
+        params: {action_name: action_delete_id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
