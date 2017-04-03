@@ -2126,13 +2126,14 @@ module.exports = [
     active: true,
     callback: function(req, res) {
       var {
-        purpose, license, entities,
+        name, purpose, license, entities,
         optional_entities, duration_days
       } = req.body
 
       var has_optional = false
 
-      if (!(purpose &&
+      if (!(name &&
+            purpose &&
             license &&
             Array.isArray(entities) &&
             entities.length &&
@@ -2145,27 +2146,57 @@ module.exports = [
         })
       }
 
-      if (Array.isArray(optional_entities) && optional_entities.length) {
+      if (/\s+/i.test(name)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'name cannot contain whitespace',
+          body: null
+        })
+      }
+
+      if (Array.isArray(optional_entities) &&
+          optional_entities.length) {
         has_optional = true
       }
 
       var errors = this.get('db_errors')
       var {user_action} = this.get('models')
       
-      user_action.create({
-        owner_id: req.user.id,
-        purpose: purpose,
-        license: license,
-        entities: JSON.stringify(entities),
-        duration_days: duration_days,
-        optional_entities: has_optional ? JSON.stringify(optional_entities) : null
+      user_action.findOne({
+        where: {
+          name: name,
+          owner_id: req.user.id
+        }
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'user_action record already exists',
+            body: null
+          })
+        }
+        return user_action.create({
+          owner_id: req.user.id,
+          name: name,
+          purpose: purpose,
+          license: license,
+          entities: JSON.stringify(entities),
+          duration_days: duration_days,
+          optional_entities: (
+            has_optional ?
+            JSON.stringify(optional_entities) :
+            null
+          )
+        })
       }).then(function(created) {
         if (created) {
           return res.status(201).json({
             error: false,
             status: 201,
             message: 'created',
-            body: {id: created.id}
+            body: null
           })
         }
         return Promise.reject({
@@ -2207,7 +2238,7 @@ module.exports = [
             message: 'ok',
             body: found.map(function(action) {
               return {
-                id: action.id,
+                name: action.name,
                 purpose: action.purpose
               }
             })
@@ -2232,19 +2263,19 @@ module.exports = [
     }
   },
 
-  // 21 GET /management/action/:user_id/:action_id
+  // 21 GET /management/action/:user_id/:action_name
   {
-    uri: '/management/action/:user_id/:action_id',
+    uri: '/management/action/:user_id/:action_name',
     method: 'get',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_id, action_id} = req.params
+      var {user_id, action_name} = req.params
       var {user_action} = this.get('models')
       user_action.findOne({
         where: {
           owner_id: user_id,
-          id: action_id
+          name: action_name
         }
       }).then(function(found) {
         if (found) {
@@ -2259,7 +2290,7 @@ module.exports = [
               optionalEntities: JSON.parse(found.optional_entities),
               durationDays: found.duration_days,
               requestedBy: user_id,
-              action: found.id
+              name: found.name
             }
           })
         }
@@ -2270,7 +2301,6 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2283,9 +2313,9 @@ module.exports = [
     }
   },
 
-  // 22 POST /management/isa/:user_id/:action_id
+  // 22 POST /management/isa/:user_id/:action_name
   {
-    uri: '/management/isa/:user_id/:action_id',
+    uri: '/management/isa/:user_id/:action_name',
     method: 'post',
     secure: true,
     active: true,
@@ -2295,7 +2325,7 @@ module.exports = [
       // the client shouldn't have to post the action document that they're accepting
       // they should only have to reference the user and action id
 
-      var {user_id, action_id} = req.params
+      var {user_id, action_name} = req.params
       var {
         crypto_key,
         user_action,
@@ -2322,7 +2352,7 @@ module.exports = [
       user_action.findOne({
         where: {
           owner_id: user_id,
-          id: action_id
+          name: action_name
         }
       }).then(function(found) {
         if (found) {
@@ -2331,7 +2361,7 @@ module.exports = [
           return information_sharing_agreement_request.create({
             from_id: user_id,
             to_id: req.user.id,
-            action_id: action_id,
+            action_id: found.id,
             acknowledged: true,
             optional_entities: JSON.stringify(optional_entities || []),
             required_entities: JSON.stringify(entities),
@@ -2532,21 +2562,21 @@ module.exports = [
     }
   },
 
-  // 24 DELETE /management/action/:action_id
+  // 24 DELETE /management/action/:action_name
   {
-    uri: '/management/action/:action_id',
+    uri: '/management/action/:action_name',
     method: 'delete',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {action_id} = req.params
+      var {action_name} = req.params
       var {user_action} = this.get('models')
       var errors = this.get('db_errors')
 
       user_action.destroy({
         where: {
           owner_id: req.user.id,
-          id: action_id
+          name: action_name
         }
       }).then(function(deleted) {
         if (deleted) {
