@@ -47,7 +47,7 @@ require('./database')(
             notification,
             data,
             function() {
-              console.log('notifier retry', value)
+              console.log('WEBHOOK RETRY', value)
               failures.webhook.push({
                 uri: value,
                 user_id: user_id,
@@ -105,6 +105,8 @@ var retryTimer = setInterval(function() {
           failures.webhook[i].ttl -= 1
         }
       } else {
+        // this branch will execute if we
+        // clobber the array into being sparse
         console.log('this should never happen :3')
       }
     }
