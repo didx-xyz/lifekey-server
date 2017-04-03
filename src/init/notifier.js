@@ -94,7 +94,7 @@ var retryTimer = setInterval(function() {
           models.dropped_message.create({
             owner_id: dropped.user_id,
             dropped_at: new Date,
-            contents: JSON.stringify(dropped.msg || '{}')
+            contents: JSON.stringify(dropped.msg)
           }).catch(
             console.log.bind(
               console,
