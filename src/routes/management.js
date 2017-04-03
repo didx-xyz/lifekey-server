@@ -254,6 +254,7 @@ module.exports = [
           email: email,
           nickname: nickname,
           webhook_url: webhook_url,
+          actions_url: actions_url,
           app_activation_code: activation_code
         })
       }).then(function(created) {
