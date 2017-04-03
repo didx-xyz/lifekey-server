@@ -114,4 +114,4 @@ var retryTimer = setInterval(function() {
       }
     }
   }).catch(console.log)
-}, 2 * 1000)
+}, 20 * 1000)
