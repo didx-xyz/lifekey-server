@@ -90,7 +90,7 @@ var retryTimer = setInterval(function() {
       }
       if (failures.webhook[i]) {
         if (failures.webhook[i].ttl === 0) {
-          var dropped = failures.webhook.splice(i, 1)
+          var dropped = failures.webhook.splice(i, 1).pop()
           models.dropped_message.create({
             owner_id: dropped.user_id,
             dropped_at: new Date,
