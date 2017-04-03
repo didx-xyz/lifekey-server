@@ -27,7 +27,7 @@
     "eccrypto": "^1.0.3",
     "express": "^4.14.0",
     "fluster": "0.0.15",
-    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#e76d6d7c37dbae1829fcdaa20d6bae0a0219bdf0",
+    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#21eae5f79b9927ecbd1ca1cd94bf6e63f80a0384",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
