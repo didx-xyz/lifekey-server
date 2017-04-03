@@ -19,15 +19,19 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
+    action_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
+    },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    optional_schemas: {
+    optional_entities: {
       type: sqlize.TEXT,
       allowNull: true
     },
-    requested_schemas: {
+    required_entities: {
       type: sqlize.TEXT,
       allowNull: false
     },

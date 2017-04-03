@@ -7,6 +7,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER,
       allowNull: false
     },
+    name: {
+      type: sqlize.STRING,
+      allowNull: false,
+    },
     purpose: {
       type: sqlize.STRING,
       allowNull: false
