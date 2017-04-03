@@ -41,32 +41,35 @@ require('./database')(false).then(function(database) {
         env.EIS_ADMIN_KEY,
         found.private_key.toString('hex'),
         env.EIS_SIGNER_KEY,
-        function(err, res) {
-          if (err) console.log('EIS error', err)
-          else console.log('EIS result', res)
-          // user.update(
-          //   {did: did},
-          //   {where: {id: user_id}}
-          // ).then(function() {
-          //   process.send({
-          //     notification_request: {
-          //       type: 'received_did',
-          //       user_id: user_id,
-          //       data: {
-          //         type: 'received_did',
-          //         received_did: true,
-          //         did_value: did
-          //       },
-          //       notification: {
-          //         title: 'You have been allocated a decentralised identifier',
-          //         body: 'Click here to view your DID!'
-          //       }
-          //     }
-          //   })
-          // }).catch(console.log)
-        }
+        console.log.bind(
+          console,
+          'EIS RESPONSE'
+        )
       )
+
+      // user.update(
+      //   {did: did},
+      //   {where: {id: user_id}}
+      // ).then(function() {
+      //   process.send({
+      //     notification_request: {
+      //       type: 'received_did',
+      //       user_id: user_id,
+      //       data: {
+      //         type: 'received_did',
+      //         received_did: true,
+      //         did_value: did
+      //       },
+      //       notification: {
+      //         title: 'You have been allocated a decentralised identifier',
+      //         body: 'Click here to view your DID!'
+      //       }
+      //     }
+      //   })
+      // }).catch(console.log)
     }).catch(console.log)
-  }).send({ready: true})
+  })
+  
+  process.send({ready: true})
   
 })
