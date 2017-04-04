@@ -15,9 +15,7 @@ module.exports = function(uri, type, notification, data, onfailure) {
       headers: {'content-type': 'application/json'}
     })
     
-    var deadlineTimer = setTimeout(function() {
-      request.abort()
-    }, 5000)
+    var deadlineTimer = setTimeout(request.abort, 5000)
     
     request.on('response', function(r) {
       clearTimeout(deadlineTimer)
