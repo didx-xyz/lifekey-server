@@ -6,6 +6,11 @@ module.exports = function(instance, sqlize) {
       unique: true,
       allowNull: true
     },
+    did_address: {
+      type: sqlize.STRING,
+      allowNull: true,
+      unique: true
+    },
     nickname: {
       type: sqlize.STRING,
       allowNull: false,
