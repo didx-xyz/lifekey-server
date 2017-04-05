@@ -760,13 +760,14 @@ module.exports = [
               notification: pnr_notif,
               data: pnr_data
             }
-          })
-          process.send({
-            notification_request: {
-              user_id: ucr.to_id,
-              notification: pnr_notif,
-              data: pnr_data
-            }
+          }, function() {
+            process.send({
+              notification_request: {
+                user_id: ucr.to_id,
+                notification: pnr_notif,
+                data: pnr_data
+              }
+            })
           })
         }
         return Promise.resolve()
