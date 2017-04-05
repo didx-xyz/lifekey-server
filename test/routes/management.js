@@ -478,6 +478,17 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_cxn_req_create.method.toUpperCase()} ${mgmt_cxn_req_create.uri}`, function() {
+
+    before(function(done) {
+      // set up for final case in suite
+      mock.express.get(
+        'models'
+      ).user_connection.create({
+        to_id: test_users[3].id,
+        from_id: test_users[2].id,
+        enabled: true
+      }).then(done.bind(done, null)).catch(done)
+    })
     
     it('should fail if required arguments are missing', function(done) {
       mgmt_cxn_req_create.callback.call(mock.express, {
@@ -515,9 +526,31 @@ describe('management endpoints', function() {
       }))
     })
 
-    // TODO add test case for duplicate connection requests
-    // TOOD add test case for sending connection request when connection is already established
-    
+    it('should disallow the creation of duplicate connection requests', function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {target: test_users[1].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_connection_request record already exists')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should disallow the creation of a connection request when an established connection already exists', function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {id: test_users[2].id},
+        body: {target: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_connection record already exists')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
   })
 
   describe(`${mgmt_connection_list.method.toUpperCase()} ${mgmt_connection_list.uri}`, function() {
@@ -654,46 +687,19 @@ describe('management endpoints', function() {
 
     before(function(done) {
       mgmt_cxn_req_create.callback.call(mock.express, {
-        user: {id: test_users[2].id},
-        body: {target: test_users[3].id}
+        user: {id: test_users[0].id},
+        body: {target: test_users[1].id}
       }, mock.res(function(res) {
-        expect(res.status).to.equal(201)
-        expect(typeof res.body).to.equal('object')
-        expect(typeof res.body.id).to.equal('number')
-        expect(res.message).to.equal('user_connection_request record created')
+        if (res.status !== 201) return done(`should not have been called ${res.status}`)
         
         mgmt_cxn_req_res.callback.call(mock.express, {
           params: {user_connection_request_id: res.body.id},
-          user: {id: test_users[3].id},
+          user: {id: test_users[1].id},
           body: {accepted: true}
         }, mock.res(function(res) {
-          expect(res.status).to.equal(201)
-          expect(res.message).to.equal('user_connection created')
-          expect(typeof res.body).to.equal('object')
-          expect(typeof res.body.id).to.equal('number')
+          if (res.status !== 201) return done(`should not have been called ${res.status}`)
           
-          mgmt_cxn_req_create.callback.call(mock.express, {
-            user: {id: test_users[0].id},
-            body: {target: test_users[1].id}
-          }, mock.res(function(res) {
-            expect(res.status).to.equal(201)
-            expect(typeof res.body).to.equal('object')
-            expect(typeof res.body.id).to.equal('number')
-            expect(res.message).to.equal('user_connection_request record created')
-            
-            mgmt_cxn_req_res.callback.call(mock.express, {
-              params: {user_connection_request_id: res.body.id},
-              user: {id: test_users[1].id},
-              body: {accepted: true}
-            }, mock.res(function(res) {
-              expect(res.status).to.equal(201)
-              expect(res.message).to.equal('user_connection created')
-              expect(typeof res.body).to.equal('object')
-              expect(typeof res.body.id).to.equal('number')
-              
-              done()
-            }))
-          }))
+          done()
         }))
       }))
     })
@@ -801,7 +807,6 @@ describe('management endpoints', function() {
           },
           user: {id: test_users[0].id, did: test_users[0].id}
         }, mock.res(function(res) {
-          
           expect(res.error).to.equal(false)
           expect(res.status).to.equal(201)
           expect(res.message).to.equal('information_sharing_agreement_request record created')

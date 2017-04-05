@@ -438,7 +438,12 @@ module.exports = [
       
       // send a connection request
       var {target} = req.body
-      var {user, user_device, user_connection, user_connection_request} = this.get('models')
+      var {
+        user,
+        user_device,
+        user_connection,
+        user_connection_request
+      } = this.get('models')
       var ucr, target_user
 
       var target_is_did = (
@@ -697,11 +702,13 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           // accept/reject the ucr
-          ucr = found
-          return found.update({
-            acknowledged: true,
-            accepted: accepted
-          })
+          ucr = {
+            to_id: found.to_id,
+            to_did: found.to_did,
+            from_id: found.from_id,
+            from_did: found.from_did
+          }
+          return found.destroy()
         }
         return Promise.reject({
           error: true,
@@ -709,20 +716,20 @@ module.exports = [
           message: 'user_connection_request record not found',
           body: null
         })
-      }).then(function(updated) {
-        if (updated && accepted) {
+      }).then(function(destroyed) {
+        if (accepted) {
           // update the associated uc record
           return Promise.all([
             user_connection.create({
-              to_id: updated.to_id,
-              from_id: updated.from_id,
-              to_did: updated.to_did,
-              from_did: updated.from_did,
+              to_id: ucr.to_id,
+              from_id: ucr.from_id,
+              to_did: ucr.to_did,
+              from_did: ucr.from_did,
               enabled: accepted
             }),
-            user.findOne({where: {id: updated.from_id}})
+            user.findOne({where: {id: ucr.from_id}})
           ])
-        } else if (updated && !accepted) {
+        } else if (!accepted) {
           return Promise.resolve(false)
         } else {
           return Promise.reject({
@@ -732,19 +739,19 @@ module.exports = [
             body: null
           })
         }
-      }).then(function(create_and_find) {
-        if (create_and_find) {
-          uc = create_and_find[0]
+      }).then(function(create_find_delete) {
+        if (create_find_delete) {
+          uc = create_find_delete[0]
           var pnr_notif = {
             title: 'User Connection',
             body: 'User connection successfully created!'
           }, pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
-            user_connection_id: create_and_find[0].id,
-            uc_id: create_and_find[0].id,
+            user_connection_id: create_find_delete[0].id,
+            uc_id: create_find_delete[0].id,
             to_id: ucr.to_id,
-            actions_url: create_and_find[1].actions_url,
+            actions_url: create_find_delete[1].actions_url,
             from_id: ucr.from_id
           }
           process.send({
