@@ -441,6 +441,11 @@ module.exports = [
       var {user, user_device, user_connection, user_connection_request} = this.get('models')
       var ucr, target_user
 
+      var target_is_did = (
+        isNaN(parseInt(target, 10)) &&
+        String(target).length === 64
+      )
+
       if (!target) {
         return res.status(400).json({
           error: true,
@@ -460,23 +465,12 @@ module.exports = [
       }
       
       // find any existing user_connection
-      // TODO fix this query
       user_connection.findOne({
         where: {
           enabled: true,
           $and: [
-            {
-                $or: [
-                  {from_id: req.user.id},
-                  {from_did: req.user.did}
-                ]
-              },
-              {
-                $or: [
-                  {to_id: target},
-                  {to_did: target}
-                ]
-              }
+            {from_id: req.user.id},
+            target_is_did ? {to_did: target} : {to_id: target}
           ]
         }
       }).then(function(found) {
@@ -487,7 +481,7 @@ module.exports = [
             error: true,
             status: 400,
             message: 'user_connection record already exists',
-            body: found.toJSON()
+            body: null
           })
         }
         
@@ -496,19 +490,10 @@ module.exports = [
         return user_connection_request.findOne({
           where: {
             acknowledged: null,
+            accepted: null,
             $and: [
-              {
-                $or: [
-                  {from_id: req.user.id},
-                  {from_did: req.user.did}
-                ]
-              },
-              {
-                $or: [
-                  {to_id: target},
-                  {to_did: target}
-                ]
-              }
+              {from_id: req.user.id},
+              target_is_did ? {to_did: target} : {to_id: target}
             ]
           }
         })
@@ -520,16 +505,13 @@ module.exports = [
             error: true,
             status: 400,
             message: 'user_connection_request record already exists',
-            body: found.toJSON()
+            body: null
           })
         }
 
-        return user.findOne({where: {
-          $or: [
-            {did: target},
-            {id: target}
-          ]
-        }})
+        return user.findOne({
+          where: target_is_did ? {did: target} : {id: target}
+        })
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
