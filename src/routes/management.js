@@ -438,8 +438,18 @@ module.exports = [
       
       // send a connection request
       var {target} = req.body
-      var {user, user_device, user_connection, user_connection_request} = this.get('models')
+      var {
+        user,
+        user_device,
+        user_connection,
+        user_connection_request
+      } = this.get('models')
       var ucr, target_user
+
+      var target_is_did = (
+        isNaN(parseInt(target, 10)) &&
+        String(target).length === 64
+      )
 
       if (!target) {
         return res.status(400).json({
@@ -460,23 +470,12 @@ module.exports = [
       }
       
       // find any existing user_connection
-      // TODO fix this query
       user_connection.findOne({
         where: {
           enabled: true,
           $and: [
-            {
-                $or: [
-                  {from_id: req.user.id},
-                  {from_did: req.user.did}
-                ]
-              },
-              {
-                $or: [
-                  {to_id: target},
-                  {to_did: target}
-                ]
-              }
+            {from_id: req.user.id},
+            target_is_did ? {to_did: target} : {to_id: target}
           ]
         }
       }).then(function(found) {
@@ -487,7 +486,7 @@ module.exports = [
             error: true,
             status: 400,
             message: 'user_connection record already exists',
-            body: found.toJSON()
+            body: null
           })
         }
         
@@ -496,19 +495,10 @@ module.exports = [
         return user_connection_request.findOne({
           where: {
             acknowledged: null,
+            accepted: null,
             $and: [
-              {
-                $or: [
-                  {from_id: req.user.id},
-                  {from_did: req.user.did}
-                ]
-              },
-              {
-                $or: [
-                  {to_id: target},
-                  {to_did: target}
-                ]
-              }
+              {from_id: req.user.id},
+              target_is_did ? {to_did: target} : {to_id: target}
             ]
           }
         })
@@ -520,16 +510,13 @@ module.exports = [
             error: true,
             status: 400,
             message: 'user_connection_request record already exists',
-            body: found.toJSON()
+            body: null
           })
         }
 
-        return user.findOne({where: {
-          $or: [
-            {did: target},
-            {id: target}
-          ]
-        }})
+        return user.findOne({
+          where: target_is_did ? {did: target} : {id: target}
+        })
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
@@ -715,11 +702,13 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           // accept/reject the ucr
-          ucr = found
-          return found.update({
-            acknowledged: true,
-            accepted: accepted
-          })
+          ucr = {
+            to_id: found.to_id,
+            to_did: found.to_did,
+            from_id: found.from_id,
+            from_did: found.from_did
+          }
+          return found.destroy()
         }
         return Promise.reject({
           error: true,
@@ -727,20 +716,20 @@ module.exports = [
           message: 'user_connection_request record not found',
           body: null
         })
-      }).then(function(updated) {
-        if (updated && accepted) {
+      }).then(function(destroyed) {
+        if (accepted) {
           // update the associated uc record
           return Promise.all([
             user_connection.create({
-              to_id: updated.to_id,
-              from_id: updated.from_id,
-              to_did: updated.to_did,
-              from_did: updated.from_did,
+              to_id: ucr.to_id,
+              from_id: ucr.from_id,
+              to_did: ucr.to_did,
+              from_did: ucr.from_did,
               enabled: accepted
             }),
-            user.findOne({where: {id: updated.from_id}})
+            user.findOne({where: {id: ucr.from_id}})
           ])
-        } else if (updated && !accepted) {
+        } else if (!accepted) {
           return Promise.resolve(false)
         } else {
           return Promise.reject({
@@ -750,19 +739,19 @@ module.exports = [
             body: null
           })
         }
-      }).then(function(create_and_find) {
-        if (create_and_find) {
-          uc = create_and_find[0]
+      }).then(function(create_find_delete) {
+        if (create_find_delete) {
+          uc = create_find_delete[0]
           var pnr_notif = {
             title: 'User Connection',
             body: 'User connection successfully created!'
           }, pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
-            user_connection_id: create_and_find[0].id,
-            uc_id: create_and_find[0].id,
+            user_connection_id: create_find_delete[0].id,
+            uc_id: create_find_delete[0].id,
             to_id: ucr.to_id,
-            actions_url: create_and_find[1].actions_url,
+            actions_url: create_find_delete[1].actions_url,
             from_id: ucr.from_id
           }
           process.send({
@@ -771,13 +760,14 @@ module.exports = [
               notification: pnr_notif,
               data: pnr_data
             }
-          })
-          process.send({
-            notification_request: {
-              user_id: ucr.to_id,
-              notification: pnr_notif,
-              data: pnr_data
-            }
+          }, function() {
+            process.send({
+              notification_request: {
+                user_id: ucr.to_id,
+                notification: pnr_notif,
+                data: pnr_data
+              }
+            })
           })
         }
         return Promise.resolve()
