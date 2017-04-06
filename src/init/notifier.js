@@ -14,22 +14,8 @@ var failures = {
 
 var db, models
 
-require('./database')(
-  false // disable logging
-).then(function(database) {
-
-  db = database.db
-  models = database.models
-
-  process.on('message', function(msg) {
-    if (!msg.notification_request) {
-      return console.log(
-        'ERROR',
-        'received a message with an unknown type',
-        Object.keys(msg)
-      )
-    }
-    var {user_id, notification, data} = msg.notification_request
+function dispatch(msg, user_id) {
+  return new Promise(function(resolve, reject) {
     models.user.findOne({
       where: {id: user_id}
     }).then(function(found) {
@@ -48,15 +34,15 @@ require('./database')(
       if (typeof value === 'string') {
         return webhook(
           url.parse(value),
-          data.type,
-          notification,
-          data,
+          msg.data.type,
+          msg.notification,
+          msg.data,
           function() {
             console.log('WEBHOOK RETRY', value)
             failures.webhook.push({
               uri: value,
               user_id: user_id,
-              msg: msg.notification_request,
+              msg: msg,
               ttl: failures.retries
             })
           }
@@ -64,13 +50,38 @@ require('./database')(
       }
       return fcm(
         value.device_id,
-        notification,
-        data,
-        console.log
+        {notification: msg.notification, data: msg.data}
       )
-    }).catch(console.log)
-  }).send({ready: true})
+    }).then(resolve).catch(reject)
+  })
+}
 
+require('./database')(
+  false // disable logging
+).then(function(database) {
+
+  db = database.db
+  models = database.models
+
+  process.on('message', function(msg) {
+    if (!msg.notification_request) {
+      return console.log(
+        'ERROR',
+        'received a message with an unknown type',
+        Object.keys(msg)
+      )
+    }
+    var {user_id} = msg.notification_request
+    var user_ids = (Array.isArray(user_id) ? user_id : [user_id])
+    Promise.all(
+      user_ids.map(
+        dispatch.bind(
+          dispatch,
+          msg.notification_request
+        )
+      )
+    ).catch(console.log)
+  }).send({ready: true})
 })
 
 var retryTimer = setInterval(function() {
