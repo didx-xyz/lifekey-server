@@ -27,17 +27,7 @@ function load(refresh) {
       path.normalize(`${__dirname}/../../${env.EIS_ADMIN_KEY}`)
     ).private_key
   } catch (e) {
-    throw new Error('unable to load private keys for eis registry: ' + e)
-  }
-
-  try {
-    env.FCM_SERVICE_ACCOUNT_KEY = require(
-      path.isAbsolute(env.FCM_SERVICE_ACCOUNT_KEY) ?
-      env.FCM_SERVICE_ACCOUNT_KEY :
-      path.normalize(`${__dirname}/../../${env.FCM_SERVICE_ACCOUNT_KEY}`)
-    )
-  } catch (e) {
-    throw new Error('unable to load fcm server key ' + e)
+    throw new Error('unable to load private keys for eis registry: ' + e.toString())
   }
 
   env.NODE_ENV = NODE_ENV
