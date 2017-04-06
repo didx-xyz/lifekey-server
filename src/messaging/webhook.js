@@ -15,11 +15,9 @@ module.exports = (
         hostname: uri.hostname,
         path: uri.path,
         port: uri.port,
-        headers: {'content-type': 'application/json'}
+        headers: {'Content-Type': 'application/json'}
       })
-      
       var deadlineTimer = setTimeout(request.abort, 5000)
-      
       request.on('response', function(r) {
         clearTimeout(deadlineTimer)
         if (r.statusCode === 200) {
