@@ -32,31 +32,27 @@ function dispatch(msg, user_id) {
       )
     }).then(function(value) {
       if (typeof value === 'string') {
-        return resolve(
-          webhook(
-            url.parse(value),
-            msg.data.type,
-            msg.notification,
-            msg.data,
-            function() {
-              console.log('WEBHOOK RETRY', value)
-              failures.webhook.push({
-                uri: value,
-                user_id: user_id,
-                msg: msg,
-                ttl: failures.retries
-              })
-            }
-          )
+        return webhook(
+          url.parse(value),
+          msg.data.type,
+          msg.notification,
+          msg.data,
+          function() {
+            console.log('WEBHOOK RETRY', value)
+            failures.webhook.push({
+              uri: value,
+              user_id: user_id,
+              msg: msg,
+              ttl: failures.retries
+            })
+          }
         )
       }
-      resolve(
-        fcm(
-          value.device_id,
-          {notification: msg.notification, data: msg.data}
-        )
+      return fcm(
+        value.device_id,
+        {notification: msg.notification, data: msg.data}
       )
-    }).catch(reject)
+    }).then(resolve).catch(reject)
   })
 }
 
