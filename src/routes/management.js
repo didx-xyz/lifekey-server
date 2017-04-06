@@ -491,7 +491,6 @@ module.exports = [
         }
         
         // find any existing unresponded-to connection request
-        // TODO fix this query
         return user_connection_request.findOne({
           where: {
             acknowledged: null,
@@ -742,32 +741,23 @@ module.exports = [
       }).then(function(create_find_delete) {
         if (create_find_delete) {
           uc = create_find_delete[0]
-          var pnr_notif = {
-            title: 'User Connection',
-            body: 'User connection successfully created!'
-          }, pnr_data = {
-            type: 'user_connection_created',
-            is_user_connection_created: true,
-            user_connection_id: create_find_delete[0].id,
-            uc_id: create_find_delete[0].id,
-            to_id: ucr.to_id,
-            actions_url: create_find_delete[1].actions_url,
-            from_id: ucr.from_id
-          }
           process.send({
             notification_request: {
-              user_id: ucr.from_id,
-              notification: pnr_notif,
-              data: pnr_data
-            }
-          }, function() {
-            process.send({
-              notification_request: {
-                user_id: ucr.to_id,
-                notification: pnr_notif,
-                data: pnr_data
+              user_id: [ucr.to_id, ucr.from_id],
+              notification: {
+                title: 'User Connection',
+                body: 'User connection successfully created!'
+              },
+              data: {
+                type: 'user_connection_created',
+                is_user_connection_created: true,
+                user_connection_id: create_find_delete[0].id,
+                uc_id: create_find_delete[0].id,
+                to_id: ucr.to_id,
+                actions_url: create_find_delete[1].actions_url,
+                from_id: ucr.from_id
               }
-            })
+            }
           })
         }
         return Promise.resolve()
@@ -1463,20 +1453,7 @@ module.exports = [
         if (found) {
           process.send({
             notification_request: {
-              user_id: found.to_id,
-              notification: {
-                title: 'Information Sharing Agreement Deleted',
-                body: 'Your ISA has been deleted'
-              },
-              data: {
-                type: 'information_sharing_agreement_deleted',
-                isa_id: found.id
-              }
-            }
-          })
-          process.send({
-            notification_request: {
-              user_id: found.from_id,
+              user_id: [found.to_id, found.from_id],
               notification: {
                 title: 'Information Sharing Agreement Deleted',
                 body: 'Your ISA has been deleted'
