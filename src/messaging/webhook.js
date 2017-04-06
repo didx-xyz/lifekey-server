@@ -23,9 +23,10 @@ module.exports = (
       request.on('response', function(r) {
         clearTimeout(deadlineTimer)
         if (r.statusCode === 200) {
+          console.log('got 200 response code from', uri.hostname)
           resolve(true)
         } else {
-          console.log('got non-200 response code from', uri.hostname)
+          console.log('got', r.statusCode, 'failure from', uri.hostname)
           if (typeof onfailure === 'function') onfailure()
           resolve()
         }
