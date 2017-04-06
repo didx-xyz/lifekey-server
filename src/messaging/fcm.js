@@ -10,4 +10,8 @@ admin.initializeApp({
   databaseURL: env.FCM_DATABASE_URL
 })
 
-module.exports = admin.messaging()
+module.exports = (
+  !~env._.indexOf('istanbul') ?
+  (recipient, payload) => Promise.resolve() :
+  admin.messaging()
+)
