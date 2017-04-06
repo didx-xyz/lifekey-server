@@ -1,20 +1,28 @@
 
 'use strict'
 
-var http = require('https')
+var http = require('http')
+var https = require('https')
 
 module.exports = function(uri, type, notification, data, onfailure) {
   
   return new Promise(function(resolve, reject) {
 
-    var request = http.request({
+    var request_options = {
       method: 'post',
       hostname: uri.hostname,
       path: uri.path,
-      port: uri.port,
-      headers: {'content-type': 'application/json'}
-    })
+      headers: {'Content-Type': 'application/json'}
+    }
     
+    if (uri.port) request_options.port = uri.port
+
+    var request = (
+      uri.protocol === 'https:' ?
+      https :
+      http
+    ).request(request_options)
+
     var deadlineTimer = setTimeout(function() {
       request.abort()
     }, 5000)
