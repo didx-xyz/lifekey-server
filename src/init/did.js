@@ -33,41 +33,36 @@ require('./database')(false).then(function(database) {
       var user_address = `0x${eu.privateToAddress(Buffer.from(found.private_key, 'hex')).toString('hex')}`
       
       // create the did contract
-      // TODO are the correct private keys used?
-      isw.spawn(admin_address, user_address, env.EIS_SIGNER_KEY, function(err, did_address) {
+      isw.spawn(admin_address, user_address, env.EIS_SIGNER_KEY, function(err, skip, receipt_logs) {
         if (err) {
-          return console.log('EIS ERROR', err)
+          return console.log('EIS spawn error', err)
         }
+        var did_addr = '0x' + receipt_logs[0].data.slice(26).slice(0, 40)
 
         // generate a did value
         var did_value = crypto.rng(32).toString('hex')
 
         // send the did value to the did contract
-        // TODO does this use the correct private key?
-        isw.update(did_address, did_value, env.EIS_ADMIN_KEY, function(err, updated) {
-          if (err) return console.log('EIS ERROR', err)
-          // TODO ensure return type of isw#update
-          
+        isw.update(did_addr, did_value, env.EIS_ADMIN_KEY, function(err, updated, receipt_logs) {
+          if (err) return console.log('EIS update error', err)
+
           // use the did address to check if the value
           // we just sent matches the one we generated
-          isw.verify(did_address, function(err, res) {
+          isw.verify(did_addr, function(err, res) {
             if (err) {
-              return console.log('EIS ERROR', err)
+              return console.log('EIS verify error', err)
             } else if (res === did_value) {
-              
               // update user record with contract address and did value
               user.update({
-                did_address: did_address,
+                did_address: did_addr,
                 did: did_value
               }, {
                 where: {id: user_id}
               }).then(function(updated) {
                 if (!updated[0]) {
-                  return console.log('EIS ERROR', 'unable to update user record')
+                  return console.log('EIS db update error', 'unable to update user record')
                 }
                 
-                // send push notification/webhook to user
-                // once user record has been updated
                 process.send({
                   notification_request: {
                     type: 'received_did',
@@ -76,7 +71,7 @@ require('./database')(false).then(function(database) {
                       type: 'received_did',
                       received_did: true,
                       did_value: did_value,
-                      did_address: did_address
+                      did_address: did_addr
                     },
                     notification: {
                       title: 'You have been allocated a decentralised identifier',
@@ -87,7 +82,7 @@ require('./database')(false).then(function(database) {
               }).catch(console.log)
             } else {
               // values don't match
-              console.log('EIS ERROR', 'did contract update failed', res, did_value)
+              console.log('EIS verify error', 'did contract update failed', res, did_value)
             }
           })
         })
