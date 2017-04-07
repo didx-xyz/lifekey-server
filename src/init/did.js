@@ -9,6 +9,8 @@ var eu = require('ethereumjs-util')
 var env = require('./env')()
 var isw = require('identity-service-wrapper')(env.EIS_HOST)
 
+var EIS_ADMIN_ADDRESS = `0x${eu.privateToAddress(Buffer.from(env.EIS_ADMIN_KEY, 'hex')).toString('hex')}`
+
 require('./database')(false).then(function(database) {
 
   var registrants = {}
@@ -18,8 +20,8 @@ require('./database')(false).then(function(database) {
     if (err) return console.log('EIS created_did event error', err)
     var {did, sender, owner, admin, ddo} = event.args
     if (!(owner in registrants)) return
-    var {user_id, ddo} = registrants[owner]
-    delete registrants[owner]
+    var user_id = registrants[owner]
+    var deleted = delete registrants[owner]
     user.update({
       did_address: did,
       did: ddo
@@ -30,6 +32,7 @@ require('./database')(false).then(function(database) {
         return console.log('EIS db update error', 'unable to update user record')
       }
       console.log('EIS ddo update success', user_id)
+      console.log('EIS pending registrations', Object.keys(registrants).length)
       process.send({
         notification_request: {
           type: 'received_did',
@@ -63,22 +66,24 @@ require('./database')(false).then(function(database) {
         return console.log('EIS ERROR', 'user has no eis key')
       }
 
-      var admin_address = `0x${eu.privateToAddress(Buffer.from(env.EIS_ADMIN_KEY, 'hex')).toString('hex')}`
       var user_address = `0x${eu.privateToAddress(Buffer.from(found.private_key, 'hex')).toString('hex')}`
 
       // generate a did value
       var did_value = crypto.rng(32).toString('hex')
       
       // create the did contract with initial ddo
-      isw.spawn(admin_address, user_address, env.EIS_SIGNER_KEY, did_value, function(err, txhash) {
-        if (err) {
-          return console.log('EIS spawn error', err)
+      isw.spawn(
+        EIS_ADMIN_ADDRESS,
+        user_address,
+        env.EIS_SIGNER_KEY,
+        did_value,
+        function(err, txhash) {
+          if (err) {
+            return console.log('EIS spawn error', err)
+          }
+          registrants[user_address] = user_id
         }
-        registrants[user_address] = {
-          ddo: did_value,
-          user_id: user_id
-        }
-      })
+      )
     }).catch(console.log)
   })
   
