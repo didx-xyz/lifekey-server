@@ -21,7 +21,7 @@ require('./database')(false).then(function(database) {
     var {did, sender, owner, admin, ddo} = event.args
     if (!(owner in registrants)) return
     var user_id = registrants[owner]
-    var deleted = delete registrants[owner]
+    delete registrants[owner]
     user.update({
       did_address: did,
       did: ddo
@@ -49,7 +49,7 @@ require('./database')(false).then(function(database) {
           }
         }
       })
-    }).catch(console.log)
+    }).catch(console.log.bind(console, 'EIS db update error'))
   })
   
   process.on('message', function(msg) {
