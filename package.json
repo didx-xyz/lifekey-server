@@ -14,7 +14,8 @@
     "db:create": "NODE_ENV=development bin/database_tables_create",
     "db:truncate": "NODE_ENV=development bin/database_tables_truncate",
     "db:drop": "NODE_ENV=development bin/database_tables_drop",
-    "db:reset": "npm run db:drop && npm run db:create"
+    "db:reset": "npm run db:drop && npm run db:create",
+    "db:proxy": "./bin/cloud_sql_proxy -credential_file=etc/keys/dev.json -instances=vivid-case-125013:europe-west1:lifekey-staging=tcp:3306",
   },
   "keywords": [],
   "author": "",
