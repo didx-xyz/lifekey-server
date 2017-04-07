@@ -12,6 +12,7 @@ var isw = require('identity-service-wrapper')(env.EIS_HOST)
 var registrants = {}
 
 isw.registry.CreatedDID(function(err, event) {
+  if (err) return console.log('EIS created_did event error', err)
   var {did, sender, owner, admin, ddo} = event.args
   if (!(owner in registrants)) return
   var {user_id, ddo} = registrants[owner]
