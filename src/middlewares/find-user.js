@@ -49,7 +49,7 @@ module.exports = function(req, res, next) {
       body: null
     })
   }).then(function(found) {
-    if (req.headers['x-cnsnt-example'] === 'yes') {
+    if (req.headers['x-cnsnt-did'] === 'example') {
       return next()
     }
     if (found) {
