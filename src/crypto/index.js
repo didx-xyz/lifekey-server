@@ -19,6 +19,7 @@ function buffers_for_verify(algorithm, public_key, plaintext, signature) {
 module.exports = {
   asymmetric: {
     is_supported_algorithm: function(algorithm) {
+      if (typeof algorithm !== 'string') return false
       return !!~[
         'rsa',
         'secp256k1'
