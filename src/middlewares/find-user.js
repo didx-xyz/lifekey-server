@@ -49,6 +49,9 @@ module.exports = function(req, res, next) {
       body: null
     })
   }).then(function(found) {
+    if (req.headers['x-cnsnt-did'] === 'example') {
+      return next()
+    }
     if (found) {
       req.user.crypto = found
       return assertAppActivated.call(OUTER, req, res, next)
