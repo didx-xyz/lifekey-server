@@ -298,7 +298,7 @@ module.exports = [
               algorithm: 'rsa',
               purpose: 'verify',
               alias: 'fingerprint',
-              public_key: Buffer.from(fingerprint.public_key, 'utf8')
+              public_key: fingerprint.public_key
             }) : null
           ])
         }
@@ -446,10 +446,10 @@ module.exports = [
       } = this.get('models')
       var ucr, target_user
 
-      var target_is_did = (
-        isNaN(parseInt(target, 10)) &&
-        String(target).length === 64
-      )
+      // var target_is_did = (
+      //   isNaN(parseInt(target, 10)) &&
+      //   String(target).length === 64
+      // )
 
       if (!target) {
         return res.status(400).json({
@@ -474,8 +474,8 @@ module.exports = [
         where: {
           enabled: true,
           $and: [
-            {from_id: req.user.id},
-            target_is_did ? {to_did: target} : {to_id: target}
+            {from_did: req.user.did},
+            {to_did: target}
           ]
         }
       }).then(function(found) {
@@ -491,14 +491,13 @@ module.exports = [
         }
         
         // find any existing unresponded-to connection request
-        // TODO fix this query
         return user_connection_request.findOne({
           where: {
             acknowledged: null,
             accepted: null,
             $and: [
-              {from_id: req.user.id},
-              target_is_did ? {to_did: target} : {to_id: target}
+              {from_did: req.user.did},
+              {to_did: target}
             ]
           }
         })
@@ -515,15 +514,13 @@ module.exports = [
         }
 
         return user.findOne({
-          where: target_is_did ? {did: target} : {id: target}
+          where: {did: target}
         })
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
           target_user = found
           return user_connection_request.create({
-            to_id: found.id,
-            from_id: req.user.id,
             to_did: found.did,
             from_did: req.user.did
           })
@@ -549,7 +546,7 @@ module.exports = [
                 is_user_connection_request: true,
                 user_connection_request_id: created.id,
                 ucr_id: created.id,
-                from_id: req.user.id,
+                // from_id: req.user.id,
                 from_did: req.user.did,
                 from_nickname: req.user.nickname
               }
@@ -603,9 +600,7 @@ module.exports = [
             {
               $or: [
                 {from_did: req.user.did},
-                {to_did: req.user.did},
-                {from_id: req.user.id},
-                {to_id: req.user.id}
+                {to_did: req.user.did}
               ]
             }
           ]
@@ -619,14 +614,7 @@ module.exports = [
         return user_connection_request.findAll({
           where: {
             acknowledged: null,
-            $and: [
-              {
-                $or: [
-                  {to_id: req.user.id},
-                  {to_did: req.user.did}
-                ]
-              }
-            ]
+            to_did: req.user.did
           }
         })
       }).then(function(user_connection_requests) {
@@ -690,22 +678,13 @@ module.exports = [
           id: user_connection_request_id,
           acknowledged: null,
           accepted: null,
-          $and: [
-            {
-              $or: [
-                {to_did: req.user.did},
-                {to_id: req.user.id}
-              ]
-            }
-          ]
+          to_did: req.user.did
         }
       }).then(function(found) {
         if (found) {
           // accept/reject the ucr
           ucr = {
-            to_id: found.to_id,
             to_did: found.to_did,
-            from_id: found.from_id,
             from_did: found.from_did
           }
           return found.destroy()
@@ -721,13 +700,11 @@ module.exports = [
           // update the associated uc record
           return Promise.all([
             user_connection.create({
-              to_id: ucr.to_id,
-              from_id: ucr.from_id,
               to_did: ucr.to_did,
               from_did: ucr.from_did,
               enabled: accepted
             }),
-            user.findOne({where: {id: ucr.from_id}})
+            user.findOne({where: {did: ucr.from_did}})
           ])
         } else if (!accepted) {
           return Promise.resolve(false)
@@ -750,9 +727,9 @@ module.exports = [
             is_user_connection_created: true,
             user_connection_id: create_find_delete[0].id,
             uc_id: create_find_delete[0].id,
-            to_id: ucr.to_id,
+            to_did: ucr.to_did,
             actions_url: create_find_delete[1].actions_url,
-            from_id: ucr.from_id
+            from_did: ucr.from_did
           }
           process.send({
             notification_request: {
@@ -813,15 +790,14 @@ module.exports = [
       var {user, user_connection} = this.get('models')
       var uc
       
-      // TODO ensure this only ever destroys one record
       user_connection.findOne({
         where: {
           id: user_connection_id,
           $and: [
             {
               $or: [
-                {to_id: req.user.id},
-                {from_id: req.user.id}
+                {to_did: req.user.did},
+                {from_did: req.user.did}
               ]
             }
           ]
@@ -841,9 +817,11 @@ module.exports = [
         })
       }).then(function(destroyed) {
         if (destroyed) {
-          return user.findOne(
-            {where: {id: uc.from_id}}
-          )
+          return user.findOne({
+            where: {
+              did: req.user.did === uc.from_did ? uc.to_did : uc.from_did
+            }
+          })
         }
         return Promise.reject({
           error: true,
@@ -1002,10 +980,7 @@ module.exports = [
 
       user.findOne({
         where: {
-          $or: [
-            {did: to},
-            {id: to}
-          ]
+          did: to
         }
       }).then(function(found) {
         if (found) {
@@ -1017,12 +992,12 @@ module.exports = [
                 {
                   $or: [
                     {
-                      to_id: req.user.id,
-                      from_id: to
+                      to_did: req.user.did,
+                      from_did: to
                     },
                     {
-                      from_id: req.user.id,
-                      to_id: to
+                      from_did: req.user.did,
+                      to_did: to
                     }
                   ]
                 }
@@ -1040,9 +1015,9 @@ module.exports = [
         if (found) {
           return information_sharing_agreement_request.create({
             from_did: req.user.did,
-            from_id: req.user.id,
+            // from_id: req.user.id,
             to_did: to_user.did,
-            to_id: to_user.id,
+            // to_id: to_user.id,
             license: license,
             optional_entities: JSON.stringify(optional_entities),
             required_entities: JSON.stringify(required_entities),
@@ -1066,7 +1041,7 @@ module.exports = [
               },
               data: {
                 type: 'information_sharing_agreement_request',
-                from_id: req.user.id,
+                from_did: req.user.did,
                 isar_id: created.id
               }
             }
@@ -1088,7 +1063,6 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1123,8 +1097,9 @@ module.exports = [
         })
       }
 
-      if (accepted && !(Array.isArray(permitted_resources) &&
-          permitted_resources.length)) {
+      if (accepted &&
+          !(Array.isArray(permitted_resources) && 
+            permitted_resources.length)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -1139,25 +1114,18 @@ module.exports = [
         information_sharing_agreement_request
       } = this.get('models')
 
-      var isar, isa, from_id
+      var isar, isa, from_did
 
       information_sharing_agreement_request.findOne({
         where: {
           id: isar_id,
           acknowledged: null,
-          $and: [
-            {
-              $or: [
-                {to_id: req.user.id},
-                {to_did: req.user.did}
-              ]
-            }
-          ]
+          to_did: req.user.did
         }
       }).then(function(found) {
         if (found) {
           isar = found
-          from_id = found.from_id
+          from_did = found.from_did
           var now = new Date
           return found.update({
             acknowledged: true,
@@ -1183,7 +1151,7 @@ module.exports = [
         } else if (!accepted) {
           process.send({
             notification_request: {
-              user_id: from_id,
+              user_id: from_did,
               notification: {
                 title: 'Information Sharing Agreement Request Rejected',
                 body: 'Your ISA request was rejected'
@@ -1203,9 +1171,9 @@ module.exports = [
         } else {
           return information_sharing_agreement.create({
             isar_id: updated.id,
-            from_id: updated.from_id,
+            // from_id: updated.from_id,
             from_did: updated.from_did,
-            to_id: updated.to_id,
+            // to_id: updated.to_id,
             to_did: updated.to_did
           })
         }
@@ -1213,13 +1181,14 @@ module.exports = [
         if (created) {
           process.send({
             notification_request: {
-              user_id: from_id,
+              user_id: from_did,
               notification: {
                 title: 'Information Sharing Agreement Request Accepted',
                 body: 'Your ISA request was accepted'
               },
               data: {
                 type: 'information_sharing_agreement_request_accepted',
+                isar_id: isar_id,
                 isa_id: created.id
               }
             }
@@ -1290,14 +1259,7 @@ module.exports = [
       information_sharing_agreement_request.findAll({
         where: {
           acknowledged: null,
-          $and: [
-            {
-              $or: [
-                {to_id: req.user.id},
-                {to_did: req.user.did}
-              ]
-            }
-          ]
+          to_did: req.user.did
         }
       }).then(function(isars) {
         if (isars) {
@@ -1310,10 +1272,7 @@ module.exports = [
         }
         return information_sharing_agreement.findAll({
           where: {
-            $or: [
-              {to_id: req.user.id},
-              {to_did: req.user.did}
-            ]
+            to_did: req.user.did
           }
         })
       }).then(function(isas) {
@@ -1366,9 +1325,9 @@ module.exports = [
         where: {
           id: isa_id,
           $or: [
-            {to_id: req.user.id},
+            // {to_id: req.user.id},
             {to_did: req.user.did},
-            {from_id: req.user.id},
+            // {from_id: req.user.id},
             {from_did: req.user.did}
           ]
         }
@@ -1453,8 +1412,8 @@ module.exports = [
           $and: [
             {
               $or: [
-                {to_id: req.user.id},
-                {from_id: req.user.id}
+                {to_did: req.user.did},
+                {from_did: req.user.did}
               ]
             }
           ]
@@ -1463,7 +1422,7 @@ module.exports = [
         if (found) {
           process.send({
             notification_request: {
-              user_id: found.to_id,
+              user_id: found.to_did,
               notification: {
                 title: 'Information Sharing Agreement Deleted',
                 body: 'Your ISA has been deleted'
@@ -1476,7 +1435,7 @@ module.exports = [
           })
           process.send({
             notification_request: {
-              user_id: found.from_id,
+              user_id: found.from_did,
               notification: {
                 title: 'Information Sharing Agreement Deleted',
                 body: 'Your ISA has been deleted'
@@ -1543,7 +1502,7 @@ module.exports = [
         if (found) {
           var {SERVER_HOSTNAME} = this.get('env')
           return qr.image(
-            `${SERVER_HOSTNAME}/profile/${found.id}`,
+            `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
             {type: 'png'}
           ).pipe(res)
         }
@@ -1605,18 +1564,18 @@ module.exports = [
           $and: [
             {
               $or: [
-                {from_id: req.user.id},
-                {to_id: req.user.id}
+                {from_did: req.user.did},
+                {to_did: req.user.did}
               ]
             }
           ]
         }
       }).then(function(found) {
         if (found && (
-          found.to_id === req.user.id ||
+          // found.to_id === req.user.id ||
           found.to_did === req.user.did
         )) {
-          from_user = found.from_id
+          from_user = found.from_did
           return Promise.resolve(found)
         }
         return Promise.reject({
@@ -1688,22 +1647,25 @@ module.exports = [
     callback: function(req, res) {
       var {isa_id} = req.params
       var {
+        user,
         information_sharing_agreement,
         information_sharing_permission,
         user_datum
       } = this.get('models')
 
-      var to_user, body = {}
+      var isa, to_user, body = {}
 
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
-          from_id: req.user.id
+          from_did: req.user.did
         }
       }).then(function(found) {
         if (found) {
-          to_user = found.to_id
-          return Promise.resolve(found)
+          isa = found
+          return user.findOne({where: {did: found.to_did}})
+          // to_user = found.to_did
+          // return Promise.resolve(found)
         }
         return Promise.reject({
           error: true,
@@ -1712,7 +1674,18 @@ module.exports = [
           body: null
         })
       }).then(function(found) {
-        if (!found.expired) {
+        if (found) {
+          to_user = found
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function() {
+        if (!isa.expired) {
           return information_sharing_permission.findAll({
             where: {isa_id: isa_id}
           })
@@ -1729,7 +1702,7 @@ module.exports = [
             found.map(function(isp) {
               return user_datum.findOne({
                 where: {
-                  owner_id: to_user,
+                  owner_id: to_user.id,
                   id: isp.user_datum_id
                 }
               })
@@ -1744,6 +1717,7 @@ module.exports = [
         })
       }).then(function(found) {
         if (found && found.length) {
+          // TODO change this key name!!!
           body.user_data = found.map(function(ud) {
             return ud.toJSON()
           })
@@ -1797,6 +1771,7 @@ module.exports = [
       }
 
       var {
+        user,
         information_sharing_agreement,
         user_datum
       } = this.get('models')
@@ -1804,7 +1779,7 @@ module.exports = [
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
-          from_id: req.user.id
+          from_did: req.user.did
         }
       }).then(function(found) {
         if (found) {
@@ -1816,22 +1791,35 @@ module.exports = [
               body: null
             })
           }
-          other_user_id = (
-            req.user.id === found.to_id ?
-            found.from_id :
-            found.to_id
-          )
+          return user.findOne({
+            where: {
+              did: (
+                req.user.did === found.to_did ?
+                found.from_did :
+                found.to_did
+              )
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
           return Promise.all(
             resources.map(function(resource, idx) {
               return user_datum.create({
-                owner_id: other_user_id,
-                entity: req.user.id,
-                attribute: resource.name,
+                owner_id: found.id,
+                entity: resource.name,
+                attribute: 'from ' + req.user.nickname,
                 alias: idx + 1,
                 mime: resource.mime,
                 value: resource.value,
                 uri: resource.uri,
-                from_user_id: req.user.id,
+                from_user_did: req.user.id,
                 from_resource_name: resource.name,
                 from_resource_description: resource.description,
                 is_verifiable_claim: resource.is_verifiable_claim,
@@ -1844,7 +1832,7 @@ module.exports = [
         return Promise.reject({
           error: true,
           status: 404,
-          message: 'information_sharing_agreement record not found',
+          message: 'user record not found',
           body: null
         })
       }).then(function(created) {
@@ -1985,10 +1973,20 @@ module.exports = [
             body: null
           })
         }
-        return our_crypto.asymmetric.get_buffers(lower_algo, public_key, plaintext_proof, signed_proof)
+        return our_crypto.asymmetric.get_buffers(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
       }).then(function(keys) {
         key_buffers = keys
-        return our_crypto.asymmetric.verify(lower_algo, public_key, plaintext_proof, signed_proof)
+        return our_crypto.asymmetric.verify(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
       }).then(function() {
         // now store the key and sig for posterity
         return http_request_verification.create({
@@ -2003,7 +2001,7 @@ module.exports = [
             algorithm: public_key_algorithm,
             purpose: purpose || 'sign',
             alias: alias,
-            public_key: key_buffers[0],
+            public_key: lower_algo === 'rsa' ? public_key : key_buffers[0],
             owner_id: req.user.id
           })
         }
@@ -2045,21 +2043,36 @@ module.exports = [
 
   // 18 GET /management/key/:id?alias
   {
-    uri: '/management/key/:user_id',
+    uri: '/management/key/:user_did',
     method: 'get',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_id} = req.params
+      var {user_did} = req.params
       var {alias} = req.query
-      var {crypto_key} = this.get('models')
-      var query = {
-        owner_id: user_id,
-        alias: 'client-server-http'
-      }
-      if (alias) query.alias = alias
-      crypto_key.findOne({
-        where: query
+      var {user, crypto_key} = this.get('models')
+
+      user.findOne({
+        where: {
+          did: user_did
+        }
+      }).then(function(found) {
+        if (found) {
+          var query = {
+            where: {
+              owner_id: found.id,
+              alias: 'client-server-http'
+            }
+          }
+          if (alias) query.where.alias = alias
+          return crypto_key.findOne(query)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           return res.status(200).json({
@@ -2083,7 +2096,6 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-
         return res.status(
           err.status || 500
         ).json({
@@ -2197,17 +2209,29 @@ module.exports = [
     }
   },
 
-  // 20 GET /management/action/:user_id
+  // 20 GET /management/action/:user_did
   {
-    uri: '/management/action/:user_id',
+    uri: '/management/action/:user_did',
     method: 'get',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_id} = req.params
-      var {user_action} = this.get('models')
-      user_action.findAll({
-        where: {owner_id: user_id}
+      var {user_did} = req.params
+      var {user, user_action} = this.get('models')
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findAll({
+            where: {owner_id: found.id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           return res.status(200).json({
@@ -2241,20 +2265,33 @@ module.exports = [
     }
   },
 
-  // 21 GET /management/action/:user_id/:action_name
+  // 21 GET /management/action/:user_did/:action_name
   {
-    uri: '/management/action/:user_id/:action_name',
+    uri: '/management/action/:user_did/:action_name',
     method: 'get',
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {user_id, action_name} = req.params
-      var {user_action} = this.get('models')
-      user_action.findOne({
-        where: {
-          owner_id: user_id,
-          name: action_name
+      var {user_did, action_name} = req.params
+      var {user, user_action} = this.get('models')
+      var action_owner_id
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findOne({
+            where: {
+              owner_id: found.id,
+              name: action_name
+            }
+          })
         }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           return res.status(200).json({
@@ -2267,7 +2304,7 @@ module.exports = [
               entities: JSON.parse(found.entities),
               optionalEntities: JSON.parse(found.optional_entities),
               durationDays: found.duration_days,
-              requestedBy: user_id,
+              requestedBy: user_did,
               name: found.name
             }
           })
@@ -2291,7 +2328,7 @@ module.exports = [
     }
   },
 
-  // 22 POST /management/isa/:user_id/:action_name
+  // 22 POST /management/isa/:user_did/:action_name
   {
     uri: '/management/isa/:user_id/:action_name',
     method: 'post',
@@ -2303,8 +2340,9 @@ module.exports = [
       // the client shouldn't have to post the action document that they're accepting
       // they should only have to reference the user and action id
 
-      var {user_id, action_name} = req.params
+      var {user_did, action_name} = req.params
       var {
+        user,
         crypto_key,
         user_action,
         user_connection,
@@ -2326,19 +2364,30 @@ module.exports = [
         })
       }
       
-      // TODO check for existing connection before continuing
-      user_action.findOne({
-        where: {
-          owner_id: user_id,
-          name: action_name
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findOne({
+            where: {
+              owner_id: found.id,
+              name: action_name
+            }
+          })
         }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           var expires_at = new Date
           expires_at.setDate(expires_at.getDate() + found.duration_days)
           return information_sharing_agreement_request.create({
-            from_id: user_id,
-            to_id: req.user.id,
+            from_did: user_did,
+            to_did: req.user.did,
             action_id: found.id,
             acknowledged: true,
             optional_entities: JSON.stringify(optional_entities || []),
@@ -2362,8 +2411,8 @@ module.exports = [
         isar_id = created.id
         return information_sharing_agreement.create({
           isar_id: created.id,
-          from_id: user_id,
-          to_id: req.user.id
+          from_did: user_did,
+          to_did: req.user.did
         })
       }).then(function(created) {
         isa_id = created.id
@@ -2378,13 +2427,15 @@ module.exports = [
       }).then(function(created) {
         process.send({
           notification_request: {
-            user_id: user_id,
+            user_id: user_did,
             notification: {
               title: 'Information Sharing Agreement Request Accepted',
               body: 'Your ISA request was accepted'
             },
             data: {
               type: 'information_sharing_agreement_request_accepted',
+              via_action: true,
+              isar_id: isar_id,
               isa_id: isa_id
             }
           }
@@ -2420,6 +2471,7 @@ module.exports = [
     callback: function(req, res) {
       var {isa_id} = req.params
       var {
+        user,
         crypto_key,
         information_sharing_agreement,
         information_sharing_agreement_request
@@ -2432,7 +2484,7 @@ module.exports = [
         where: {id: isa_id}
       }).then(function(found) {
         if (found) {
-          if (found.to_id === req.user.id || found.from_id === req.user.id) {
+          if (found.to_did === req.user.did || found.from_did === req.user.did) {
             return information_sharing_agreement_request.findOne({
               where: {id: found.isar_id}
             })
@@ -2460,19 +2512,16 @@ module.exports = [
 
                 // TODO requires data model change
                 // durationDays: isar.duration_days,
-                requestedBy: isar.from_id,
-                action: isar.action_id
+                requestedBy: isar.from_did,
+                action: isar.action_id // FIXME query the action name
               },
               response: {
-                respondedBy: isar.to_id
+                respondedBy: isar.to_did
               }
             }
           }
-          return crypto_key.findOne({
-            where: {
-              owner_id: isar.from_id,
-              alias: 'eis'
-            }
+          return user.findOne({
+            where: {did: isar.from_did}
           })
         } else {
           return Promise.reject({
@@ -2482,6 +2531,21 @@ module.exports = [
             body: null
           })
         }
+      }).then(function(found) {
+        if (found) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: found.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           return our_crypto.asymmetric.sign(
@@ -2498,11 +2562,23 @@ module.exports = [
         })
       }).then(function(signature) {
         receipt.isa.requestSignatureValue = signature.toString('base64')
-        return crypto_key.findOne({
-          where: {
-            owner_id: isar.from_id,
-            alias: 'eis'
-          }
+        return user.findOne({
+          where: {did: isar.from_did}
+        })
+      }).then(function(found) {
+        if (found) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: found.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
         })
       }).then(function(found) {
         if (found) {
