@@ -19,7 +19,7 @@ module.exports = [
           'SELECT id, entity, attribute, alias',
           'FROM user_data',
           'WHERE owner_id = :owner_id AND',
-          'from_user_id IS NOT NULL',
+          'from_user_did IS NOT NULL',
           'ORDER BY entity, attribute, alias ASC'
         ].join(' '), {
           replacements: {owner_id: req.user.id},
@@ -46,7 +46,7 @@ module.exports = [
           'SELECT id, entity, attribute, alias',
           'FROM user_data',
           'WHERE owner_id = :owner_id AND',
-          'from_user_id IS NULL',
+          'from_user_did IS NULL',
           'ORDER BY entity, attribute, alias ASC'
         ].join(' '), {
           replacements: {owner_id: req.user.id},
@@ -318,20 +318,19 @@ module.exports = [
     }
   },
 
-  // 5 GET /profile/:user_id
+  // 5 GET /profile/:user_did
   {
-    uri: '/profile/:user_id',
+    uri: '/profile/:user_did',
     method: 'get',
     secure: false,
     active: false,
     callback: function(req, res) {
-      var {user_id} = req.params
+      var {user_did} = req.params
       var {user} = this.get('models')
       user.findOne({
         where: {
           $or: [
-            {id: user_id},
-            {did: user_id}
+            {did: user_did}
           ]
         }
       }).then(function(found) {
@@ -345,7 +344,6 @@ module.exports = [
                 colour: found.branding_colour_code,
                 image_uri: found.branding_image_uri,
                 nickname: found.nickname,
-                id: found.id,
                 did: found.did
               }
             }
