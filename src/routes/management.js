@@ -460,7 +460,7 @@ module.exports = [
         })
       }
 
-      if (req.user.did === target || req.user.id === target) {
+      if (req.user.did === target || req.user.id === target || (''+req.user.id) === target) {
         return res.status(400).json({
           error: true,
           status: 400,
