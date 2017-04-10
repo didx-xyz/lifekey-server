@@ -10,8 +10,8 @@ var assertAppActivated = (
 module.exports = function(req, res, next) {
   var OUTER = this
 
-  if (!(('x-cnsnt-id' in req.headers ||
-         'x-cnsnt-did' in req.headers) &&
+  if (!(('x-cnsnt-did' in req.headers ||
+         'x-cnsnt-id' in req.headers) &&
         'x-cnsnt-plain' in req.headers &&
         'x-cnsnt-signed' in req.headers)) {
     // if missing any of the above

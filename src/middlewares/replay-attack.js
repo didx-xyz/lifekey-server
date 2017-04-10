@@ -14,7 +14,11 @@ module.exports = function(req, res, next) {
   // load models for querying and insertion
   var {http_request_verification} = this.get('models')
 
-  var b64_public_key = req.user.crypto.public_key.toString('base64')
+  var public_key = (
+    req.user.crypto.algorithm === 'rsa' ?
+    req.user.crypto.public_key.toString('utf8') : // rsa keys are pem format
+    req.user.crypto.public_key.toString('base64') // p256k1 keys are not pem format
+  )
 
   http_request_verification.findOne({
     where: {
@@ -32,7 +36,7 @@ module.exports = function(req, res, next) {
     }
     // create the record for posterity
     return http_request_verification.create({
-      public_key: b64_public_key,
+      public_key: public_key,
       algorithm: req.user.crypto.algorithm,
       plaintext: req.headers['x-cnsnt-plain'],
       signature: req.headers['x-cnsnt-signed']
