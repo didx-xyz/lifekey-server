@@ -595,5 +595,24 @@ module.exports = [
         })
       })
     }
+  },
+
+  // 12 GET /profile/did
+  {
+    uri: '/profile/did',
+    method: 'get',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      return res.status(200).json({
+        error: false,
+        status: 200,
+        message: 'ok',
+        body: {
+          did: req.user.did,
+          did_address: req.user.did_address
+        }
+      })
+    }
   }
 ]
