@@ -14,6 +14,7 @@ module.exports = [
     callback: function(req, res) {
       var {pushed} = req.query
       var db = this.get('db')
+      var errors = this.get('db_errors')
       if (pushed) {
         db.query([
           'SELECT id, entity, attribute, alias',
@@ -32,6 +33,7 @@ module.exports = [
             body: found.length ? found : []
           })
         }).catch(function(err) {
+          err = errors(err)
           return res.status(
             err.status || 500
           ).json({
@@ -59,6 +61,7 @@ module.exports = [
             body: found.length ? found : []
           })
         }).catch(function(err) {
+          err = errors(err)
           return res.status(
             err.status || 500
           ).json({
@@ -82,6 +85,7 @@ module.exports = [
       
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
+      var errors = this.get('db_errors')
 
       // user accessing their own resources
       user_datum.findOne({
@@ -112,6 +116,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -149,6 +154,7 @@ module.exports = [
       }
 
       var {user_datum} = this.get('models')
+      var errors = this.get('db_errors')
 
       user_datum.findOne({
         where: {
@@ -196,7 +202,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log(err)
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -219,6 +225,8 @@ module.exports = [
       
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
+      var errors = this.get('db_errors')
+
       var {
         entity, attribute, alias,
         schema, uri, encoding,
@@ -261,6 +269,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -285,6 +294,7 @@ module.exports = [
 
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
+      var errors = this.get('db_errors')
 
       user_datum.destroy({
         where: {
@@ -307,6 +317,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -345,7 +356,10 @@ module.exports = [
                 colour: found.branding_colour_code,
                 image_uri: found.branding_image_uri,
                 actions_url: found.actions_url,
-                nickname: found.nickname,
+                display_name: found.display_name,
+                address: found.contact_address,
+                tel: found.contact_tel,
+                email: found.contact_email,
                 did: found.did
               }
             }
@@ -425,6 +439,142 @@ module.exports = [
       var {image_uri} = req.body
       user.update(
         {branding_image_uri: image_uri},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 8 PUT /profile/name
+  {
+    uri: '/profile/name',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {name} = req.body
+      user.update(
+        {display_name: name},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 9 PUT /profile/email
+  {
+    uri: '/profile/email',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {email} = req.body
+      user.update(
+        {contact_email: email},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 10 PUT /profile/tel
+  {
+    uri: '/profile/tel',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {tel} = req.body
+      user.update(
+        {contact_tel: tel},
+        {where: {id: req.user.id}}
+      ).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 11 PUT /profile/address
+  {
+    uri: '/profile/address',
+    method: 'put',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      var {address} = req.body
+      user.update(
+        {contact_address: address},
         {where: {id: req.user.id}}
       ).then(function(updated) {
         return res.status(200).json({
