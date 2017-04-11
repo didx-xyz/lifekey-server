@@ -32,6 +32,24 @@ module.exports = function(instance, sqlize) {
       allowNull: true,
       unique: true
     },
+    display_name: {
+      type: sqlize.TEXT,
+      allowNull: true,
+      unique: false
+    },
+    contact_email: {
+      type: sqlize.TEXT,
+      allowNull: true,
+      validate: {isEmail: true}
+    },
+    contact_tel: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    contact_address: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
     branding_image_uri: {
       type: sqlize.TEXT,
       allowNull: true
@@ -40,6 +58,11 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true,
       defaultValue: '#1A7BFF'
+    },
+    contact_email: {
+      type: sqlize.STRING,
+      allowNull: true,
+      validate: {isEmail: true}
     },
     app_activation_code: {
       type: sqlize.STRING,

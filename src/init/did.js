@@ -29,10 +29,13 @@ require('./database')(false).then(function(database) {
       where: {id: user_id}
     }).then(function(updated) {
       if (!updated[0]) {
-        return console.log('EIS db update error', 'unable to update user record')
+        // super fatal
+        console.log('EIS db update error - unable to update user', user_id)
+        process.emit('message', {did_allocation_request: user_id})
+        return
       }
-      console.log('EIS ddo update success', user_id)
-      console.log('EIS pending registrations', Object.keys(registrants).length)
+      console.log('EIS ddo updated for user', user_id)
+      console.log('EIS pending registrations', Object.keys(registrants).length, registrants)
       process.send({
         notification_request: {
           type: 'received_did',
