@@ -752,14 +752,14 @@ module.exports = [
           }
           process.send({
             notification_request: {
-              user_id: ucr.from_id,
+              user_id: ucr.from_did,
               notification: pnr_notif,
               data: pnr_data
             }
           }, function() {
             process.send({
               notification_request: {
-                user_id: ucr.to_id,
+                user_id: ucr.to_did,
                 notification: pnr_notif,
                 data: pnr_data
               }
