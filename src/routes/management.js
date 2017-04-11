@@ -445,7 +445,7 @@ module.exports = [
         user_connection_request
       } = this.get('models')
       var ucr, target_user
-
+      
       if (!target) {
         return res.status(400).json({
           error: true,
@@ -581,6 +581,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({

@@ -14,7 +14,7 @@ module.exports = function(instance, sqlize) {
       allowNull: false
     },
     value: {
-      type: sqlize.BLOB,
+      type: sqlize.BLOB('long'),
       allowNull: false
     },
     schema: {
