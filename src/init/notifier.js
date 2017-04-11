@@ -56,9 +56,9 @@ require('./database')(
           notification,
           data,
           function() {
-            console.log('WEBHOOK RETRY', value)
+            console.log('WEBHOOK RETRY', value[1].webhook_url)
             failures.webhook.push({
-              uri: value,
+              uri: value[1].webhook_url,
               user_id: value[1].id,
               msg: msg.notification_request,
               ttl: failures.retries
