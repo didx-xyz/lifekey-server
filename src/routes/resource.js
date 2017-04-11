@@ -343,6 +343,7 @@ module.exports = [
               user: {
                 colour: found.branding_colour_code,
                 image_uri: found.branding_image_uri,
+                actions_url: found.actions_url,
                 nickname: found.nickname,
                 did: found.did
               }

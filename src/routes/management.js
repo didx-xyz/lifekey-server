@@ -446,11 +446,6 @@ module.exports = [
       } = this.get('models')
       var ucr, target_user
 
-      // var target_is_did = (
-      //   isNaN(parseInt(target, 10)) &&
-      //   String(target).length === 64
-      // )
-
       if (!target) {
         return res.status(400).json({
           error: true,
@@ -460,7 +455,9 @@ module.exports = [
         })
       }
 
-      if (req.user.did === target || req.user.id === target || (''+req.user.id) === target) {
+      if (req.user.did === target ||
+          req.user.id === target ||
+          (''+req.user.id) === target) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -474,8 +471,18 @@ module.exports = [
         where: {
           enabled: true,
           $and: [
-            {from_did: req.user.did},
-            {to_did: target}
+            {
+              $or: [
+                {from_did: req.user.did},
+                {to_did: target}
+              ]
+            },
+            {
+              $or: [
+                {from_did: target},
+                {to_did: req.user.did}
+              ]
+            }
           ]
         }
       }).then(function(found) {
@@ -496,8 +503,18 @@ module.exports = [
             acknowledged: null,
             accepted: null,
             $and: [
-              {from_did: req.user.did},
-              {to_did: target}
+              {
+                $or: [
+                  {from_did: req.user.did},
+                  {to_did: target}
+                ]
+              },
+              {
+                $or: [
+                  {from_did: target},
+                  {to_did: req.user.did}
+                ]
+              }
             ]
           }
         })
@@ -513,9 +530,7 @@ module.exports = [
           })
         }
 
-        return user.findOne({
-          where: {did: target}
-        })
+        return user.findOne({where: {did: target}})
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
