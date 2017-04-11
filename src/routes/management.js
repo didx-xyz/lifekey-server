@@ -444,6 +444,7 @@ module.exports = [
         user_connection,
         user_connection_request
       } = this.get('models')
+      var errors = this.get('db_errors')
       var ucr, target_user
       
       if (!target) {
@@ -457,7 +458,8 @@ module.exports = [
 
       if (req.user.did === target ||
           req.user.id === target ||
-          (''+req.user.id) === target) {
+          (''+req.user.id) === target ||
+          (''+req.user.did === target)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -473,14 +475,14 @@ module.exports = [
           $and: [
             {
               $or: [
-                {from_did: req.user.did},
-                {to_did: target}
-              ]
-            },
-            {
-              $or: [
-                {from_did: target},
-                {to_did: req.user.did}
+                {
+                  from_did: req.user.did,
+                  to_did: target
+                },
+                {
+                  from_did: target,
+                  to_did: req.user.did
+                }
               ]
             }
           ]
@@ -505,14 +507,14 @@ module.exports = [
             $and: [
               {
                 $or: [
-                  {from_did: req.user.did},
-                  {to_did: target}
-                ]
-              },
-              {
-                $or: [
-                  {from_did: target},
-                  {to_did: req.user.did}
+                  {
+                    from_did: req.user.did,
+                    to_did: target
+                  },
+                  {
+                    from_did: target,
+                    to_did: req.user.did
+                  }
                 ]
               }
             ]
@@ -551,7 +553,7 @@ module.exports = [
           ucr = created
           process.send({
             notification_request: {
-              user_id: created.to_id,
+              user_id: created.to_did,
               notification: {
                 title: 'New Connection Request',
                 body: `You have received a connection request from ${req.user.nickname}!`
@@ -581,7 +583,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log(err)
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -679,6 +681,7 @@ module.exports = [
         user_connection,
         user_connection_request
       } = this.get('models')
+      var errors = this.get('db_errors')
 
       if (typeof accepted !== 'boolean') {
         return res.status(400).json({
@@ -783,6 +786,7 @@ module.exports = [
           )
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -804,6 +808,7 @@ module.exports = [
     callback: function(req, res) {
       var {user_connection_id} = req.params
       var {user, user_connection} = this.get('models')
+      var errors = this.get('db_errors')
       var uc
       
       user_connection.findOne({
@@ -879,6 +884,7 @@ module.exports = [
           })
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -900,6 +906,7 @@ module.exports = [
     callback: function(req, res) {
       var {activation_code} = req.params
       var {user} = this.get('models')
+      var errors = this.get('db_errors')
       var user_id
       user.findOne({
         where: {app_activation_code: activation_code}
@@ -934,6 +941,7 @@ module.exports = [
           '<p><a href="lifekey:main-menu">Click here</a> to begin!</p>'
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -991,6 +999,7 @@ module.exports = [
         user_connection,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
 
       var to_user
 
@@ -1031,9 +1040,7 @@ module.exports = [
         if (found) {
           return information_sharing_agreement_request.create({
             from_did: req.user.did,
-            // from_id: req.user.id,
             to_did: to_user.did,
-            // to_id: to_user.id,
             license: license,
             optional_entities: JSON.stringify(optional_entities),
             required_entities: JSON.stringify(required_entities),
@@ -1050,7 +1057,7 @@ module.exports = [
         if (created) {
           process.send({
             notification_request: {
-              user_id: to_user.id,
+              user_id: to_user.did,
               notification: {
                 title: 'New Information Sharing Agreement',
                 body: 'New information sharing agreement'
@@ -1079,6 +1086,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1129,6 +1137,7 @@ module.exports = [
         information_sharing_agreement,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
 
       var isar, isa, from_did
 
@@ -1187,9 +1196,7 @@ module.exports = [
         } else {
           return information_sharing_agreement.create({
             isar_id: updated.id,
-            // from_id: updated.from_id,
             from_did: updated.from_did,
-            // to_id: updated.to_id,
             to_did: updated.to_did
           })
         }
@@ -1242,6 +1249,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1265,6 +1273,7 @@ module.exports = [
         information_sharing_agreement_request,
         information_sharing_agreement
       } = this.get('models')
+      var errors = this.get('db_errors')
       
       var body = {
         unacked: [],
@@ -1307,6 +1316,7 @@ module.exports = [
           })
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1335,15 +1345,14 @@ module.exports = [
         information_sharing_permission,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
       var isa, isar, isps
 
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
           $or: [
-            // {to_id: req.user.id},
             {to_did: req.user.did},
-            // {from_id: req.user.id},
             {from_did: req.user.did}
           ]
         }
@@ -1396,6 +1405,7 @@ module.exports = [
           }
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1420,6 +1430,7 @@ module.exports = [
 
       var {isa_id} = req.params
       var {information_sharing_agreement} = this.get('models')
+      var errors = this.get('db_errors')
 
       information_sharing_agreement.findOne({
         where: {
@@ -1486,6 +1497,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1507,6 +1519,7 @@ module.exports = [
     callback: function(req, res) {
       var {user_id} = req.params
       var {user} = this.get('models')
+      var errors = this.get('db_errors')
       user.findOne({
         where: {
           $or: [
@@ -1529,6 +1542,7 @@ module.exports = [
           body: null
         })
       }.bind(this)).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1571,6 +1585,7 @@ module.exports = [
         information_sharing_agreement_request,
         information_sharing_permission
       } = this.get('models')
+      var errors = this.get('db_errors')
 
       var from_user
 
@@ -1642,6 +1657,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1668,6 +1684,7 @@ module.exports = [
         information_sharing_permission,
         user_datum
       } = this.get('models')
+      var errors = this.get('db_errors')
 
       var isa, to_user, body = {}
 
@@ -1753,6 +1770,7 @@ module.exports = [
           body: body
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1791,6 +1809,7 @@ module.exports = [
         information_sharing_agreement,
         user_datum
       } = this.get('models')
+      var errors = this.get('db_errors')
       
       information_sharing_agreement.findOne({
         where: {
@@ -1883,6 +1902,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2067,6 +2087,7 @@ module.exports = [
       var {user_did} = req.params
       var {alias} = req.query
       var {user, crypto_key} = this.get('models')
+      var errors = this.get('db_errors')
 
       user.findOne({
         where: {
@@ -2112,6 +2133,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2168,7 +2190,7 @@ module.exports = [
 
       var errors = this.get('db_errors')
       var {user_action} = this.get('models')
-      
+
       user_action.findOne({
         where: {
           name: name,
@@ -2234,6 +2256,8 @@ module.exports = [
     callback: function(req, res) {
       var {user_did} = req.params
       var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
       user.findOne({
         where: {did: user_did}
       }).then(function(found) {
@@ -2269,6 +2293,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -2290,6 +2315,8 @@ module.exports = [
     callback: function(req, res) {
       var {user_did, action_name} = req.params
       var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
       var action_owner_id
       user.findOne({
         where: {did: user_did}
@@ -2332,6 +2359,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
