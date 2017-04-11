@@ -3,21 +3,13 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement_request', {
-    from_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
-    },
     from_did: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    to_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     to_did: {
       type: sqlize.STRING,
-      allowNull: true
+      allowNull: false
     },
     action_id: {
       type: sqlize.INTEGER,
