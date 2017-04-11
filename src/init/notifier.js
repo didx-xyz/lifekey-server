@@ -31,23 +31,27 @@ require('./database')(
     }
     var {user_id, notification, data} = msg.notification_request
     models.user.findOne({
-      where: {id: user_id}
+      where: (
+        typeof user_id === 'string' &&
+        user_id.length === 64 ?
+        {did: user_id} :
+        {id: user_id}
+      )
     }).then(function(found) {
       if (found) {
-        if (found.webhook_url) {
-          return Promise.resolve(found.webhook_url)
-        }
-        return models.user_device.findOne({
-          where: {owner_id: user_id}
-        })
+        if (found.webhook_url) return Promise.all([null, found])
+        return Promise.all([
+          models.user_device.findOne({where: {owner_id: found.id}}),
+          null
+        ])
       }
       return Promise.reject(
         new Error('couldnt find user by id ' + user_id)
       )
     }).then(function(value) {
-      if (typeof value === 'string') {
+      if (!value[0]) {
         return webhook(
-          url.parse(value),
+          url.parse(value[1].webhook_url),
           data.type,
           notification,
           data,
@@ -55,7 +59,7 @@ require('./database')(
             console.log('WEBHOOK RETRY', value)
             failures.webhook.push({
               uri: value,
-              user_id: user_id,
+              user_id: value[1].id,
               msg: msg.notification_request,
               ttl: failures.retries
             })
@@ -63,7 +67,7 @@ require('./database')(
         )
       }
       return fcm(
-        value.device_id,
+        value[1].device_id,
         notification,
         data,
         console.log
