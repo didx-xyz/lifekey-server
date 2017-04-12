@@ -39,7 +39,8 @@
     "secp256k1": "^3.2.5",
     "sendgrid": "^4.7.1",
     "sequelize": "^3.28.0",
-    "ursa": "^0.9.4"
+    "ursa": "^0.9.4",
+    "web3": "^0.18.4"
   },
   "devDependencies": {
     "chai": "^3.5.0",
