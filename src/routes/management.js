@@ -2620,37 +2620,29 @@ module.exports = [
           })
         }
       }).then(function(found) {
-        if (found) {
-          receipt = {
-            '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
-            isaSignatureValue: null,
-            isa: {
-              requestSignatureValue: null,
-              request: {
-                purpose: isar.purpose,
-                license: isar.license,
-                entities: JSON.parse(isar.required_entities),
-                optionalEntities: JSON.parse(isar.optional_entities),
+        receipt = {
+          '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
+          isaSignatureValue: null,
+          isa: {
+            requestSignatureValue: null,
+            request: {
+              purpose: isar.purpose,
+              license: isar.license,
+              entities: JSON.parse(isar.required_entities),
+              optionalEntities: JSON.parse(isar.optional_entities),
 
-                // TODO requires data model change
-                // durationDays: isar.duration_days,
-                requestedBy: isar.from_did,
-                action: found.name
-              },
-              response: {
-                respondedBy: isar.to_did
-              }
+              // TODO requires data model change
+              // durationDays: isar.duration_days,
+              requestedBy: isar.from_did,
+              action: ((found || {}).name) || null
+            },
+            response: {
+              respondedBy: isar.to_did
             }
           }
-          return user.findOne({
-            where: {did: isar.from_did}
-          })
         }
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'user_action record not found',
-          body: null
+        return user.findOne({
+          where: {did: isar.from_did}
         })
       }).then(function(found) {
         if (found) {
