@@ -2457,8 +2457,7 @@ module.exports = [
         user_connection,
         information_sharing_agreement_request,
         information_sharing_agreement,
-        information_sharing_permission,
-        information_sharing_agreement_receipt
+        information_sharing_permission
       } = this.get('models')
 
       var errors = this.get('db_errors')
@@ -2581,6 +2580,7 @@ module.exports = [
       var {isa_id} = req.params
       var {
         user,
+        user_action,
         crypto_key,
         information_sharing_agreement,
         information_sharing_agreement_request
@@ -2608,6 +2608,19 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           isar = found
+          return user_action.findOne({
+            where: {id: isar.action_id}
+          })
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'information_sharing_agreement_request record not found',
+            body: null
+          })
+        }
+      }).then(function(found) {
+        if (found) {
           receipt = {
             '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
             isaSignatureValue: null,
@@ -2622,7 +2635,7 @@ module.exports = [
                 // TODO requires data model change
                 // durationDays: isar.duration_days,
                 requestedBy: isar.from_did,
-                action: isar.action_id // FIXME query the action name
+                action: found.name
               },
               response: {
                 respondedBy: isar.to_did
@@ -2632,14 +2645,13 @@ module.exports = [
           return user.findOne({
             where: {did: isar.from_did}
           })
-        } else {
-          return Promise.reject({
-            error: true,
-            status: 404,
-            message: 'information_sharing_agreement_request record not found',
-            body: null
-          })
         }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
           return crypto_key.findOne({
