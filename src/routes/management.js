@@ -20,7 +20,7 @@ var our_crypto = require('../crypto')
 
 var thanks_balance_check_available = false
 
-(function() {
+;(function() {
   if (!send_is_undefined) {
     
     var THANKS_TOKEN_CONTRACT_ABI = [
