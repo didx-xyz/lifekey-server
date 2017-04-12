@@ -1955,9 +1955,9 @@ module.exports = [
 
   // 16 GET /management/thanks/balance
   {
-    uri: '/management/thanks/balance/:did',
+    uri: '/management/thanks/balance',
     method: 'get',
-    secure: false,
+    secure: true,
     active: false,
     callback: function(req, res) {
       if (!thanks_balance_check_available) {
@@ -1968,19 +1968,17 @@ module.exports = [
           body: null
         })
       }
-      var {did} = req.params
-      if (!(typeof did === 'string' &&
-            did.length === 64)) {
+      if (!req.user.did_address) {
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'invalid did value given',
+          message: 'your user record does not yet have a DID',
           body: null
         })
       }
-      thanks.balanceOf(did, function(err, balance) {
+      thanks.balanceOf(req.user.did_address, function(err, balance) {
         if (err) {
-          console.log('unable to query balance of user', did, err)
+          console.log('unable to query balance of user', req.user.id, err)
           return res.status(500).json({
             error: true,
             status: 500,
@@ -1992,7 +1990,7 @@ module.exports = [
           error: false,
           status: 200,
           message: 'ok',
-          body: {balance: balance.toString(10)}
+          body: {balance: balance}
         })
       })
     }
