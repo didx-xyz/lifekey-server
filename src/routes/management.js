@@ -16,6 +16,8 @@ var web3 = require('web3')
 var qr = require('qr-image')
 var cuid = require('cuid')
 
+var env = require('../init/env')()
+
 var our_crypto = require('../crypto')
 
 var thanks_balance_check_available = false
