@@ -20,7 +20,7 @@ var our_crypto = require('../crypto')
 
 var thanks_balance_check_available = false
 
-(function initialise_thanks_token_contract() {
+(function() {
   if (!send_is_undefined) {
     
     var THANKS_TOKEN_CONTRACT_ABI = [
@@ -49,7 +49,7 @@ var thanks_balance_check_available = false
 
     thanks_balance_check_available = true
   }
-})()
+}())
 
 module.exports = [
   
