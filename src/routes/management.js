@@ -1955,38 +1955,8 @@ module.exports = [
     method: 'get',
     secure: false,
     active: false,
-    callback: thanks_balance_check_available ? (
-      function(req, res) {
-        var {did} = req.params
-        if (!(typeof did === 'string' &&
-              did.length === 64)) {
-          return res.status(400).json({
-            error: true,
-            status: 400,
-            message: 'invalid did value given',
-            body: null
-          })
-        }
-        thanks.balanceOf(did, function(err, balance) {
-          if (err) {
-            console.log('unable to query balance of user', did, err)
-            return res.status(500).json({
-              error: true,
-              status: 500,
-              message: 'internal server error',
-              body: null
-            })
-          }
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'ok',
-            body: {balance: balance.toString(10)}
-          })
-        })
-      }
-    ) : (
-      function(res, res) {
+    callback: function(req, res) {
+      if (!thanks_balance_check_available) {
         return res.status(500).json({
           error: true,
           status: 500,
@@ -1994,7 +1964,34 @@ module.exports = [
           body: null
         })
       }
-    )
+      var {did} = req.params
+      if (!(typeof did === 'string' &&
+            did.length === 64)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'invalid did value given',
+          body: null
+        })
+      }
+      thanks.balanceOf(did, function(err, balance) {
+        if (err) {
+          console.log('unable to query balance of user', did, err)
+          return res.status(500).json({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {balance: balance.toString(10)}
+        })
+      })
+    }
   },
 
   // 17 POST /management/key
