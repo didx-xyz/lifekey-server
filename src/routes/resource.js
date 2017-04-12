@@ -340,11 +340,7 @@ module.exports = [
       var {user_did} = req.params
       var {user} = this.get('models')
       user.findOne({
-        where: {
-          $or: [
-            {did: user_did}
-          ]
-        }
+        where: {did: user_did}
       }).then(function(found) {
         if (found) {
           return res.status(200).json({
