@@ -67,7 +67,7 @@ require('./database')(
         )
       }
       return fcm(
-        value[1].device_id,
+        value[0].device_id,
         notification,
         data,
         console.log
