@@ -9,10 +9,18 @@ var assertAppActivated = (
 
 module.exports = function(req, res, next) {
   var OUTER = this
+  
+  if (!(req.headers['x-cnsnt-did'] || req.headers['x-cnsnt-id'])) {
+    // if missing any of the above
+    return res.status(400).json({
+      error: true,
+      status: 400,
+      message: 'authentication parameters missing from request headers',
+      body: null
+    })
+  }
 
-  if (!((req.headers['x-cnsnt-did'] ||
-         req.headers['x-cnsnt-id']) &&
-        'x-cnsnt-plain' in req.headers &&
+  if (!('x-cnsnt-plain' in req.headers &&
         'x-cnsnt-signed' in req.headers)) {
     // if missing any of the above
     return res.status(400).json({
