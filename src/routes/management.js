@@ -20,6 +20,8 @@ var our_crypto = require('../crypto')
 
 var thanks_balance_check_available = false
 
+var w3, thanks
+
 ;(function() {
   if (!send_is_undefined) {
     
@@ -28,7 +30,7 @@ var thanks_balance_check_available = false
     ]
 
     try {
-      var w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
+      w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
     } catch (e) {
       thanks_balance_check_available = false
       console.log('unable to initialise connection to eis host')
@@ -36,7 +38,7 @@ var thanks_balance_check_available = false
     }
 
     try {
-      var thanks = w3.eth.contract(
+      thanks = w3.eth.contract(
         THANKS_TOKEN_CONTRACT_ABI
       ).at(
         env.THANKS_TOKEN_CONTRACT_ADDRESS
