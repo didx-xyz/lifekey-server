@@ -1967,7 +1967,7 @@ module.exports = [
             body: null
           })
         }
-        thanks.balanceOf(did, function(err, res) {
+        thanks.balanceOf(did, function(err, balance) {
           if (err) {
             console.log('unable to query balance of user', did, err)
             return res.status(500).json({
@@ -1981,7 +1981,7 @@ module.exports = [
             error: false,
             status: 200,
             message: 'ok',
-            body: {balance: res.toString(10)}
+            body: {balance: balance.toString(10)}
           })
         })
       }
