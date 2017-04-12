@@ -593,9 +593,9 @@ module.exports = [
     }
   },
 
-  // 12 GET /profile/did
+  // 12 GET /profile
   {
-    uri: '/profile/did',
+    uri: '/profile',
     method: 'get',
     secure: true,
     active: false,
@@ -605,6 +605,13 @@ module.exports = [
         status: 200,
         message: 'ok',
         body: {
+          colour: req.user.branding_colour_code,
+          image_uri: req.user.branding_image_uri,
+          actions_url: req.user.actions_url,
+          display_name: req.user.display_name,
+          address: req.user.contact_address,
+          tel: req.user.contact_tel,
+          email: req.user.contact_email,
           did: req.user.did,
           did_address: req.user.did_address
         }
