@@ -33,7 +33,7 @@ var w3, thanks
       w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
     } catch (e) {
       thanks_balance_check_available = false
-      console.log('unable to initialise connection to eis host')
+      console.log('unable to initialise connection to eis host', e)
       return
     }
 
@@ -45,13 +45,13 @@ var w3, thanks
       )
     } catch (e) {
       thanks_balance_check_available = false
-      console.log('unable to initialise thanks token contract instance')
+      console.log('unable to initialise thanks token contract instance', e)
       return
     }
 
     thanks_balance_check_available = true
   }
-}())
+})()
 
 module.exports = [
   
