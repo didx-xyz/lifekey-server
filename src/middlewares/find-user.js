@@ -48,10 +48,17 @@ module.exports = function(req, res, next) {
       body: null
     })
   }).then(function(found) {
-    // if (req.headers['x-cnsnt-did'] === 'example') {
-    //   req.user = {did: 'example', id: 2, did_address: 'example', email: 'example', nickname: 'example'}
-    //   return next()
-    // }
+    // white list example user
+    if (req.headers['x-cnsnt-did'] === 'example') {
+      req.user = {
+        did: 'example',
+        id: 2,
+        did_address: 'example',
+        email: 'example',
+        nickname: 'example'
+      }
+      return next()
+    }
     if (found) {
       req.user.crypto = found
       return assertAppActivated.call(OUTER, req, res, next)
