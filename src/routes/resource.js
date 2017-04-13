@@ -133,8 +133,8 @@ module.exports = [
   {
     uri: '/resource',
     method: 'post',
-    secure: false,
-    active: false,
+    secure: true,
+    active: true,
     callback: function(req, res) {
       
       var {
