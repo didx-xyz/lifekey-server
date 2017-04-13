@@ -49,6 +49,7 @@ module.exports = function(req, res, next) {
     })
   }).then(function(found) {
     if (req.headers['x-cnsnt-did'] === 'example') {
+      req.user = {did: 'example', id: 2, did_address: 'example', email: 'example', nickname: 'example'}
       return next()
     }
     if (found) {
