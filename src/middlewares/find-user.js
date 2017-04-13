@@ -49,7 +49,7 @@ module.exports = function(req, res, next) {
     })
   }).then(function(found) {
     // white list example user
-    if (req.headers['x-cnsnt-did'] === 'example') {
+    if (req.headers['x-cnsnt-id'] === '2') {
       req.user = {
         did: 'example',
         id: 2,
