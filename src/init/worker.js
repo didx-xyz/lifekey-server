@@ -70,7 +70,7 @@ server.enable('trust proxy')
 if (!TESTING && env.NODE_ENV !== 'production') server.use(morgan('dev'))
 
 server.use(cors())
-server.use(bodyParser.json({ limit: '5mb' }))
+server.use(bodyParser.json({ limit: '50mb' }))
 
 require('./database')(
   false // disable logging
