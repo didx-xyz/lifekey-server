@@ -1790,6 +1790,11 @@ module.exports = [
         if (found && found.length) {
           // TODO change this key name!!!
           body.user_data = found.map(function(ud) {
+            ud.value = (
+              ud.value && ud.encoding ?
+              ud.value.toString(ud.encoding) :
+              ud.value
+            )
             return ud.toJSON()
           })
           return Promise.resolve()
@@ -2862,6 +2867,11 @@ module.exports = [
         })
       }).then(function(found) {
         if (found) {
+          found.value = (
+            found.value && found.encoding ?
+            found.value.toString(found.encoding) :
+            found.value
+          )
           return res.status(200).json({
             error: false,
             status: 200,

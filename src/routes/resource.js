@@ -45,6 +45,11 @@ module.exports = [
               status: 200,
               message: 'ok',
               body: found.map(function(f) {
+                f.value = (
+                  f.value && f.encoding ?
+                  f.value.toString(f.encoding) :
+                  found.value
+                )
                 return f.toJSON()
               })
             })
