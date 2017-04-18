@@ -2793,7 +2793,7 @@ module.exports = [
       } = this.get('models')
       var errors = this.get('db_errors')
 
-      var token = crypto.rng(32).toString('base64')
+      var token = req.user.did + crypto.rng(32).toString('base64')
       facial_verification.create({
         subject_did: req.user.did,
         token: token
