@@ -12,66 +12,75 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {pushed} = req.query
+      var {pushed, all} = req.query
       var db = this.get('db')
+      var {user_datum} = this.get('models')
       var errors = this.get('db_errors')
-      if (pushed) {
-        db.query([
-          'SELECT id, entity, attribute, alias',
-          'FROM user_data',
-          'WHERE owner_id = :owner_id AND',
-          'from_user_did IS NOT NULL',
-          'ORDER BY entity, attribute, alias ASC'
-        ].join(' '), {
-          replacements: {owner_id: req.user.id},
-          type: db.QueryTypes.SELECT
-        }).then(function(found) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'ok',
-            body: found.length ? found : []
+
+      function dispatch() {
+        if (pushed) {
+          return db.query([
+            'SELECT id, entity, attribute, alias',
+            'FROM user_data',
+            'WHERE owner_id = :owner_id AND',
+            'from_user_did IS NOT NULL',
+            'ORDER BY entity, attribute, alias ASC'
+          ].join(' '), {
+            replacements: {owner_id: req.user.id},
+            type: db.QueryTypes.SELECT
+          }).then(function(found) {
+            return res.status(200).json({
+              error: false,
+              status: 200,
+              message: 'ok',
+              body: found.length ? found : []
+            })
           })
-        }).catch(function(err) {
-          err = errors(err)
-          return res.status(
-            err.status || 500
-          ).json({
-            error: err.error || true,
-            status: err.status || 500,
-            message: err.message || 'internal server error',
-            body: err.body || null
+        } else if (all) {
+          return user_datum.findAll({
+            where: {owner_id: req.user.id}
+          }).then(function(found) {
+            return res.status(200).json({
+              error: false,
+              status: 200,
+              message: 'ok',
+              body: found.map(function(f) {
+                return f.toJSON()
+              })
+            })
           })
-        })
-      } else {
-        db.query([
-          'SELECT id, entity, attribute, alias',
-          'FROM user_data',
-          'WHERE owner_id = :owner_id AND',
-          'from_user_did IS NULL',
-          'ORDER BY entity, attribute, alias ASC'
-        ].join(' '), {
-          replacements: {owner_id: req.user.id},
-          type: db.QueryTypes.SELECT
-        }).then(function(found) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'ok',
-            body: found.length ? found : []
+        } else {
+          return db.query([
+            'SELECT id, entity, attribute, alias',
+            'FROM user_data',
+            'WHERE owner_id = :owner_id AND',
+            'from_user_did IS NULL',
+            'ORDER BY entity, attribute, alias ASC'
+          ].join(' '), {
+            replacements: {owner_id: req.user.id},
+            type: db.QueryTypes.SELECT
+          }).then(function(found) {
+            return res.status(200).json({
+              error: false,
+              status: 200,
+              message: 'ok',
+              body: found.length ? found : []
+            })
           })
-        }).catch(function(err) {
-          err = errors(err)
-          return res.status(
-            err.status || 500
-          ).json({
-            error: err.error || true,
-            status: err.status || 500,
-            message: err.message || 'internal server error',
-            body: err.body || null
-          })
-        })
+        }
       }
+      
+      dispatch().catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
     }
   },
 
