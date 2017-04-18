@@ -10,6 +10,8 @@ var assertAppActivated = (
 module.exports = function(req, res, next) {
   var OUTER = this
 
+  var errors = this.get('db_errors')
+
   if (!((req.headers['x-cnsnt-did'] || req.headers['x-cnsnt-id']) &&
         ('x-cnsnt-plain' in req.headers &&
         'x-cnsnt-signed' in req.headers))) {
@@ -37,7 +39,11 @@ module.exports = function(req, res, next) {
       return crypto_key.findOne({
         where: {
           owner_id: found.id,
-          alias: 'client-server-http'
+          alias: (
+            'x-cnsnt-fingerprint' in req.headers ?
+            'fingerprint' :
+            'client-server-http'
+          )
         }
       })
     }
@@ -70,6 +76,7 @@ module.exports = function(req, res, next) {
       body: null
     })
   }).catch(function(err) {
+    err = errors(err)
     return res.status(
       err.status || 500
     ).json({
