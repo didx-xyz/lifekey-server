@@ -239,7 +239,7 @@ describe('resource', function() {
 
   // 0 GET /resource
   describe(`${resource_index.method.toUpperCase()} ${resource_index.uri}`, function() {
-    it('should respond with an array of [entity, attribute, alias] values if not using query option', function(done) {
+    it('should respond with an array of [entity, attribute, alias] values if not using any query options', function(done) {
       resource_index.callback.call(mock.express, {
         user: {id: test_user.id, did: test_user.did},
         query: {}
@@ -248,6 +248,32 @@ describe('resource', function() {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
         expect(res.body.length).to.equal(3)
+        done()
+      }))
+    })
+
+    it('should respond with all resources and values if using all query option', function(done) {
+      resource_index.callback.call(mock.express, {
+        user: {id: test_user.id, did: test_user.did},
+        query: {all: true}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body.length).to.equal(3)
+        done()
+      }))
+    })
+
+    it('should respond with all resources created by other users if using pushed option', function(done) {
+      resource_index.callback.call(mock.express, {
+        user: {id: test_user.id, did: test_user.did},
+        query: {pushed: true}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body.length).to.equal(0)
         done()
       }))
     })
