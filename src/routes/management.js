@@ -1864,13 +1864,14 @@ module.exports = [
               body: null
             })
           }
+          other_user_id = (
+            req.user.did === found.to_did ?
+            found.from_did :
+            found.to_did
+          )
           return user.findOne({
             where: {
-              did: (
-                req.user.did === found.to_did ?
-                found.from_did :
-                found.to_did
-              )
+              did: other_user_id
             }
           })
         }
