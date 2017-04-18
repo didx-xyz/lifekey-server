@@ -7,7 +7,7 @@ var mock = require('../mock/express')
 var subject = require('../../src/middlewares/find-user')
 
 var now = Date.now()
-var test_user, test_user_key
+var test_user, test_user_key, test_user_fingerprint_key
 
 before(function(done) {
   this.timeout(20000) // it takes a while to load these models
@@ -18,6 +18,7 @@ before(function(done) {
     false // disable sql logging
   ).then(function(database) {
     mock.express.models = database.models
+    mock.express.db_errors = database.errors
     user = database.models.user
     crypto_key = database.models.crypto_key
     return user.create({
@@ -44,6 +45,20 @@ before(function(done) {
   }).then(function(created) {
     if (created) {
       test_user_key = created
+      return crypto_key.create({
+        owner_id: test_user.id,
+        algorithm: 'foo',
+        purpose: 'foo',
+        alias: 'fingerprint',
+        private_key: Buffer.from('foo'),
+        public_key: Buffer.from('foo')
+      })
+      return done()
+    }
+    return done(new Error('should not have been called'))
+  }).then(function(created) {
+    if (created) {
+      test_user_fingerprint_key = created
       return done()
     }
     return done(new Error('should not have been called'))
@@ -79,13 +94,27 @@ describe('middleware find-user', function() {
     }), done.bind(done, new Error('should not be called')))
   })
 
-  it('should invoke the success callback if specified user exists', function(done) {
+  it('should invoke the success callback if specified user exists (no fingerprint key)', function(done) {
     subject.call(mock.express, {
       headers: {
         'x-cnsnt-id': test_user.id,
         'x-cnsnt-did': test_user.did,
         'x-cnsnt-plain': 'foo',
         'x-cnsnt-signed': 'foo'
+      }
+    }, mock.res(function(res) {
+      done(new Error('should not be called'))
+    }), done)
+  })
+
+  it('should invoke the success callback if specified user exists (fingerprint key)', function(done) {
+    subject.call(mock.express, {
+      headers: {
+        'x-cnsnt-id': test_user.id,
+        'x-cnsnt-did': test_user.did,
+        'x-cnsnt-plain': 'foo',
+        'x-cnsnt-signed': 'foo',
+        'x-cnsnt-fingerprint': 'foo'
       }
     }, mock.res(function(res) {
       done(new Error('should not be called'))
