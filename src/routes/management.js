@@ -2772,7 +2772,276 @@ module.exports = [
         })
       })
     }
-  }
+  },
+
+  // 25 POST /facial-verification
+  {
+    uri: '/facial-verification',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {
+        user,
+        facial_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var token = crypto.rng(32).toString('base64')
+      facial_verification.create({
+        subject_did: req.user.did,
+        token: token
+      }).then(function(created) {
+        return res.status(201).json({
+          error: false,
+          status: 201,
+          message: 'created',
+          body: {token: token}
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 26 GET /facial-verification/:user_did/:token
+  {
+    uri: '/facial-verification/:user_did/:token',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did, token} = req.params
+      var {
+        user,
+        user_datum,
+        facial_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      facial_verification.findOne({
+        where: {
+          token: token,
+          subject_did: user_did
+        }
+      }).then(function(found) {
+        if (found) {
+          return user.findOne({
+            where: {did: user_did}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'facial_verification record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return user_datum.findOne({
+            where: {
+              owner_id: found.id,
+              schema: 'schema.cnsnt.io/person',
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              entity: found.entity,
+              attribute: found.attribute,
+              alias: found.alias,
+              schema: found.schema,
+              value: found.value,
+              encoding: found.encoding,
+              mime: found.mime
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_datum record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 27 POST /facial-verification/:user_did/:facial_verification_token
+  {
+    uri: '/facial-verification/:user_did/:token',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did, token} = req.params
+      var {
+        user,
+        crypto_key,
+        user_datum,
+        facial_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var {result} = req.body
+
+      if (!(typeof result === 'string' &&
+            result.length &&
+            !!~['yes', 'no', 'not sure'].indexOf(result))) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      facial_verification.update({
+        verifier_did: req.user.did,
+        result: result
+      }, {
+        where: {
+          token: token,
+          subject_did: user_did,
+          verifier_did: null,
+          result: null
+        }
+      }).then(function(updated) {
+        if (updated[0]) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: req.user.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update facial_verification record',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          var claim_instance = {
+            '@context': [
+              'http://schema.cnsnt.io/verifiable_claim'
+            ].concat('http://schema.cnsnt.io/facial_verification'),
+            claim: {
+              facialVerificationResult: result,
+              isCredential: false,
+              issuedFor: user_did,
+              creator: req.user.did,
+              createdAt: Date.now()
+            },
+            signatureValue: ''
+          }
+          return Promise.all([
+            claim_instance,
+            our_crypto.asymmetric.sign(
+              'secp256k1',
+              found.private_key,
+              JSON.stringify(claim_instance.claim)
+            )
+          ])
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(res) {
+        res[0].signatureValue = res[1].toString('base64')
+        return Promise.all([
+          user.findOne({where: {did: user_did}}),
+          res[0]
+        ])
+      }).then(function(res) {
+        return user_datum.create({
+          owner_id: res[0].id,
+          value: JSON.stringify(res[1]),
+          entity: 'Claim',
+          attribute: 'Verifiable',
+          alias: Date.now(),
+          from_user_did: req.user.did,
+          from_resource_name: 'Facial recognition verifiable claim',
+          from_resource_description: 'Facial recognition with ' + req.user.did,
+          is_verifiable_claim: true,
+          mime: 'application/ld+json'
+        })
+      }).then(function(created) {
+        if (created) {
+          process.send({
+            notification_request: {
+              user_id: user_did,
+              notification: {
+                title: 'Resources Pushed',
+                body: 'One or more resources wre pushed to you'
+              },
+              data: {
+                type: 'resource_pushed',
+                resource_ids: [created.id]
+              }
+            }
+          })
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
 
   // example
   // 
