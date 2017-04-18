@@ -247,7 +247,7 @@ describe('resource', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
-        expect(res.body.length).to.equal(4)
+        expect(res.body.length).to.equal(3)
         done()
       }))
     })
