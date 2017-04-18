@@ -20,6 +20,7 @@ var actions_receipts_isa_id
 var action_delete_id
 var isar_respond1, isar_respond2
 var created_isa_id
+var face_verify_token
 var update_uc, update_uc2
 var test_users = [
   {
@@ -287,6 +288,10 @@ describe('management endpoints', function() {
   
   var mgmt_isa_receipt = routes[23]
   var mgmt_action_delete = routes[24]
+
+  var mgmt_face_verify_create = routes[25]
+  var mgmt_face_verify_get = routes[26]
+  var mgmt_face_verify_respond = routes[27]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -1778,6 +1783,94 @@ describe('management endpoints', function() {
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.user_action).to.equal('number')
         expect(res.body.user_action).to.equal(1)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_create.method.toUpperCase()} ${mgmt_face_verify_create.uri}`, function() {
+    it('should respond with a base64 token', function(done) {
+      mgmt_face_verify_create.callback.call(mock.express, {
+        user: {did: test_users[1].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
+        expect(typeof res.body).to.equal('object')
+        expect(res.body).to.not.equal(null)
+        expect(typeof res.body.token).to.equal('string')
+        face_verify_token = res.body.token
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_get.method.toUpperCase()} ${mgmt_face_verify_get.uri}`, function() {
+    
+    before(function(done) {
+      mock.express.models.user_datum.create({
+        owner_id: test_users[1].id,
+        schema: 'schema.cnsnt.io/person',
+        entity: 'person',
+        attribute: 'face',
+        value: 'foo',
+        mime: 'application/ld+json',
+        encoding: 'utf8',
+        alias: 'my picture'
+      }).then(
+        done.bind(done, null)
+      ).catch(done)
+    })
+
+    it('should respond with a person schema instance', function(done) {
+      mgmt_face_verify_get.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(res.body).to.not.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_respond.method.toUpperCase()} ${mgmt_face_verify_respond.uri}`, function() {
+    it('should respond with error if required arguments are missing', function(done) {
+      mgmt_face_verify_respond.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with success if verfication was responded to', function(done) {
+      mgmt_face_verify_respond.callback.call(mock.express, {
+        user: {id: test_users[2].id, did: test_users[2].id},
+        body: {result: 'yes'},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
         done()
       }))
     })
