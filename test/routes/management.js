@@ -1791,7 +1791,7 @@ describe('management endpoints', function() {
   describe(`${mgmt_face_verify_create.method.toUpperCase()} ${mgmt_face_verify_create.uri}`, function() {
     it('should respond', function(done) {
       mgmt_face_verify_create.callback.call(mock.express, {
-        user: {did: test_users[1].id}
+        query: {user_did: test_users[1].id}
       }, mock.res(done.bind(done, null)))
     })
   })
