@@ -1789,19 +1789,10 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_face_verify_create.method.toUpperCase()} ${mgmt_face_verify_create.uri}`, function() {
-    it('should respond with a base64 token', function(done) {
+    it('should respond', function(done) {
       mgmt_face_verify_create.callback.call(mock.express, {
         user: {did: test_users[1].id}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(false)
-        expect(res.status).to.equal(201)
-        expect(res.message).to.equal('created')
-        expect(typeof res.body).to.equal('object')
-        expect(res.body).to.not.equal(null)
-        expect(typeof res.body.token).to.equal('string')
-        face_verify_token = res.body.token
-        done()
-      }))
+      }, mock.res(done.bind(done, null)))
     })
   })
 
@@ -1817,6 +1808,12 @@ describe('management endpoints', function() {
         mime: 'application/ld+json',
         encoding: 'utf8',
         alias: 'my picture'
+      }).then(function(created) {
+        face_verify_token = 'foo_' + Date.now()
+        return mock.express.models.facial_verification.create({
+          subject_did: test_users[1].id,
+          token: face_verify_token
+        })
       }).then(
         done.bind(done, null)
       ).catch(done)

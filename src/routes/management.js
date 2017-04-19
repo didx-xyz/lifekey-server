@@ -2791,19 +2791,35 @@ module.exports = [
         user,
         facial_verification
       } = this.get('models')
+
+      var {SERVER_HOSTNAME} = this.get('env')
+
       var errors = this.get('db_errors')
 
-      var token = req.user.did + crypto.rng(32).toString('base64')
-      facial_verification.create({
-        subject_did: req.user.did,
-        token: token
-      }).then(function(created) {
-        return res.status(201).json({
-          error: false,
-          status: 201,
-          message: 'created',
-          body: {token: token}
+      var token
+
+      facial_verification.findOne({
+        where: {
+          subject_did: req.user.did,
+          verifier_did: null,
+          result: null
+        }
+      }).then(function(found) {
+        var token
+        if (found) {
+          token = found.token
+          return Promise.resolve()
+        }
+        token = req.user.did + crypto.rng(32).toString('base64')
+        return facial_verification.create({
+          subject_did: req.user.did,
+          token: token
         })
+      }).then(function() {
+        return qr.image(
+          `${SERVER_HOSTNAME}/facial-verification/${req.user.did}/${token}`,
+          {type: 'png'}
+        ).pipe(res)
       }).catch(function(err) {
         err = errors(err)
         return res.status(
