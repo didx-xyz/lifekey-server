@@ -2780,10 +2780,10 @@ module.exports = [
     }
   },
 
-  // 25 POST /facial-verification
+  // 25 get /facial-verification
   {
     uri: '/facial-verification',
-    method: 'post',
+    method: 'get',
     secure: true,
     active: true,
     callback: function(req, res) {
