@@ -2841,8 +2841,8 @@ module.exports = [
   {
     uri: '/facial-verification/:user_did/:token',
     method: 'get',
-    secure: true,
-    active: true,
+    secure: false,
+    active: false,
     callback: function(req, res) {
       var {user_did, token} = req.params
       var {
