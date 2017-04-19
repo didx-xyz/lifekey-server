@@ -2784,9 +2784,12 @@ module.exports = [
   {
     uri: '/facial-verification',
     method: 'get',
-    secure: true,
-    active: true,
+    secure: false,
+    active: false,
     callback: function(req, res) {
+
+      var {user_did} = req.query
+
       var {
         user,
         facial_verification
@@ -2800,7 +2803,7 @@ module.exports = [
 
       facial_verification.findOne({
         where: {
-          subject_did: req.user.did,
+          subject_did: user_did,
           verifier_did: null,
           result: null
         }
@@ -2810,14 +2813,14 @@ module.exports = [
           token = found.token
           return Promise.resolve()
         }
-        token = req.user.did + crypto.rng(32).toString('base64')
+        token = user_did + crypto.rng(32).toString('base64')
         return facial_verification.create({
-          subject_did: req.user.did,
+          subject_did: user_did,
           token: token
         })
       }).then(function() {
         return qr.image(
-          `${SERVER_HOSTNAME}/facial-verification/${req.user.did}/${token}`,
+          `${SERVER_HOSTNAME}/facial-verification/${user_did}/${token}`,
           {type: 'png'}
         ).pipe(res)
       }).catch(function(err) {
