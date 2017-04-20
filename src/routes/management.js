@@ -758,7 +758,7 @@ module.exports = [
         if (found) {
           // accept/reject the ucr
           ucr = {
-            to_did: found.to_did,
+            to_did: req.user.did,
             from_did: found.from_did
           }
           return found.destroy()
@@ -806,11 +806,11 @@ module.exports = [
             from_did: ucr.from_did
           }
 
-          var to_pnr_data = pnr_data
+          var to_pnr_data = Object.assign({}, pnr_data)
           to_pnr_data.actions_url = create_find[1].actions_url
           to_pnr_data.other_user_did = ucr.from_did
 
-          var from_pnr_data = pnr_data
+          var from_pnr_data = Object.assign({}, pnr_data)
           from_pnr_data.actions_url = req.user.actions_url
           from_pnr_data.other_user_did = ucr.to_did
           
