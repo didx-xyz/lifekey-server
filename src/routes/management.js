@@ -3073,6 +3073,49 @@ module.exports = [
     }
   },
 
+  // 28 GET /management/action
+  {
+    uri: '/management/action',
+    method: 'get',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      user_action.findAll({
+        where: {owner_id: req.user.id}
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.map(function(action) {
+              return action.toJSON()
+            })
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to query user_action records',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
   // example
   // 
   // N METHOD /:VERSION/:URI
