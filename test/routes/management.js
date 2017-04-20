@@ -294,9 +294,6 @@ describe('management endpoints', function() {
   var mgmt_face_verify_get = routes[26]
   var mgmt_face_verify_respond = routes[27]
 
-describe.only('temp', function() {
-
-
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
     after(function(done) {
@@ -649,7 +646,6 @@ describe.only('temp', function() {
     // TODO test case: should return not found if the user is not associated to the record
   })
 
-})
   describe(`${mgmt_cxn_delete.method.toUpperCase()} ${mgmt_cxn_delete.uri}`, function() {
     it('should return not found if the user is not associated to the record', function(done) {
       mgmt_cxn_delete.callback.call(mock.express, {
