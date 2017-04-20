@@ -7,7 +7,24 @@
 // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
 var send_is_undefined = !process.send
-if (send_is_undefined) process.send = function() {}
+if (send_is_undefined) {
+  var process_send_called = 0
+  var process_send_calls = {}
+  process.send = function(msg, on_send) {
+    process_send_called += 1
+    process_send_calls[process_send_called] = msg
+    if (typeof on_send === 'function') {
+      on_send()
+    }
+    return true
+  }
+  process.get_call_data = function() {
+    return {
+      call_count: process_send_called,
+      call_args: process_send_calls
+    }
+  }
+}
 
 var url = require('url')
 var crypto = require('crypto')
@@ -741,7 +758,7 @@ module.exports = [
         if (found) {
           // accept/reject the ucr
           ucr = {
-            to_did: found.to_did,
+            to_did: req.user.did,
             from_did: found.from_did
           }
           return found.destroy()
@@ -773,13 +790,14 @@ module.exports = [
             body: null
           })
         }
-      }).then(function(create_find_delete) {
-        if (create_find_delete) {
-          uc = create_find_delete[0]
+      }).then(function(create_find) {
+        if (create_find) {
+          uc = create_find[0]
           var pnr_notif = {
             title: 'User Connection',
             body: 'User connection successfully created!'
-          }, pnr_data = {
+          }
+          var pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
             user_connection_id: uc.id,
@@ -788,24 +806,26 @@ module.exports = [
             from_did: ucr.from_did
           }
 
-          var from_pnr_data = pnr_data
+          var to_pnr_data = Object.assign({}, pnr_data)
+          to_pnr_data.actions_url = create_find[1].actions_url
+          to_pnr_data.other_user_did = ucr.from_did
+
+          var from_pnr_data = Object.assign({}, pnr_data)
           from_pnr_data.actions_url = req.user.actions_url
-          
-          var to_pnr_data = pnr_data
-          to_pnr_data.actions_url = create_find_delete[1].actions_url
+          from_pnr_data.other_user_did = ucr.to_did
           
           process.send({
             notification_request: {
-              user_id: ucr.from_did,
+              user_id: ucr.to_did,
               notification: pnr_notif,
-              data: from_pnr_data
+              data: to_pnr_data
             }
           }, function() {
             process.send({
               notification_request: {
-                user_id: ucr.to_did,
+                user_id: ucr.from_did,
                 notification: pnr_notif,
-                data: to_pnr_data
+                data: from_pnr_data
               }
             })
           })

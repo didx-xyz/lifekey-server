@@ -585,6 +585,16 @@ describe('management endpoints', function() {
 
   describe(`${mgmt_cxn_req_res.method.toUpperCase()} ${mgmt_cxn_req_res.uri}`, function() {
 
+    before(function(done) {
+      // add action urls for these two
+      var now = Date.now()
+      mock.express.models.user.update({
+        actions_url: 'http://example.com/foo' + now
+      }, {
+        where: {id: test_users[0].id}
+      }).then(done.bind(done, null)).catch(done)
+    })
+
     it('should fail if required arguments are missing', function(done) {
       mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
@@ -600,7 +610,10 @@ describe('management endpoints', function() {
     it('should 201 if the connection was created', function(done) {
       mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
-        user: {did: test_users[1].id},
+        user: {
+          did: test_users[1].id,
+          actions_url: 'http://example.com/foo_' + Date.now()
+        },
         body: {accepted: true}
       }, mock.res(function(res) {
 
@@ -609,6 +622,11 @@ describe('management endpoints', function() {
         expect(res.message).to.equal('user_connection created')
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.id).to.equal('number')
+
+        // ensure mock contains call data with actions url
+        var call_data = process.get_call_data().call_args
+        expect(!!call_data[7].notification_request.data.actions_url).to.equal(true)
+
         update_uc = res.body.id
 
         // enumerate list of connections again to assert correct
