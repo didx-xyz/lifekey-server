@@ -2351,8 +2351,12 @@ module.exports = [
             message: 'ok',
             body: found.map(function(action) {
               return {
-                name: action.name,
-                purpose: action.purpose
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
               }
             })
           })
@@ -3057,6 +3061,56 @@ module.exports = [
           error: false,
           status: 200,
           message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 28 GET /management/action
+  {
+    uri: '/management/action',
+    method: 'get',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      user_action.findAll({
+        where: {owner_id: req.user.id}
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.map(function(action) {
+              return {
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
+              }
+            })
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to query user_action records',
           body: null
         })
       }).catch(function(err) {

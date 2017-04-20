@@ -282,6 +282,7 @@ describe('management endpoints', function() {
   var mgmt_key_create = routes[17]
   var mgmt_key_get = routes[18]
   var mgmt_action_create = routes[19]
+  var mgmt_action_user_get_all = routes[28]
   var mgmt_action_get_all = routes[20]
   var mgmt_action_get_one = routes[21]
   var mgmt_isa_by_action = routes[22]
@@ -1600,6 +1601,21 @@ describe('management endpoints', function() {
     })
   })
 
+  describe(`${mgmt_action_user_get_all.method.toUpperCase()} ${mgmt_action_user_get_all.uri}`, function() {
+    it('should respond with an array of the calling user\'s actions', function(done) {
+      mgmt_action_user_get_all.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(Array.isArray(res.body)).to.equal(true)
+        expect(res.body.length).to.equal(1)
+        done()
+      }))
+    })
+  })
+
   describe(`${mgmt_action_get_all.method.toUpperCase()} ${mgmt_action_get_all.uri}`, function() {
 
     it('should respond with an array of actions', function(done) {
@@ -1801,7 +1817,7 @@ describe('management endpoints', function() {
     before(function(done) {
       mock.express.models.user_datum.create({
         owner_id: test_users[1].id,
-        schema: 'schema.cnsnt.io/person',
+        schema: 'schema.cnsnt.io/identity_photo',
         entity: 'person',
         attribute: 'face',
         value: 'foo',
