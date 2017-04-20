@@ -773,13 +773,14 @@ module.exports = [
             body: null
           })
         }
-      }).then(function(create_find_delete) {
-        if (create_find_delete) {
-          uc = create_find_delete[0]
+      }).then(function(create_find) {
+        if (create_find) {
+          uc = create_find[0]
           var pnr_notif = {
             title: 'User Connection',
             body: 'User connection successfully created!'
-          }, pnr_data = {
+          }
+          var pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
             user_connection_id: uc.id,
@@ -788,24 +789,26 @@ module.exports = [
             from_did: ucr.from_did
           }
 
+          var to_pnr_data = pnr_data
+          to_pnr_data.actions_url = create_find[1].actions_url
+          to_pnr_data.other_user_did = ucr.from_did
+
           var from_pnr_data = pnr_data
           from_pnr_data.actions_url = req.user.actions_url
-          
-          var to_pnr_data = pnr_data
-          to_pnr_data.actions_url = create_find_delete[1].actions_url
+          from_pnr_data.other_user_did = ucr.to_did
           
           process.send({
             notification_request: {
-              user_id: ucr.from_did,
+              user_id: ucr.to_did,
               notification: pnr_notif,
-              data: from_pnr_data
+              data: to_pnr_data
             }
           }, function() {
             process.send({
               notification_request: {
-                user_id: ucr.to_did,
+                user_id: ucr.from_did,
                 notification: pnr_notif,
-                data: to_pnr_data
+                data: from_pnr_data
               }
             })
           })
