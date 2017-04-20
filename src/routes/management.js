@@ -782,24 +782,28 @@ module.exports = [
           }, pnr_data = {
             type: 'user_connection_created',
             is_user_connection_created: true,
-            user_connection_id: create_find_delete[0].id,
-            uc_id: create_find_delete[0].id,
+            user_connection_id: uc.id,
+            uc_id: uc.id,
             to_did: ucr.to_did,
-            actions_url: create_find_delete[1].actions_url,
             from_did: ucr.from_did
           }
+
+          var pnr_data1 = pnr_data, pnr_data2 = pnr_data
+          pnr_data1.actions_url = req.user.actions_url
+          pnr_data2.actions_url = create_find_delete[1].actions_url
+          
           process.send({
             notification_request: {
               user_id: ucr.from_did,
               notification: pnr_notif,
-              data: pnr_data
+              data: pnr_data1
             }
           }, function() {
             process.send({
               notification_request: {
                 user_id: ucr.to_did,
                 notification: pnr_notif,
-                data: pnr_data
+                data: pnr_data2
               }
             })
           })
