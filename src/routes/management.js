@@ -788,22 +788,24 @@ module.exports = [
             from_did: ucr.from_did
           }
 
-          var pnr_data1 = pnr_data, pnr_data2 = pnr_data
-          pnr_data1.actions_url = req.user.actions_url
-          pnr_data2.actions_url = create_find_delete[1].actions_url
+          var from_pnr_data = pnr_data
+          from_pnr_data.actions_url = req.user.actions_url
+          
+          var to_pnr_data = pnr_data
+          to_pnr_data.actions_url = create_find_delete[1].actions_url
           
           process.send({
             notification_request: {
               user_id: ucr.from_did,
               notification: pnr_notif,
-              data: pnr_data1
+              data: from_pnr_data
             }
           }, function() {
             process.send({
               notification_request: {
                 user_id: ucr.to_did,
                 notification: pnr_notif,
-                data: pnr_data2
+                data: to_pnr_data
               }
             })
           })
