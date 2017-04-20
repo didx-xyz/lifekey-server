@@ -7,7 +7,24 @@
 // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
 var send_is_undefined = !process.send
-if (send_is_undefined) process.send = function() {}
+if (send_is_undefined) {
+  var process_send_called = 0
+  var process_send_calls = {}
+  process.send = function(msg, on_send) {
+    process_send_called += 1
+    process_send_calls[process_send_called] = msg
+    if (typeof on_send === 'function') {
+      on_send()
+    }
+    return true
+  }
+  process.get_call_data = function() {
+    return {
+      call_count: process_send_called,
+      call_args: process_send_calls
+    }
+  }
+}
 
 var url = require('url')
 var crypto = require('crypto')
