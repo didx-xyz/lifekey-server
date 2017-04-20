@@ -2351,8 +2351,12 @@ module.exports = [
             message: 'ok',
             body: found.map(function(action) {
               return {
-                name: action.name,
-                purpose: action.purpose
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
               }
             })
           })
@@ -3092,7 +3096,14 @@ module.exports = [
             status: 200,
             message: 'ok',
             body: found.map(function(action) {
-              return action.toJSON()
+              return {
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
+              }
             })
           })
         }
