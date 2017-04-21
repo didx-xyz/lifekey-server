@@ -2904,7 +2904,7 @@ module.exports = [
           return user_datum.findOne({
             where: {
               owner_id: found.id,
-              schema: 'schema.cnsnt.io/identity_photo',
+              schema: 'schema.cnsnt.io/person',
             }
           })
         }
