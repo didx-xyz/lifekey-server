@@ -2475,7 +2475,7 @@ module.exports = [
 
   // 22 POST /management/isa/:user_did/:action_name
   {
-    uri: '/management/isa/:user_id/:action_name',
+    uri: '/management/isa/:user_did/:action_name',
     method: 'post',
     secure: true,
     active: true,
