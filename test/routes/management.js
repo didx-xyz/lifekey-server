@@ -1835,7 +1835,7 @@ describe('management endpoints', function() {
     before(function(done) {
       mock.express.models.user_datum.create({
         owner_id: test_users[1].id,
-        schema: 'schema.cnsnt.io/identity_photo',
+        schema: 'schema.cnsnt.io/person',
         entity: 'person',
         attribute: 'face',
         value: 'foo',
