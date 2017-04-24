@@ -203,7 +203,8 @@ module.exports = [
         user,
         user_device,
         crypto_key,
-        http_request_verification
+        http_request_verification,
+        active_bot
       } = this.get('models')
 
       var errors = this.get('db_errors')
@@ -387,6 +388,14 @@ module.exports = [
         })
         return Promise.resolve()
       }.bind(this)).then(function() {
+        if (is_programmatic_user) {
+          return active_bot.create({
+            owner_id: created_user_id,
+            last_ping: new Date
+          })
+        }
+        return Promise.resolve()
+      }).then(function() {
         // and finally respond affirmatively
         // to the calling agent
         return Promise.resolve(
