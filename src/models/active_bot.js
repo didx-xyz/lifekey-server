@@ -13,7 +13,7 @@ module.exports = function(instance, sqlize) {
     }
   }, {
     timestamps: true,
-    paranoid: true,
+    paranoid: false,
     underscored: true,
     comment: 'liveness checking for bot users'
   })
