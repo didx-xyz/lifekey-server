@@ -16,7 +16,7 @@ module.exports = [
         var now = new Date
         return Promise.all(
           found.filter(function(bot) {
-            return (now.getTime() - bot.last_ping.getTime()) > (2000 * 60)
+            return (now.getTime() - bot.last_ping.getTime()) <= (2000 * 60)
           }).map(function(bot) {
             return user.findOne({where: {id: bot.owner_id}})
           })
