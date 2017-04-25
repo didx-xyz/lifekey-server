@@ -3153,6 +3153,55 @@ module.exports = [
     }
   },
 
+  // 29 POST /management/thanks
+  {
+    uri: '/management/thanks',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {recipient, amount, reason} = req.body
+      var {user} = this.get('models')
+      user.findOne({
+        where: {did: recipient}
+      }).then(function(found) {
+        if (found) {
+          // TODO call ethereum to transfer tokens
+          process.send({
+            notification_request: {
+              user_id: recipient,
+              notification: {
+                title: 'You have been awarded Thanks!',
+                body: 'Press here to see more'
+              },
+              data: {
+                type: 'received_thanks',
+                amount: amount,
+                reason: reason,
+                from_did: req.user.did
+              }
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  }
+
   // example
   // 
   // N METHOD /:VERSION/:URI
