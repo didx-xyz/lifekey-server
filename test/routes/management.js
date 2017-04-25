@@ -1823,10 +1823,18 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_face_verify_create.method.toUpperCase()} ${mgmt_face_verify_create.uri}`, function() {
-    it('should respond', function(done) {
+    it('should create a token record and respond', function(done) {
       mgmt_face_verify_create.callback.call(mock.express, {
         query: {user_did: test_users[1].id}
-      }, mock.res(done.bind(done, null)))
+      }, mock.res(function() {
+        mock.express.models.facial_verification.findOne({
+          where: {subject_did: test_users[1].id}
+        }).then(function(found) {
+          expect(typeof found.token).to.equal('string')
+          expect(!!found.token).to.equal(true)
+          done()
+        }).catch(done)
+      }))
     })
   })
 
