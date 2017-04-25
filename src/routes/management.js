@@ -31,7 +31,6 @@ var crypto = require('crypto')
 
 var web3 = require('web3')
 var qr = require('qrcode')
-// var qr = require('qr-image')
 var cuid = require('cuid')
 
 var env = require('../init/env')()
@@ -2846,10 +2845,7 @@ module.exports = [
           result: null
         }
       }).then(function(found) {
-        if (found) {
-          token = found.token
-          return Promise.resolve(found)
-        }
+        if (found) return Promise.resolve(found)
         return facial_verification.create({
           subject_did: user_did,
           token: user_did + crypto.rng(32).toString('hex')
@@ -2869,12 +2865,7 @@ module.exports = [
             }
           }
         )
-        // return qr.image(
-        //   ,
-        //   {type: 'png'}
-        // ).pipe(res)
       }).catch(function(err) {
-        console.log(err)
         err = errors(err)
         return res.status(
           err.status || 500
@@ -2964,7 +2955,6 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log(err)
         err = errors(err)
         return res.status(
           err.status || 500
