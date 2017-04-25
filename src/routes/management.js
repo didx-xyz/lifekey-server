@@ -1603,10 +1603,20 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           var {SERVER_HOSTNAME} = this.get('env')
-          return qr.image(
+          return qr.toFileStream(
+            res,
             `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
-            {type: 'png'}
-          ).pipe(res)
+            function(err) {
+              if (err) {
+                throw {
+                  error: true,
+                  status: 500,
+                  message: 'qr code generation error',
+                  body: null
+                }
+              }
+            }
+          )
         }
         return Promise.reject({
           error: true,
