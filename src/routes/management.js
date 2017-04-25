@@ -2847,7 +2847,6 @@ module.exports = [
           result: null
         }
       }).then(function(found) {
-        var token
         if (found) {
           token = found.token
           return Promise.resolve()
