@@ -30,7 +30,8 @@ var url = require('url')
 var crypto = require('crypto')
 
 var web3 = require('web3')
-var qr = require('qr-image')
+var qr = require('qrcode')
+// var qr = require('qr-image')
 var cuid = require('cuid')
 
 var env = require('../init/env')()
@@ -2854,10 +2855,24 @@ module.exports = [
           token: user_did + crypto.rng(32).toString('hex')
         })
       }).then(function(fv) {
-        return qr.image(
+        qr.toFileStream(
+          res,
           `${SERVER_HOSTNAME}/facial-verification/${fv.subject_did}/${fv.token}`,
-          {type: 'png'}
-        ).pipe(res)
+          function(err) {
+            if (err) {
+              throw {
+                error: true,
+                status: 500,
+                message: 'qr code generation error',
+                body: null
+              }
+            }
+          }
+        )
+        // return qr.image(
+        //   ,
+        //   {type: 'png'}
+        // ).pipe(res)
       }).catch(function(err) {
         err = errors(err)
         return res.status(

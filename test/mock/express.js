@@ -18,6 +18,9 @@ module.exports = {
   },
   res: function(onend) {
     var mock = {}
+    mock.removeListener = function(event, listener) {
+      return mock
+    }
     mock.emit = function() {
       return true
     }
