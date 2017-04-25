@@ -2874,6 +2874,7 @@ module.exports = [
         //   {type: 'png'}
         // ).pipe(res)
       }).catch(function(err) {
+        console.log(err)
         err = errors(err)
         return res.status(
           err.status || 500
