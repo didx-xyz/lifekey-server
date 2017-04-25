@@ -2838,8 +2838,6 @@ module.exports = [
 
       var errors = this.get('db_errors')
 
-      var token
-
       facial_verification.findOne({
         where: {
           subject_did: user_did,
@@ -2849,16 +2847,15 @@ module.exports = [
       }).then(function(found) {
         if (found) {
           token = found.token
-          return Promise.resolve()
+          return Promise.resolve(found)
         }
-        token = user_did + crypto.rng(32).toString('base64')
         return facial_verification.create({
           subject_did: user_did,
-          token: token
+          token: user_did + crypto.rng(32).toString('hex')
         })
-      }).then(function() {
+      }).then(function(fv) {
         return qr.image(
-          `${SERVER_HOSTNAME}/facial-verification/${user_did}/${token}`,
+          `${SERVER_HOSTNAME}/facial-verification/${fv.subject_did}/${fv.token}`,
           {type: 'png'}
         ).pipe(res)
       }).catch(function(err) {
