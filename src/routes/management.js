@@ -2916,7 +2916,10 @@ module.exports = [
           return user_datum.findOne({
             where: {
               owner_id: found.id,
-              schema: 'schema.cnsnt.io/person',
+              $or: [
+                {schema: 'schema.cnsnt.io/person'},
+                {schema: 'http://schema.cnsnt.io/person'}
+              ]
             }
           })
         }
