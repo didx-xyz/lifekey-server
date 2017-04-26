@@ -5,11 +5,6 @@ var env = require('./env')()
 var crypto = require('../crypto')
 
 function generate(resource, private_key) {
-  // resource.context array (one or more urls pointing to jsonld definitions)
-  // resource.is_credential boolean (will this verfiable claim be shown as a badge in the app?)
-  // resource.issued_for mixed (user id or did for whom this claim is issued)
-  // resource.creator mixed (you)
-  // resource.additional_fields object (gets included in the "claim" object such that each field is merged directly - each additional field must map to a field in your jsonld definition (which is referenced in the @context array))
   if (!(typeof resource === 'object' &&
         resource !== null &&
         resource.context &&
@@ -45,14 +40,7 @@ function generate(resource, private_key) {
     claim_instance.claim[field] = resource.additional_fields[field]
   })
 
-  return crypto.asymmetric.sign(
-    'secp256k1',
-    private_key,
-    JSON.stringify(claim_instance.claim)
-  ).then(function(signature) {
-    claim_instance.signatureValue = signature.toString('base64')
-    return Promise.resolve(claim_instance)
-  })
+  return claim_instance
 }
 
 var db, models, private_key
@@ -65,11 +53,9 @@ require('./database')(
   models = database.models
   private_key = Buffer.from(env.EIS_ADMIN_KEY, 'hex')
 
-
   process.on('message', function(msg) {
-    // vc_generation_request
     var {user_id, field} = msg.vc_generation_request
-
+    var user, schema = 'http://schema.cnsnt.io/' + field
     models.user.findOne({
       where: {
         $or: [
@@ -79,33 +65,82 @@ require('./database')(
       }
     }).then(function(found) {
       if (found) {
+        user = found
         if (!found[field]) {
-          return Promise.reject(new Error('user ' + user_id + ' has no ' + field))
+          return Promise.reject(
+            new Error([
+              'user',
+              user_id,
+              'has no',
+              field
+            ].join(' '))
+          )
         }
-        return generate({
-          context: ['http://schema.cnsnt.io/' + field],
-          is_credential: true,
-          issued_for: user_id,
-          created_at: new Date(),
-          additional_fields: {
-            email: found[field]
+        return Promise.resolve(
+          generate({
+            context: schema,
+            is_credential: true,
+            issued_for: user_id,
+            created_at: new Date,
+            additional_fields: {
+              email: found[field]
+            }
+          })
+        )
+      }
+      return Promise.reject(
+        new Error(
+          'unable to find user by given identifier ' +
+          user_id
+        )
+      )
+    }).then(function(instance) {
+      return Promise.all([
+        instance,
+        crypto.asymmetric.sign(
+          'secp256k1',
+          private_key,
+          JSON.stringify(instance.claim)
+        )
+      ])
+    }).then(function(res) {
+      res[0].signatureValue = res[1].toString('base64')
+      return Promise.resolve(res[0])
+    }).then(function(claim) {
+      return models.user_datum.create({
+        owner_id: user.id,
+        entity: 'verifiable-claim',
+        attribute: 'email',
+        alias: 'from-lifekey-server',
+        value: JSON.stringify(claim),
+        encoding: 'utf8',
+        mime: 'application/ld+json',
+        is_verifiable_claim: true,
+        schema: schema
+      })
+    }).then(function(created) {
+      if (!created) {
+        return Promise.reject(
+          new Error(
+            'unable to create resource record for user id ' +
+            user_id
+          )
+        )
+      }
+      process.send({
+        notification_request: {
+          user_id: user_id,
+          notification: {
+            title: 'New resource received',
+            body: 'You were pushed one or more resources'
           },
-        }, private_key)
-      }
-      return Promise.reject(new Error('unable to find user by given identifier ' + user_id))
-    }).catch(console.log)
-
-    // callback
-    process.send({
-      notification_request: {
-        user_id: user_id,
-        notification: {title: '', body: ''},
-        data: {
-          type: 'resource_pushed',
-          isa_id: null,
-          resource_ids: [new_resource_id]
+          data: {
+            type: 'resource_pushed',
+            isa_id: null,
+            resource_ids: [created.id]
+          }
         }
-      }
-    })
+      })
+    }).catch(console.log)
   })
 }).catch(console.log)
