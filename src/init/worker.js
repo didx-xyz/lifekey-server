@@ -43,6 +43,14 @@ process.on('message', function(message) {
     ))
     server.set('sengrid_service_ready', message.sendgrid_service_ready)
   }
+  if (typeof message.vc_generator_service_ready === 'boolean') {
+    console.log('SLAVE updating vc_generator service availability to', (
+      message.vc_generator_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('vc_generator_service_ready', message.vc_generator_service_ready)
+  }
 })
 
 var fs = require('fs')

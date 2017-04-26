@@ -151,5 +151,5 @@ require('./database')(
         }
       })
     }).catch(console.log)
-  })
+  }).send({ready: true})
 }).catch(console.log)
