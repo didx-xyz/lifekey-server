@@ -66,6 +66,7 @@ require('./database')(
     }).then(function(found) {
       if (found) {
         user = found
+        // FIXME we've run the same query twice (activation route) before we decide to skip this task
         if (found.webhook_url || found.actions_url) {
           return Promise.reject(
             new Error(
