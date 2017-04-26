@@ -16,6 +16,9 @@ var resource_delete = routes[4]
 var profile_colour_update = routes[6]
 var profile_image_update = routes[7]
 
+var base64_resource
+var base64_resource_value
+
 describe('resource', function() {
   
   var test_user
@@ -99,6 +102,27 @@ describe('resource', function() {
         done()
       }))
     })
+
+    it('should create a resource with the specified encoding', function(done) {
+      base64_resource_value = Buffer.from('deadbeef', 'hex').toString('base64')
+      resource_create.callback.call(mock.express, {
+        user: {id: test_user.id, did: test_user.did},
+        body: {
+          value: base64_resource_value,
+          entity: 'foo',
+          attribute: 'bar',
+          alias: 'bazbaz',
+          encoding: 'base64'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
+        expect(!!res.body).to.equal(true)
+        base64_resource = res.body.id
+        done()
+      }))
+    })
   })
 
   // 3 GET /resource/:resource_id
@@ -141,6 +165,16 @@ describe('resource', function() {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('user_datum record not found')
+        done()
+      }))
+    })
+
+    it('should return the resource without double encoding', function(done) {
+      resource_get_one.callback.call(mock.express, {
+        user: {id: test_user.id, did: test_user.did},
+        params: {resource_id: base64_resource}
+      }, mock.res(function(res) {
+        expect(res.body.value).to.equal(base64_resource_value)
         done()
       }))
     })
@@ -247,7 +281,7 @@ describe('resource', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
-        expect(res.body.length).to.equal(3)
+        expect(res.body.length).to.equal(4)
         done()
       }))
     })
@@ -260,7 +294,7 @@ describe('resource', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
-        expect(res.body.length).to.equal(3)
+        expect(res.body.length).to.equal(4)
         done()
       }))
     })
