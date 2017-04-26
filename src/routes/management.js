@@ -1010,8 +1010,7 @@ module.exports = [
         })
         res.set('Content-Type', 'text/html')
         res.status(200).end(
-          '<p>LifeKey is now activated!</p>' +
-          '<p><a href="lifekey:main-menu">Click here</a> to begin!</p>'
+          '<p>Thanks for activating!</p>'
         )
       }).catch(function(err) {
         err = errors(err)
@@ -1725,7 +1724,7 @@ module.exports = [
             user_id: from_user,
             notification: {
               title: 'Information Sharing Agreement Updated',
-              body: 'Click here to see any changes to the ISA'
+              body: 'See the changes to your ISA'
             },
             data: {
               type: 'information_sharing_agreement_updated',
@@ -3212,6 +3211,78 @@ module.exports = [
           error: true,
           status: 404,
           message: 'user record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 30 POST /management/message
+  {
+    uri: '/management/message',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {msg, recipient} = req.body
+      var {user_connection} = this.get('models')
+      Promise.resolve().then(function() {
+        if (msg.length > 4096) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: '4096 byte limit exceeded',
+            body: null
+          })
+        }
+        return user_connection.findOne({
+          where: {
+            $or: [
+              {to_did: recipient, from_did: req.user.did},
+              {to_did: req.user.did, from_did: recipient}
+            ]
+          }
+        })
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user_connection record not found',
+            body: null
+          })
+        }
+        return Promise.resolve()
+      }).then(function() {
+        process.send({
+          notification_request: {
+            user_id: recipient,
+            notification: {
+              title: 'Connection message',
+              body: 'One of your connections sent you a message'
+            },
+            data: {
+              type: 'user_message_received',
+              from_did: req.user.did,
+              message: msg
+            }
+          }
+        })
+        return Promise.resolve()
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
           body: null
         })
       }).catch(function(err) {
