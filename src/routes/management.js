@@ -202,6 +202,7 @@ module.exports = [
       var {
         user,
         user_device,
+        user_datum,
         crypto_key,
         http_request_verification,
         active_bot
@@ -335,6 +336,32 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           return Promise.all([
+            user_datum.create({
+              owner_id: created_user_id,
+              entity: 'person',
+              attribute: 'person',
+              alias: 'person',
+              mime: 'application/ld+json',
+              encoding: 'utf8',
+              schema: 'http://schema.cnsnt.io/person',
+              value: JSON.stringify({
+                '@context': ['http://schema.cnsnt.io/person'],
+                firstName: nickname,
+                lastName: null,
+                title: null,
+                nationality: null,
+                birthPlace: null,
+                birthDate: null,
+                alias: nickname,
+                avatar: null,
+                identityPhotograph: null,
+                maritalStatus: null,
+                maritalContractType: null,
+                preferredLanguage: null,
+                createdDate: new Date,
+                modifiedDate: null
+              }),
+            }),
             crypto_key.create({
               owner_id: created_user_id,
               algorithm: 'secp256k1',
