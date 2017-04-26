@@ -2242,7 +2242,10 @@ module.exports = [
           message: 'ok',
           body: {
             public_key_algorithm: 'secp256k1',
-            public_key: our_crypto.asymmetric.get_public(env.EIS_ADMIN_KEY).toString('base64')
+            public_key: our_crypto.asymmetric.get_public(
+              'secp256k1',
+              Buffer.from(env.EIS_ADMIN_KEY, 'hex')
+            ).toString('base64')
           }
         })
       }
