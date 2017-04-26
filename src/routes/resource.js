@@ -186,11 +186,23 @@ module.exports = [
             body: null
           })
         }
+
+        try {
+          var resource_value = Buffer.from(value, encoding || 'utf8')
+        } catch (e) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'failed to encode the given value with the specified encoding',
+            body: null
+          })
+        }
+
         return user_datum.create({
           owner_id: req.user.id,
           entity: entity,
           attribute: attribute,
-          value: value,
+          value: resource_value,
           schema: schema,
           uri: uri,
           alias: alias,
