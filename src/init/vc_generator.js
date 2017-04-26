@@ -66,6 +66,14 @@ require('./database')(
     }).then(function(found) {
       if (found) {
         user = found
+        if (found.webhook_url || found.actions_url) {
+          return Promise.reject(
+            new Error(
+              'skipping verifiable claim generation for programmatic user ' +
+              user_id
+            )
+          )
+        }
         if (!found[field]) {
           return Promise.reject(
             new Error([
