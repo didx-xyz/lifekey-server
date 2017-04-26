@@ -78,7 +78,6 @@ describe('directory', function() {
     it('should return the list of bots that have passed the liveness test in the last two minutes', function(done) {
       list.callback.call(mock.express, {
       }, mock.res(function(res) {
-        console.log(res)
         expect(res.error).to.equal(false)
         expect(Array.isArray(res.body)).to.equal(true)
         expect(res.body.length > 0).to.equal(true)
