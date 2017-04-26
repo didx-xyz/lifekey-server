@@ -286,13 +286,13 @@ describe('management endpoints', function() {
   var mgmt_action_get_all = routes[20]
   var mgmt_action_get_one = routes[21]
   var mgmt_isa_by_action = routes[22]
-  
   var mgmt_isa_receipt = routes[23]
   var mgmt_action_delete = routes[24]
-
   var mgmt_face_verify_create = routes[25]
   var mgmt_face_verify_get = routes[26]
   var mgmt_face_verify_respond = routes[27]
+
+  var mgmt_message = routes[30]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -1910,6 +1910,66 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
         expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_message.method.toUpperCase()} ${mgmt_message.uri}`, function() {
+    
+    before(function(done) {
+      mock.express.models.user_connection.create({
+        from_did: test_users[3].id,
+        to_did: test_users[2].id,
+        enabled: true
+      }).then(
+        done.bind(done, null)
+      ).catch(done)
+    })
+
+    it('should return an error if message is too large', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: {length: 4097},
+          recipient: test_users[2].id
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.message).to.equal('4096 byte limit exceeded')
+        expect(res.status).to.equal(400)
+        done()
+      }))
+    })
+
+    it('should return an error if the user is not connected with the recipient', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: 'foo',
+          recipient: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.message).to.equal('user_connection record not found')
+        expect(res.status).to.equal(404)
+        done()
+      }))
+    })
+
+    it('should respond with 200 if the message was sent', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: 'foo',
+          recipient: test_users[2].id
+        }
+      }, mock.res(function(res) {
+        var cd = process.get_call_data()
+        var msg = cd.call_args[cd.call_count].notification_request
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(msg.data.type).to.equal('user_message_received')
         done()
       }))
     })
