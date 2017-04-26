@@ -202,6 +202,7 @@ module.exports = [
       var {
         user,
         user_device,
+        user_datum,
         crypto_key,
         http_request_verification,
         active_bot
@@ -335,6 +336,32 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           return Promise.all([
+            !is_programmatic_user ? user_datum.create({
+              owner_id: created_user_id,
+              entity: 'person',
+              attribute: 'person',
+              alias: 'person',
+              mime: 'application/ld+json',
+              encoding: 'utf8',
+              schema: 'http://schema.cnsnt.io/person',
+              value: JSON.stringify({
+                '@context': ['http://schema.cnsnt.io/person'],
+                firstName: nickname,
+                lastName: null,
+                title: null,
+                nationality: null,
+                birthPlace: null,
+                birthDate: null,
+                alias: nickname,
+                avatar: null,
+                identityPhotograph: null,
+                maritalStatus: null,
+                maritalContractType: null,
+                preferredLanguage: null,
+                createdDate: new Date,
+                modifiedDate: null
+              }),
+            }) : null,
             crypto_key.create({
               owner_id: created_user_id,
               algorithm: 'secp256k1',
@@ -997,6 +1024,10 @@ module.exports = [
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
         process.send({
+          vc_generation_request: {
+            user_id: user_id,
+            field: 'email'
+          },
           notification_request: {
             user_id: user_id,
             notification: {
@@ -2204,9 +2235,27 @@ module.exports = [
       var {user, crypto_key} = this.get('models')
       var errors = this.get('db_errors')
 
+      if (user_did === 'lifekey-server' || alias === 'lifekey-server') {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {
+            public_key_algorithm: 'secp256k1',
+            public_key: our_crypto.asymmetric.get_public(
+              'secp256k1',
+              Buffer.from(env.EIS_ADMIN_KEY, 'hex')
+            ).toString('base64')
+          }
+        })
+      }
+
       user.findOne({
         where: {
-          did: user_did
+          $or: [
+            {did: user_did},
+            {id: user_did}
+          ]
         }
       }).then(function(found) {
         if (found) {

@@ -83,6 +83,11 @@ services.lifekey = cluster({
             })
             service_init.call(OUTER, 'notifier', function(msg) {})
             service_init.call(OUTER, 'sendgrid', function(msg) {})
+            service_init.call(OUTER, 'vc_generator', function(msg) {
+              if (msg.notification_request) {
+                services.notifier.send(msg)
+              }
+            })
           }
         }
         if (msg.did_allocation_request) {
@@ -95,6 +100,9 @@ services.lifekey = cluster({
         }
         if (msg.send_email_request) {
           services.sendgrid.send(msg)
+        }
+        if (msg.vc_generation_request) {
+          services.vc_generator.send(msg)
         }
       }
     }

@@ -115,6 +115,9 @@ module.exports = {
           })
         }
       }
+    },
+    get_public: function(algorithm, private_key) {
+      if (algorithm === 'secp256k1') return secp.getPublic(private_key)
     }
   }
 }

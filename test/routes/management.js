@@ -685,10 +685,14 @@ describe('management endpoints', function() {
       }).catch(done)
     })
 
-    it('should update the app_activation_link_clicked bit to enabled if not yet enabled and respond with html string', function(done) {
+    it('should update the app_activation_link_clicked bit to enabled if not yet enabled, send a signal to generate a vc for email address and respond with html string', function(done) {
       mgmt_app_activate.callback.call(mock.express, {
         params: {activation_code: activation_code}
       }, mock.res(function(res) {
+        var cd = process.get_call_data()
+        var last_send = cd.call_args[cd.call_count]
+        expect('vc_generation_request' in last_send).to.equal(true)
+        expect(last_send.vc_generation_request.field).to.equal('email')
         expect(typeof res).to.equal('string')
         done()
       }))
