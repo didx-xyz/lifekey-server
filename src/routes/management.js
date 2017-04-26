@@ -336,7 +336,7 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           return Promise.all([
-            user_datum.create({
+            !is_programmatic_user ? user_datum.create({
               owner_id: created_user_id,
               entity: 'person',
               attribute: 'person',
@@ -361,7 +361,7 @@ module.exports = [
                 createdDate: new Date,
                 modifiedDate: null
               }),
-            }),
+            }) : null,
             crypto_key.create({
               owner_id: created_user_id,
               algorithm: 'secp256k1',
