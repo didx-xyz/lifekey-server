@@ -997,6 +997,10 @@ module.exports = [
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
         process.send({
+          vc_generation_request: {
+            user_id: user_id,
+            field: 'email'
+          },
           notification_request: {
             user_id: user_id,
             notification: {
@@ -2204,9 +2208,24 @@ module.exports = [
       var {user, crypto_key} = this.get('models')
       var errors = this.get('db_errors')
 
+      if (user_did === 'lifekey-server' || alias === 'lifekey-server') {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {
+            public_key_algorithm: 'secp256k1',
+            public_key: our_crypto.asymmetric.get_public(env.EIS_ADMIN_KEY).toString('base64')
+          }
+        })
+      }
+
       user.findOne({
         where: {
-          did: user_did
+          $or: [
+            {did: user_did},
+            {id: user_did}
+          ]
         }
       }).then(function(found) {
         if (found) {
