@@ -20,7 +20,7 @@ module.exports = [
       function dispatch() {
         if (pushed) {
           return db.query([
-            'SELECT id, entity, attribute, alias',
+            'SELECT id, entity, attribute, alias, is_verifiable_claim',
             'FROM user_data',
             'WHERE owner_id = :owner_id AND',
             'from_user_did IS NOT NULL',
@@ -56,10 +56,9 @@ module.exports = [
           })
         } else {
           return db.query([
-            'SELECT id, entity, attribute, alias',
+            'SELECT id, entity, attribute, alias, is_verifiable_claim',
             'FROM user_data',
-            'WHERE owner_id = :owner_id AND',
-            'from_user_did IS NULL',
+            'WHERE owner_id = :owner_id',
             'ORDER BY entity, attribute, alias ASC'
           ].join(' '), {
             replacements: {owner_id: req.user.id},
