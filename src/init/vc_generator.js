@@ -55,7 +55,14 @@ require('./database')(
 
   process.on('message', function(msg) {
     var {user_id, field} = msg.vc_generation_request
-    var user, schema = 'http://schema.cnsnt.io/' + field
+    var user
+    if (field === 'email') {
+      var schema = 'http://schema.cnsnt.io/contact_' + field
+    } else {
+      console.log('unknown field and schema type, exiting...')
+      return
+    }
+    
     models.user.findOne({
       where: {
         $or: [
