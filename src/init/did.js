@@ -24,7 +24,7 @@ require('./database')(false).then(function(database) {
     delete registrants[owner]
     user.update({
       did_address: did,
-      did: ddo
+      did: did // TODO: Update to 'did:cnsnt:'+did format, use only did for now
     }, {
       where: {id: user_id}
     }).then(function(updated) {
