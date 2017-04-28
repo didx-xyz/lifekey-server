@@ -22,9 +22,10 @@ require('./database')(false).then(function(database) {
     if (!(owner in registrants)) return
     var user_id = registrants[owner]
     delete registrants[owner]
+    var fixed_did_value = `did:cnsnt:0x${did}`
     user.update({
       did_address: did,
-      did: did // TODO: Update to 'did:cnsnt:'+did format, use only did for now
+      did: fixed_did_value
     }, {
       where: {id: user_id}
     }).then(function(updated) {
@@ -43,7 +44,7 @@ require('./database')(false).then(function(database) {
           data: {
             type: 'received_did',
             received_did: true,
-            did_value: ddo,
+            did_value: fixed_did_value,
             did_address: did
           },
           notification: {
