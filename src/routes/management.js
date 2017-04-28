@@ -1394,6 +1394,9 @@ module.exports = [
           body.unacked = isars.map(isar => {
             return {
               id: isar.id,
+              from_did: isar.from_did,
+              purpose: isar.purpose,
+              license: isar.license,
               required_entities: JSON.parse(isar.required_entities)
             }
           })
