@@ -3142,7 +3142,7 @@ module.exports = [
               user_id: user_did,
               notification: {
                 title: 'Resources Pushed',
-                body: 'One or more resources wre pushed to you'
+                body: 'One or more resources were pushed to you'
               },
               data: {
                 type: 'resource_pushed',
