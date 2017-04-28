@@ -92,11 +92,9 @@ services.lifekey = cluster({
           }
         }
         if (msg.did_allocation_request) {
-          // proxy the message to the DID service
           services.did.send(msg)
         }
         if (msg.notification_request) {
-          // proxy the message to the notifier service
           services.notifier.send(msg)
         }
         if (msg.send_email_request) {
@@ -104,6 +102,9 @@ services.lifekey = cluster({
         }
         if (msg.vc_generation_request) {
           services.vc_generator.send(msg)
+        }
+        if (msg.isa_ledger_request) {
+          services.isa_ledger_request.send(msg)
         }
       }
     }
