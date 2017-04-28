@@ -2814,6 +2814,7 @@ module.exports = [
           body: null
         })
       }).then(function(signature) {
+        process.send({isa_ledger_request: {isa_id: isa_id}})
         receipt.isaSignatureValue = signature.toString('base64')
         return res.status(200).json({
           error: false,
