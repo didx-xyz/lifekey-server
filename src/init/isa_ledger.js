@@ -12,9 +12,15 @@ var env = require('./env')()
 var get_receipt = require('../routes/management')[23]
 var mock = require('../../test/mock/express')
 
+// service ready state
+var error = false
+
+// forward references
+var db, models, w3, all_time, nonces = {}
+
 function getTransactionCount(address, callback) {
   if (typeof nonces[address] === 'undefined') {
-    return web3.eth.getTransactionCount(address, function(err, nonce) {
+    return w3.eth.getTransactionCount(address, function(err, nonce) {
       if (err) return callback(err, null)
       nonces[address] = nonce
       return callback(null, nonces[address])
@@ -24,12 +30,6 @@ function getTransactionCount(address, callback) {
     return callback(null, nonces[address])
   }
 }
-
-// service ready state
-var error = false
-
-// forward references
-var db, models, w3, all_time, nonces = {}
 
 var receipts = {/* txhash: {isa_id, receipt_hash} */}
 var receipt_timer = setInterval(function() {
