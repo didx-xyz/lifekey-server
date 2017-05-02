@@ -37,8 +37,8 @@ var receipt_timer = setInterval(function() {
   Object.keys(receipts).forEach(function(txhash) {
     w3.eth.getTransactionReceipt(txhash, function(err, receipt) {
       if (err) return console.log(err)
-      if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
-        return Promise.all([
+      else if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
+        Promise.all([
           models.isa_receipt_transaction.create({
             isa_id: receipts[txhash].isa_id,
             transaction_hash: txhash,
@@ -54,8 +54,7 @@ var receipt_timer = setInterval(function() {
           console.log('pending isa receipts', receipts)
           delete receipts[txhash]
         }).catch(console.log)
-      }
-      console.log('neither error nor confirmation')
+      } else console.log('neither error nor confirmation')
     })
   })
 }, 10 * 1000)
@@ -159,7 +158,7 @@ require('./database')(
                 gasLimit: 3000000,
                 gasPrice: +w3.toWei(20, 'gwei'),
                 data: receipt_hash,
-                nonce: nonce + 1,
+                nonce: nonce,
                 value: 0
               })
               transaction.sign(private_key)
