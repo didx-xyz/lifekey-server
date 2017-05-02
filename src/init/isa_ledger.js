@@ -16,14 +16,28 @@ var mock = require('../../test/mock/express')
 var error = false
 
 // forward references
-var db, models, w3, all_time
+var db, models, w3, all_time, nonces = {}
+
+function getTransactionCount(address, callback) {
+  if (typeof nonces[address] === 'undefined') {
+    return w3.eth.getTransactionCount(address, function(err, nonce) {
+      if (err) return callback(err, null)
+      nonces[address] = nonce
+      return callback(null, nonces[address])
+    })
+  } else {
+    nonces[address] += 1
+    return callback(null, nonces[address])
+  }
+}
 
 var receipts = {/* txhash: {isa_id, receipt_hash} */}
 var receipt_timer = setInterval(function() {
+  console.log('isa receipt confirmation timer tick')
   Object.keys(receipts).forEach(function(txhash) {
     w3.eth.getTransactionReceipt(txhash, function(err, receipt) {
       if (err) return console.log(err)
-      if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
+      else if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
         Promise.all([
           models.isa_receipt_transaction.create({
             isa_id: receipts[txhash].isa_id,
@@ -40,7 +54,7 @@ var receipt_timer = setInterval(function() {
           console.log('pending isa receipts', receipts)
           delete receipts[txhash]
         }).catch(console.log)
-      }
+      } else console.log('neither error nor confirmation')
     })
   })
 }, 10 * 1000)
@@ -126,7 +140,7 @@ require('./database')(
             )
           ).digest('base64')
 
-          w3.eth.getTransactionCount(addr, function(err, nonce) {
+          getTransactionCount(addr, function(err, nonce) {
             if (err) {
 
               // UNLOCK
@@ -144,7 +158,7 @@ require('./database')(
                 gasLimit: 3000000,
                 gasPrice: +w3.toWei(20, 'gwei'),
                 data: receipt_hash,
-                nonce: nonce + 1,
+                nonce: nonce,
                 value: 0
               })
               transaction.sign(private_key)
