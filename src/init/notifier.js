@@ -32,9 +32,8 @@ require('./database')(
     var {user_id, notification, data} = msg.notification_request
     models.user.findOne({
       where: (
-        (user_id === 'example') ||
         typeof user_id === 'string' &&
-        user_id.length === 64 ?
+        user_id.indexOf('did:cnsnt:') === 0 ?
         {did: user_id} :
         {id: user_id}
       )
