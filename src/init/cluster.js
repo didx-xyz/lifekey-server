@@ -104,7 +104,7 @@ services.lifekey = cluster({
           services.vc_generator.send(msg)
         }
         if (msg.isa_ledger_request) {
-          services.isa_ledger_request.send(msg)
+          services.isa_ledger.send(msg)
         }
       }
     }
