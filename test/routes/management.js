@@ -979,6 +979,9 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('created information_sharing_agreement record')
         created_isa_id = res.body.id
+        var cd = process.get_call_data()
+        var msg = cd.call_args[cd.call_count - 1].isa_ledger_request
+        expect(msg.isa_id).to.equal(created_isa_id)
         done()
       }))
     })
@@ -1790,9 +1793,6 @@ describe('management endpoints', function() {
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.isaSignatureValue).to.equal('string')
         expect(typeof res.body.isa.requestSignatureValue).to.equal('string')
-        var cd = process.get_call_data()
-        var msg = cd.call_args[cd.call_count].isa_ledger_request
-        expect(msg.isa_id).to.equal(actions_receipts_isa_id)
         done()
       }))
     })
