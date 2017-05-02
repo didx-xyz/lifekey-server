@@ -14,6 +14,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: false
     },
+    transaction_hash: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
     expired: {
       type: sqlize.BOOLEAN,
       allowNull: true,
