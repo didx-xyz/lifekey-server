@@ -22,7 +22,7 @@ require('./database')(false).then(function(database) {
     if (!(owner in registrants)) return
     var user_id = registrants[owner]
     delete registrants[owner]
-    var fixed_did_value = `did:cnsnt:0x${did}`
+    var fixed_did_value = `did:cnsnt:${did}`
     user.update({
       did_address: did,
       did: fixed_did_value
