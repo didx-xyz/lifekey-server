@@ -42,7 +42,8 @@ module.exports = [
         user_action,
         user_device,
         crypto_key,
-        user_datum
+        user_datum,
+        active_bot
       } = this.get('models')
       var errors = this.get('db_errors')
       user.findOne({
@@ -56,7 +57,8 @@ module.exports = [
             user_action.destroy({where: {owner_id: found.id}}),
             user_device.destroy({where: {owner_id: found.id}}),
             crypto_key.destroy({where: {owner_id: found.id}}),
-            user_datum.destroy({where: {owner_id: found.id}})
+            user_datum.destroy({where: {owner_id: found.id}}),
+            active_bot.destroy({where: {owner_id: found.id}})
           ])
         }
         return Promise.reject({
