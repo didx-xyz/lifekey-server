@@ -8,7 +8,8 @@ var crypto = require('crypto')
 try {
   [
     'EIS_SIGNER_KEY',
-    'EIS_ADMIN_KEY'
+    'EIS_ADMIN_KEY',
+    'ISA_RECEIPT_KEY'
   ].forEach(function(alias) {
     fs.writeFileSync(
       `${__dirname}/../etc/keys/${alias}.json`,
