@@ -3261,6 +3261,12 @@ module.exports = [
               }
             }
           })
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: null
+          })
         }
         return Promise.reject({
           error: true,
