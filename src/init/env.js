@@ -26,6 +26,11 @@ function load(refresh) {
       env.EIS_ADMIN_KEY :
       path.normalize(`${__dirname}/../../${env.EIS_ADMIN_KEY}`)
     ).private_key
+    env.ISA_RECEIPT_KEY = require(
+      path.isAbsolute(env.ISA_RECEIPT_KEY) ?
+      env.ISA_RECEIPT_KEY :
+      path.normalize(`${__dirname}/../../${env.ISA_RECEIPT_KEY}`)
+    ).private_key
   } catch (e) {
     throw new Error('unable to load private keys for eis registry: ' + e.toString())
   }

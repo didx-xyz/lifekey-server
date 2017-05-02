@@ -2699,7 +2699,9 @@ module.exports = [
         where: {id: isa_id}
       }).then(function(found) {
         if (found) {
-          if (found.to_did === req.user.did || found.from_did === req.user.did) {
+          if (req.skip_relation_check ||
+              found.to_did === req.user.did ||
+              found.from_did === req.user.did) {
             return information_sharing_agreement_request.findOne({
               where: {id: found.isar_id}
             })
@@ -2814,6 +2816,7 @@ module.exports = [
           body: null
         })
       }).then(function(signature) {
+        process.send({isa_ledger_request: {isa_id: isa_id}})
         receipt.isaSignatureValue = signature.toString('base64')
         return res.status(200).json({
           error: false,

@@ -28,6 +28,8 @@ scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" \
 # copy service configurations to respective locations
 # ensure required keys exist
 # and restart the service
+
+# FIXME the conditional used to check for private keys is not robust
 ssh "$DONT_CHECK_KEYS" "root@$TARGET" "
 cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/cloud_sql_proxy.conf /etc/init
 cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/lifekey-server.conf /etc/init
@@ -37,7 +39,7 @@ if [ -e /root/lifekey/EIS_ADMIN_KEY.json ]; then
   cp -R /root/lifekey/*.json /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys
 else
   source /opt/nvm/nvm.sh
-  /srv/$SERVER_ENV.api.lifekey.cnsnt.io/bin/generate_eis_keys
+  /srv/$SERVER_ENV.api.lifekey.cnsnt.io/bin/generate_eth_keys
   cp /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys/*.json /root/lifekey
 fi
 

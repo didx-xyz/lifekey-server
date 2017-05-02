@@ -51,6 +51,14 @@ process.on('message', function(message) {
     ))
     server.set('vc_generator_service_ready', message.vc_generator_service_ready)
   }
+  if (typeof message.isa_ledger_service_ready === 'boolean') {
+    console.log('SLAVE updating isa_ledger service availability to', (
+      message.isa_ledger_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('isa_ledger_service_ready', message.isa_ledger_service_ready)
+  }
 })
 
 var fs = require('fs')
