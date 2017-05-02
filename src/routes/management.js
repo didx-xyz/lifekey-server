@@ -2699,7 +2699,9 @@ module.exports = [
         where: {id: isa_id}
       }).then(function(found) {
         if (found) {
-          if (found.to_did === req.user.did || found.from_did === req.user.did) {
+          if (req.skip_relation_check ||
+              found.to_did === req.user.did ||
+              found.from_did === req.user.did) {
             return information_sharing_agreement_request.findOne({
               where: {id: found.isar_id}
             })
