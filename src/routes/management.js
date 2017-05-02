@@ -2640,6 +2640,7 @@ module.exports = [
           })
         )
       }).then(function(created) {
+        process.send({isa_ledger_request: {isa_id: isa_id}})
         process.send({
           notification_request: {
             user_id: user_did,
