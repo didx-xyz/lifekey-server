@@ -292,6 +292,8 @@ describe('management endpoints', function() {
   var mgmt_face_verify_get = routes[26]
   var mgmt_face_verify_respond = routes[27]
 
+  var mgmt_send_thanks = routes[29]
+
   var mgmt_message = routes[30]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
@@ -1977,6 +1979,38 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(msg.data.type).to.equal('user_message_received')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_send_thanks.method.toUpperCase()} ${mgmt_send_thanks.uri}`, function() {
+
+    it('should trigger a call to notifier service if user is found', function(done) {
+      mgmt_send_thanks.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        body: {amount: 10, recipient: test_users[2].id, reason: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
+        var cd = process.get_call_data()
+        var last_send = cd.call_args[cd.call_count]
+        expect(last_send.notification_request.user_id).to.equal(test_users[2].id)
+        done()
+      }))
+    })
+
+    it('should respond with error if user not found', function(done) {
+      mgmt_send_thanks.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        body: {amount: 10, recipient: 'foo', reason: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user record not found')
+        expect(res.body).to.equal(null)
         done()
       }))
     })
