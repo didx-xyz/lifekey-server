@@ -12,19 +12,33 @@ var env = require('./env')()
 var get_receipt = require('../routes/management')[23]
 var mock = require('../../test/mock/express')
 
+function getTransactionCount(address, callback) {
+  if (typeof nonces[address] === 'undefined') {
+    return web3.eth.getTransactionCount(address, function(err, nonce) {
+      if (err) return callback(err, null)
+      nonces[address] = nonce
+      return callback(null, nonces[address])
+    })
+  } else {
+    nonces[address] += 1
+    return callback(null, nonces[address])
+  }
+}
+
 // service ready state
 var error = false
 
 // forward references
-var db, models, w3, all_time
+var db, models, w3, all_time, nonces = {}
 
 var receipts = {/* txhash: {isa_id, receipt_hash} */}
 var receipt_timer = setInterval(function() {
+  console.log('isa receipt confirmation timer tick')
   Object.keys(receipts).forEach(function(txhash) {
     w3.eth.getTransactionReceipt(txhash, function(err, receipt) {
       if (err) return console.log(err)
       if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
-        Promise.all([
+        return Promise.all([
           models.isa_receipt_transaction.create({
             isa_id: receipts[txhash].isa_id,
             transaction_hash: txhash,
@@ -41,6 +55,7 @@ var receipt_timer = setInterval(function() {
           delete receipts[txhash]
         }).catch(console.log)
       }
+      console.log('neither error nor confirmation')
     })
   })
 }, 10 * 1000)
@@ -126,7 +141,7 @@ require('./database')(
             )
           ).digest('base64')
 
-          w3.eth.getTransactionCount(addr, function(err, nonce) {
+          getTransactionCount(addr, function(err, nonce) {
             if (err) {
 
               // UNLOCK
