@@ -24,17 +24,18 @@ var receipt_timer = setInterval(function() {
     w3.eth.getTransactionReceipt(txhash, function(err, receipt) {
       if (err) return console.log(err)
       if (receipt && ((w3.eth.blockNumber - receipt.blockNumber) >= 1)) {
-        models.isa_receipt_transaction.create({
-          isa_id: receipts[txhash].isa_id,
-          transaction_hash: txhash,
-          receipt_hash: receipts[txhash].receipt_hash
-        }).then(function(created) {
-          if (!created) {
-            return console.log(
-              'error creating isa_receipt_transaction record for isa',
-              receipts[txhash].isa_id
-            )
-          }
+        Promise.all([
+          models.isa_receipt_transaction.create({
+            isa_id: receipts[txhash].isa_id,
+            transaction_hash: txhash,
+            receipt_hash: receipts[txhash].receipt_hash
+          }),
+          models.information_sharing_agreement.update({
+            transaction_hash: txhash
+          }, {
+            where: {isa_id: receipts[txhash].isa_id}
+          })
+        ]).then(function(res) {
           console.log('confirmed receipt ledgering for isa', receipts[txhash].isa_id)
           console.log('pending isa receipts', receipts)
           delete receipts[txhash]
