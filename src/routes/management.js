@@ -343,7 +343,7 @@ module.exports = [
               alias: 'person',
               mime: 'application/ld+json',
               encoding: 'utf8',
-              schema: 'http://schema.cnsnt.io/person',
+              schema: 'schema.cnsnt.io/person',
               value: JSON.stringify({
                 '@context': ['http://schema.cnsnt.io/person'],
                 firstName: nickname,
