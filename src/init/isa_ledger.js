@@ -47,7 +47,7 @@ var receipt_timer = setInterval(function() {
           models.information_sharing_agreement.update({
             transaction_hash: txhash
           }, {
-            where: {isa_id: receipts[txhash].isa_id}
+            where: {id: receipts[txhash].isa_id}
           })
         ]).then(function(res) {
           console.log('confirmed receipt ledgering for isa', receipts[txhash].isa_id)
