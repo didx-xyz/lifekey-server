@@ -50,8 +50,8 @@ var receipt_timer = setInterval(function() {
           })
         ]).then(function(res) {
           console.log('confirmed receipt ledgering for isa', receipts[txhash].isa_id)
-          console.log('pending isa receipts', receipts)
           delete receipts[txhash]
+          console.log('pending isa receipts', receipts)
         }).catch(console.log)
       }
     })
