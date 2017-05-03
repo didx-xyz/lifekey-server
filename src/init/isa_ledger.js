@@ -18,7 +18,7 @@ var error = false
 // forward references
 var db, models, w3, all_time, nonces = {}
 
-function getTransactionCount(address, callback) {
+function get_next_nonce(address, callback) {
   if (typeof nonces[address] === 'undefined') {
     return w3.eth.getTransactionCount(address, function(err, nonce) {
       if (err) return callback(err, null)
@@ -33,7 +33,6 @@ function getTransactionCount(address, callback) {
 
 var receipts = {/* txhash: {isa_id, receipt_hash} */}
 var receipt_timer = setInterval(function() {
-  console.log('isa receipt confirmation timer tick')
   Object.keys(receipts).forEach(function(txhash) {
     w3.eth.getTransactionReceipt(txhash, function(err, receipt) {
       if (err) return console.log(err)
@@ -54,7 +53,7 @@ var receipt_timer = setInterval(function() {
           console.log('pending isa receipts', receipts)
           delete receipts[txhash]
         }).catch(console.log)
-      } else console.log('neither error nor confirmation')
+      }
     })
   })
 }, 10 * 1000)
@@ -140,7 +139,7 @@ require('./database')(
             )
           ).digest('base64')
 
-          getTransactionCount(addr, function(err, nonce) {
+          get_next_nonce(addr, function(err, nonce) {
             if (err) {
 
               // UNLOCK
