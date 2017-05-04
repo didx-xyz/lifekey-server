@@ -343,7 +343,7 @@ module.exports = [
             alias: 'consent-account',
             value: JSON.stringify({
               '@context': 'http://schema.cnsnt.io/contact_email',
-              email: req.user.email,
+              email: email,
               createdDate: new Date,
               modifiedDate: new Date
             }),
