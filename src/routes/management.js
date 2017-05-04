@@ -3151,6 +3151,7 @@ module.exports = [
           value: JSON.stringify(res[1]),
           entity: 'Claim',
           attribute: 'Verifiable',
+          schema: 'schema.cnsnt.io/facial_verification',
           alias: Date.now(),
           from_user_did: req.user.did,
           from_resource_name: 'Facial recognition verifiable claim',
