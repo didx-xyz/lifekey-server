@@ -337,7 +337,7 @@ module.exports = [
         if (created) {
           return Promise.all([
             !is_programmatic_user ? user_datum.create({
-            owner_id: req.user.id,
+            owner_id: created_user_id,
             entity: 'me',
             attribute: 'email',
             alias: 'consent-account',
