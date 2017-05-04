@@ -337,6 +337,22 @@ module.exports = [
         if (created) {
           return Promise.all([
             !is_programmatic_user ? user_datum.create({
+            owner_id: req.user.id,
+            entity: 'me',
+            attribute: 'email',
+            alias: 'consent-account',
+            value: JSON.stringify({
+              '@context': 'http://schema.cnsnt.io/contact_email',
+              email: req.user.email,
+              createdDate: new Date,
+              modifiedDate: new Date
+            }),
+            is_verifiable_claim: false,
+            schema: 'schema.cnsnt.io/contact_email',
+            mime: 'application/ld+json',
+            encoding: 'utf8'
+          }) : null,
+          !is_programmatic_user ? user_datum.create({
               owner_id: created_user_id,
               entity: 'person',
               attribute: 'person',
@@ -1022,25 +1038,6 @@ module.exports = [
         user_id = found.id
         // update the record
         return found.update({app_activation_link_clicked: true})
-      }).then(function() {
-        return Promise.all([
-          user_datum.create({
-            owner_id: req.user.id,
-            entity: 'me',
-            attribute: 'email',
-            alias: 'consent-account',
-            value: JSON.stringify({
-              '@context': 'http://schema.cnsnt.io/contact_email',
-              email: req.user.email,
-              createdDate: new Date,
-              modifiedDate: new Date
-            }),
-            is_verifiable_claim: false,
-            schema: 'schema.cnsnt.io/contact_email',
-            mime: 'application/ld+json',
-            encoding: 'utf8'
-          })
-        ])
       }).then(function() {
         process.send({
           vc_generation_request: {
