@@ -1035,6 +1035,7 @@ module.exports = [
               createdDate: new Date,
               modifiedDate: new Date
             }),
+            is_verifiable_claim: false,
             schema: 'schema.cnsnt.io/contact_email',
             mime: 'application/ld+json',
             encoding: 'utf8'
