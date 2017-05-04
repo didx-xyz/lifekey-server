@@ -56,7 +56,7 @@ module.exports = [
           })
         } else {
           return db.query([
-            'SELECT id, entity, attribute, alias, is_verifiable_claim, schema, is_credential, mime, encoding, uri, updated_at, from_resource_name, from_resource_did, from_resource_description',
+            'SELECT id, entity, attribute, alias, is_verifiable_claim, `schema`, mime, encoding, uri, updated_at, from_resource_name, from_user_did, from_resource_description',
             'FROM user_data',
             'WHERE owner_id = :owner_id',
             'ORDER BY entity, attribute, alias ASC'
