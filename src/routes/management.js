@@ -2335,7 +2335,7 @@ module.exports = [
     uri: '/management/action',
     method: 'post',
     secure: true,
-    active: true,
+    active: false,
     callback: function(req, res) {
       var {
         name, purpose, license, entities,
