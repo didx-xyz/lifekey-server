@@ -25,5 +25,8 @@ module.exports = function(to, from, subject, content, mime) {
         value: content
       }]
     }
-  }), console.log)
+  }), function(err, res) {
+    if (err) return console.log(err)
+    console.log('sent activation email to', to)
+  })
 }
