@@ -14,7 +14,7 @@ var EIS_ADMIN_ADDRESS = `0x${eu.privateToAddress(Buffer.from(env.EIS_ADMIN_KEY, 
 require('./database')(false).then(function(database) {
 
   var registrants = {}
-  var {user, crypto_key} = database.models
+  var {user, crypto_key, user_datum} = database.models
 
   isw.registry.CreatedDID(function(err, event) {
     if (err) return console.log('EIS created_did event error', err)
