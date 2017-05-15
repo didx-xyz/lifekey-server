@@ -30,11 +30,29 @@ require('./database')(false).then(function(database) {
       where: {id: user_id}
     }).then(function(updated) {
       if (!updated[0]) {
-        // super fatal
-        console.log('EIS db update error - unable to update user', user_id)
-        process.emit('message', {did_allocation_request: user_id})
-        return
+        return Promise.reject(
+          'unable to update user ' +
+          user_id +
+          ' - perhaps this user no longer exists?'
+        )
       }
+      return user_datum.create({
+        owner_id: user_id,
+        entity: 'me',
+        attribute: 'DID',
+        alias: 'DID',
+        value: JSON.stringify({
+          '@context': 'http://schema.cnsnt.io/decentralised_identifier',
+          decentralisedIdentifier: fixed_did_value,
+          createdDate: new Date,
+          modifiedDate: new Date
+        }),
+        is_verifiable_claim: false,
+        schema: 'schema.cnsnt.io/decentralised_identifier',
+        mime: 'application/ld+json',
+        encoding: 'utf8'
+      })
+    }).then(function(updated) {
       console.log('EIS ddo updated for user', user_id)
       console.log('EIS pending registrations', Object.keys(registrants).length, registrants)
       process.send({
@@ -67,7 +85,11 @@ require('./database')(false).then(function(database) {
       }
     }).then(function(found) {
       if (!found) {
-        return console.log('EIS ERROR', 'user has no eis key')
+        return console.log(
+          'EIS ERROR',
+          'user has no eis key',
+          'perhaps this user no longer exists?'
+        )
       }
 
       var user_address = `0x${eu.privateToAddress(Buffer.from(found.private_key, 'hex')).toString('hex')}`
