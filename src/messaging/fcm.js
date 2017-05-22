@@ -25,7 +25,7 @@ function message(recipient, notification, data) {
   }
   
   if (data) msg.data = data
-  if (notification) msg.notification = notification
+  // if (notification) msg.notification = notification
   
   return msg
 }
