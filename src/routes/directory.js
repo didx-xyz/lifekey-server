@@ -60,7 +60,7 @@ module.exports = [
       var {active_bot} = this.get('models')
       var errors = this.get('db_errors')
       req.user.update({
-        host_address: req.ip
+        host_address: req.headers['x-real-ip']
       }, {where: {
         owner_id: req.user.id
       }}).then(function() {
