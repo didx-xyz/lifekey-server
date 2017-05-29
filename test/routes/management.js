@@ -84,6 +84,17 @@ var test_users = [
       plaintext_proof: `u_5${now}`,
       signed_proof: ''
     }
+  },
+  {
+    email: `u_6${now}@example.com`,
+    nickname: `u_5${now}`,
+    device_id: `u_6${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: '',
+    plaintext_proof: `u_6${now}`,
+    signable_proof: crypto.createHash('sha256').update(`u_6${now}`).digest(),
+    signed_proof: ''
   }
 ]
 
@@ -198,6 +209,7 @@ before(function(done) {
     test_users[3].private_key = rsa.generatePrivateKey()
     test_users[4].private_key = rsa.generatePrivateKey()
     test_users[4].fingerprint.private_key = rsa.generatePrivateKey()
+    test_users[5].private_key = rsa.generatePrivateKey()
     test_users_fail_cases[3].private_key = rsa.generatePrivateKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
@@ -209,6 +221,7 @@ before(function(done) {
       test_users[3].private_key.toPublicPem().toString('utf8'),
       test_users[4].private_key.toPublicPem().toString('utf8'),
       test_users[4].fingerprint.private_key.toPublicPem().toString('utf8'),
+      test_users[5].private_key.toPublicPem().toString('utf8'),
       test_users_fail_cases[3].private_key.toPublicPem().toString('utf8')
     ])
   }).then(function(public_keys) {
@@ -219,7 +232,8 @@ before(function(done) {
     test_users[3].public_key = public_keys[3]
     test_users[4].public_key = public_keys[4]
     test_users[4].fingerprint.public_key = public_keys[5]
-    test_users_fail_cases[3].public_key = public_keys[6]
+    test_users[5].public_key = public_keys[6]
+    test_users_fail_cases[3].public_key = public_keys[7]
     console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
@@ -230,6 +244,7 @@ before(function(done) {
       test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false),
       test_users[4].private_key.hashAndSign('sha256', test_users[4].plaintext_proof, 'utf8', 'base64', false),
       test_users[4].fingerprint.private_key.hashAndSign('sha256', test_users[4].fingerprint.plaintext_proof, 'utf8', 'base64', false),
+      test_users[5].private_key.hashAndSign('sha256', test_users[5].plaintext_proof, 'utf8', 'base64', false),
       test_users_fail_cases[3].private_key.hashAndSign('sha256', test_users_fail_cases[3].plaintext_proof, 'utf8', 'base64', false)
     ])
   }).then(function(signatures) {
@@ -240,7 +255,8 @@ before(function(done) {
     test_users[3].signed_proof = signatures[3]
     test_users[4].signed_proof = signatures[4]
     test_users[4].fingerprint.signed_proof = signatures[5]
-    test_users_fail_cases[3].signed_proof = signatures[6]
+    test_users[5].signed_proof = signatures[6]
+    test_users_fail_cases[3].signed_proof = signatures[7]
     console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
@@ -250,6 +266,7 @@ before(function(done) {
     test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
     test_users[4].signable_proof = test_users[4].signable_proof.toString('hex')
     test_users[4].fingerprint.signable_proof = test_users[4].fingerprint.signable_proof.toString('hex')
+    test_users[5].signable_proof = test_users[5].signable_proof.toString('hex')
     test_users_fail_cases[3].signable_proof = test_users_fail_cases[3].signable_proof.toString('hex')
     console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
@@ -441,6 +458,18 @@ describe('management endpoints', function() {
       }))
     })
 
+    it('should allow duplicate usernames', function(done) {
+      mgmt_register.callback.call(mock.express, {
+        body: test_users[5]
+      }, mock.res(function(res) {
+        expect(res.status).to.equal(201)
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+        test_users[5].id = res.body.id
+        done()
+      }))
+    })
+
     it('should insert a new user record if using fingerprint signing parameters and respond with a basic identifier', function(done) {
       mgmt_register.callback.call(mock.express, {
         body: test_users[4]
@@ -618,7 +647,7 @@ describe('management endpoints', function() {
         },
         body: {accepted: true}
       }, mock.res(function(res) {
-
+        
         // assert that the acceptance was successful
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('user_connection created')
@@ -627,7 +656,14 @@ describe('management endpoints', function() {
 
         // ensure mock contains call data with actions url
         var call_data = process.get_call_data().call_args
-        expect(!!call_data[7].notification_request.data.actions_url).to.equal(true)
+        
+        expect(
+          !!(
+            call_data[
+              Object.keys(call_data).length
+            ].notification_request.data.actions_url
+          )
+        ).to.equal(true)
 
         update_uc = res.body.id
 
