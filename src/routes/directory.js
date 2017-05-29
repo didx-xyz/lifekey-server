@@ -7,7 +7,7 @@ module.exports = [
   {
     uri: '/directory',
     method: 'get',
-    secure: true,
+    secure: false,
     active: false,
     callback: function(req, res) {
       var {active_bot, user} = this.get('models')
