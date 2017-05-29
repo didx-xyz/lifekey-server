@@ -31,7 +31,8 @@ module.exports = [
               display_name: user.display_name,
               nickname: user.nickname,
               did: user.did,
-              actions_url: user.actions_url
+              actions_url: user.actions_url,
+              host_address: user.host_address
             }
           })
         })
@@ -58,11 +59,17 @@ module.exports = [
     callback: function(req, res) {
       var {active_bot} = this.get('models')
       var errors = this.get('db_errors')
-      active_bot.update({
-        last_ping: new Date
+      req.user.update({
+        host_address: req.ip
       }, {where: {
         owner_id: req.user.id
-      }}).then(function(updated) {
+      }}).then(function() {
+        return active_bot.update({
+          last_ping: new Date
+        }, {where: {
+          owner_id: req.user.id
+        }})
+      }).then(function(updated) {
         return res.status(200).json({
           error: false,
           status: 200,

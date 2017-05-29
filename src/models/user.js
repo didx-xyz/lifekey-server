@@ -15,6 +15,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: false
     },
+    host_address: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
     email: {
       type: sqlize.STRING,
       allowNull: false,
