@@ -88,7 +88,11 @@ services.lifekey = cluster({
                 services.notifier.send(msg)
               }
             })
-            service_init.call(OUTER, 'isa_ledger', function(msg) {})
+            service_init.call(OUTER, 'isa_ledger', function(msg) {
+              if (msg.notification_request) {
+                services.notifier.send(msg)
+              }
+            })
           }
         }
         if (msg.did_allocation_request) {
