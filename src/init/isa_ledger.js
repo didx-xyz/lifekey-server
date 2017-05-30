@@ -49,6 +49,41 @@ var receipt_timer = setInterval(function() {
             where: {id: receipts[txhash].isa_id}
           })
         ]).then(function(res) {
+          return models.information_sharing_agreement.findOne({
+            where: {transaction_hash: txhash}
+          })
+        }).then(function(isa) {
+          if (!isa) return Promise.resolve()
+          process.send({
+            notification_request: {
+              user_id: isa.to_did,
+              notification: {
+                title: 'ISA Ledgered to Blockchain',
+                body: 'Your ISA has been ledgered'
+              },
+              data: {
+                type: 'isa_ledgered',
+                isa_id: receipts[txhash].isa_id,
+                txid: txhash
+              }
+            }
+          })
+          process.send({
+            notification_request: {
+              user_id: isa.from_did,
+              notification: {
+                title: 'ISA Ledgered to Blockchain',
+                body: 'Your ISA has been ledgered'
+              },
+              data: {
+                type: 'isa_ledgered',
+                isa_id: receipts[txhash].isa_id,
+                txid: txhash
+              }
+            }
+          })
+          return Promise.resolve()
+        }).then(function() {
           console.log('confirmed receipt ledgering for isa', receipts[txhash].isa_id)
           delete receipts[txhash]
           console.log('pending isa receipts', receipts)
