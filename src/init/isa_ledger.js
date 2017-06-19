@@ -108,6 +108,19 @@ require('./database')(
     process.send({ready: false})
     return
   }
+
+  console.log('connected', w3.isConnected())
+
+  var version_keys = Object.keys(w3.version)
+
+  version_keys.forEach(function(version_key) {
+    w3.version[version_key](console.log.bind(console, version_key))
+  })
+
+  var net_stats = Object.keys(w3.net)
+  net_stats.forEach(function(net_stat) {
+    w3.net[net_stat](console.log.bind(console, net_stat))
+  })
   
   // initialise keys and address
   var private_key = Buffer.from(env.ISA_RECEIPT_KEY, 'hex')
