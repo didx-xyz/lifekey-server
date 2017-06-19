@@ -112,6 +112,7 @@ require('./database')(
   // initialise keys and address
   private_key = Buffer.from(env.ISA_RECEIPT_KEY, 'hex')
   addr = `0x${ut.privateToAddress(private_key).toString('hex')}`
+  console.log('getting balance for', addr)
   return new Promise(function(resolve, reject) {
     // ensure balance is not zero
     w3.eth.getBalance(addr, function(err, balance) {
@@ -254,6 +255,6 @@ require('./database')(
 
   process.send({ready: true})
 }).catch(function(err) {
-  console.log(err)
+  console.log(err || 'no error message')
   process.send({ready: false})
 })
