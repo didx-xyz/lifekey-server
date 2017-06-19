@@ -102,7 +102,6 @@ require('./database')(
   try {
     w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
   } catch (e) {
-    console.log('isa_ledger --- unable to initialise web3 instance to eis host', e)
     return Promise.reject(e)
   }
   return Promise.resolve()
