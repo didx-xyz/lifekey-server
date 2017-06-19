@@ -109,17 +109,6 @@ require('./database')(
   console.log('isa_ledger --- initialised w3')
   return Promise.resolve()
 }).then(function() {
-  
-  console.log(w3.net.peerCount)
-  console.log(w3.net.listening)
-  console.log(w3.currentProvider)
-  console.log(w3.version.whisper)
-  console.log(w3.version.ethereum)
-  console.log(w3.version.network)
-  console.log(w3.version.node)
-  console.log(w3.version.api)
-  return Promise.resolve()
-}).then(function() {
   // initialise keys and address
   private_key = Buffer.from(env.ISA_RECEIPT_KEY, 'hex')
   addr = `0x${ut.privateToAddress(private_key).toString('hex')}`
