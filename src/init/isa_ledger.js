@@ -109,6 +109,7 @@ require('./database')(
   console.log('isa_ledger --- initialised w3')
   return Promise.resolve()
 }).then(function() {
+  
   console.log(w3.net.peerCount)
   console.log(w3.net.listening)
   console.log(w3.currentProvider)
