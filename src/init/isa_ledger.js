@@ -105,7 +105,8 @@ require('./database')(
     w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
   } catch (e) {
     console.log('unable to initialise web3 instance to eis host', e)
-    error = true
+    process.send({ready: false})
+    return
   }
   
   // initialise keys and address
