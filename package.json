@@ -29,7 +29,7 @@
     "ethereumjs-util": "^5.1.1",
     "express": "^4.14.0",
     "fluster": "0.0.15",
-    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#8dde8410dd1c609a366595d8fd2bda5fee415ae9",
+    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#ab697afdc54d4cd1777121fdadd3ac710c35a015",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
