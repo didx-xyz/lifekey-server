@@ -112,18 +112,23 @@ require('./database')(false).then(function(database) {
       var did_value = crypto.rng(32).toString('hex')
       
       // create the did contract with initial ddo
-      isw.spawn(
-        EIS_ADMIN_ADDRESS,
-        user_address,
-        env.EIS_SIGNER_KEY,
-        did_value,
-        function(err, txhash) {
-          if (err) {
-            return console.log('EIS spawn error', err)
+      try {
+        isw.spawn(
+          EIS_ADMIN_ADDRESS,
+          user_address,
+          env.EIS_SIGNER_KEY,
+          did_value,
+          function(err, txhash) {
+            if (err) {
+              return console.log('EIS spawn error', err)
+            }
+            registrants[user_address] = user_id
           }
-          registrants[user_address] = user_id
-        }
-      )
+        )
+      } catch (e) {
+        console.log('error THREE', e)
+      }
+      
     }).catch(console.log)
   })
   
