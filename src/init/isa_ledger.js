@@ -96,7 +96,9 @@ require('./database')(
   models = database.models
   mock.express.set('models', database.models)
   mock.express.set('db_errors', database.errors)
-  
+  console.log('isa_ledger --- initialised models')
+  return Promise.resolve()
+}).then(function() {
   // intialise web3
   try {
     w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
@@ -104,6 +106,7 @@ require('./database')(
     console.log('unable to initialise web3 instance to eis host', e)
     return Promise.reject(e)
   }
+  console.log('isa_ledger --- initialised w3')
   return Promise.resolve()
 }).then(function() {
   w3.net.peerCount(console.log.bind(console, 'net.peerCount'))
@@ -261,5 +264,6 @@ require('./database')(
 
   process.send({ready: true})
 }).catch(function(err) {
+  console.log(err)
   process.send({ready: false})
 })
