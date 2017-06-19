@@ -96,37 +96,35 @@ require('./database')(
   models = database.models
   mock.express.set('models', database.models)
   mock.express.set('db_errors', database.errors)
-  console.log('isa_ledger --- initialised models')
   return Promise.resolve()
 }).then(function() {
   // intialise web3
   try {
     w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
   } catch (e) {
-    console.log('unable to initialise web3 instance to eis host', e)
+    console.log('isa_ledger --- unable to initialise web3 instance to eis host', e)
     return Promise.reject(e)
   }
-  console.log('isa_ledger --- initialised w3')
   return Promise.resolve()
 }).then(function() {
   // initialise keys and address
   private_key = Buffer.from(env.ISA_RECEIPT_KEY, 'hex')
   addr = `0x${ut.privateToAddress(private_key).toString('hex')}`
-  console.log('getting balance for', addr)
   return new Promise(function(resolve, reject) {
     // ensure balance is not zero
     w3.eth.getBalance(addr, function(err, balance) {
       if (err) {
-        console.log('error getting balance for ISA_RECEIPT_KEY account')
+        console.log('isa_ledger --- error getting balance for ISA_RECEIPT_KEY account')
         return reject(err)
       } else if (!balance) {
-        console.log('error getting balance for ISA_RECEIPT_KEY account', 'balance is not defined')
+        console.log('isa_ledger --- error getting balance for ISA_RECEIPT_KEY account', 'balance is not defined')
         return reject()
       } else if (balance.toNumber() <= 0) {
-        console.log('ISA_RECEIPT_KEY account balance too low to continue')
+        console.log('isa_ledger --- ISA_RECEIPT_KEY account balance too low to continue')
         return reject()
       } else {
         // no error that we can identify
+        console.log('isa_ledger --- account balance', balance.toNumber())
         return resolve()
       }
     })
@@ -151,7 +149,7 @@ require('./database')(
     
     if (isa_id in all_time) {
       return console.log(
-        'skipping receipt ledgering for',
+        'isa_ledger --- skipping receipt ledgering for',
         isa_id,
         'receipt ledgering either in progress or already ledgered'
       )
@@ -170,7 +168,7 @@ require('./database')(
         delete all_time[isa_id]
         
         return console.log(
-          'error calling GET /management/receipt/:isa_id',
+          'isa_ledger --- error calling GET /management/receipt/:isa_id',
           res
         )
       }
@@ -190,7 +188,7 @@ require('./database')(
           delete all_time[isa_id]
 
           return console.log(
-            'error getting nonce for isa receipt ledgering account',
+            'isa_ledger --- error getting nonce for isa receipt ledgering account',
             err
           )
         }
@@ -211,7 +209,7 @@ require('./database')(
           delete all_time[isa_id]
           
           return console.log(
-            'error generating or signing raw transaction for isa',
+            'isa_ledger --- error generating or signing raw transaction for isa',
             isa_id,
             e
           )
@@ -226,14 +224,14 @@ require('./database')(
                 // UNLOCK
                 delete all_time[isa_id]
                 
-                return console.log('error sending txn for', isa_id, err)
+                return console.log('isa_ledger --- error sending txn for', isa_id, err)
               }
               receipts[txhash] = {
                 isa_id: isa_id,
                 receipt_hash: receipt_hash
               }
               console.log(
-                'awaiting txn confirmations for isa',
+                'isa_ledger --- awaiting txn confirmations for isa',
                 isa_id
               )
             }
@@ -244,7 +242,7 @@ require('./database')(
           delete all_time[isa_id]
           
           return console.log(
-            'error serialising transaction for raw send for isa',
+            'isa_ledger --- error serialising transaction for raw send for isa',
             isa_id,
             e
           )
@@ -255,6 +253,6 @@ require('./database')(
 
   process.send({ready: true})
 }).catch(function(err) {
-  console.log(err || 'no error message')
+  console.log('isa_ledger ---', err || 'no error message')
   process.send({ready: false})
 })
