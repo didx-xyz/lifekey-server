@@ -109,19 +109,17 @@ require('./database')(
     return
   }
 
-  console.log('connected', w3.isConnected())
+  console.log(
+    'net.peerCount', w3.net.peerCount,
+    'net.listening', w3.net.listening,
+    'currentProvider', w3.currentProvider,
+    'version.whisper', w3.version.whisper,
+    'version.ethereum', w3.version.ethereum,
+    'version.network', w3.version.network,
+    'version.node', w3.version.node,
+    'version.api', w3.version.api,
+  )
 
-  var version_keys = Object.keys(w3.version)
-
-  version_keys.forEach(function(version_key) {
-    w3.version[version_key](console.log.bind(console, version_key))
-  })
-
-  var net_stats = Object.keys(w3.net)
-  net_stats.forEach(function(net_stat) {
-    w3.net[net_stat](console.log.bind(console, net_stat))
-  })
-  
   // initialise keys and address
   var private_key = Buffer.from(env.ISA_RECEIPT_KEY, 'hex')
   var addr = `0x${ut.privateToAddress(private_key).toString('hex')}`
