@@ -17,7 +17,6 @@ try {
   console.log('error ONE', e)
 }
 
-
 var EIS_ADMIN_ADDRESS = `0x${eu.privateToAddress(Buffer.from(env.EIS_ADMIN_KEY, 'hex')).toString('hex')}`
 
 require('./database')(false).then(function(database) {
