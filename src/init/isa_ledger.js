@@ -117,7 +117,7 @@ require('./database')(
     'version.ethereum', w3.version.ethereum,
     'version.network', w3.version.network,
     'version.node', w3.version.node,
-    'version.api', w3.version.api,
+    'version.api', w3.version.api
   )
 
   // initialise keys and address
