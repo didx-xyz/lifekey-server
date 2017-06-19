@@ -116,7 +116,7 @@ require('./database')(
     // ensure balance is not zero
     w3.eth.getBalance(addr, function(err, balance) {
       if (err) {
-        console.log('error getting balance for ISA_RECEIPT_KEY account', err)
+        console.log('error getting balance for ISA_RECEIPT_KEY account')
         return reject(err)
       } else if (!balance) {
         console.log('error getting balance for ISA_RECEIPT_KEY account', 'balance is not defined')
