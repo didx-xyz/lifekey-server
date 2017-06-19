@@ -109,14 +109,14 @@ require('./database')(
   console.log('isa_ledger --- initialised w3')
   return Promise.resolve()
 }).then(function() {
-  w3.net.peerCount(console.log.bind(console, 'net.peerCount'))
-  w3.net.listening(console.log.bind(console, 'net.listening'))
-  w3.currentProvider(console.log.bind(console, 'currentProvider'))
-  w3.version.whisper(console.log.bind(console, 'version.whisper'))
-  w3.version.ethereum(console.log.bind(console, 'version.ethereum'))
-  w3.version.network(console.log.bind(console, 'version.network'))
-  w3.version.node(console.log.bind(console, 'version.node'))
-  w3.version.api(console.log.bind(console, 'version.api'))
+  console.log(w3.net.peerCount)
+  console.log(w3.net.listening)
+  console.log(w3.currentProvider)
+  console.log(w3.version.whisper)
+  console.log(w3.version.ethereum)
+  console.log(w3.version.network)
+  console.log(w3.version.node)
+  console.log(w3.version.api)
   return Promise.resolve()
 }).then(function() {
   // initialise keys and address
