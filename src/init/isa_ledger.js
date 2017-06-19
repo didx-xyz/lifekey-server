@@ -117,11 +117,14 @@ require('./database')(
     if (err) {
       error = true
       console.log('error getting balance for ISA_RECEIPT_KEY account', err)
-    }
-
-    if (balance.toNumber() <= 0) {
+    } else if (!balance) {
+      error = true
+      console.log('error getting balance for ISA_RECEIPT_KEY account', 'balance is not defined')
+    } else if (balance.toNumber() <= 0) {
       error = true
       console.log('ISA_RECEIPT_KEY account balance too low to continue')
+    } else {
+      // no error that we can identify
     }
 
     // find any existing receipt ledgerings
@@ -244,7 +247,7 @@ require('./database')(
         }))
       })
 
-      process.send({ready: error ? false : true})
+      process.send({ready: !error})
     }).catch(console.log)
   })
 })
