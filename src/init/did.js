@@ -134,13 +134,15 @@ require('./database')(
   user = database.models
   crypto_key = database.models
   user_datum = database.models
-  process.send({ready: true})
+
+  console.log(typeof crypto_key, typeof user_datum, typeof user)
   while (process_message_backlog.length) {
     process_message(process_message_backlog.pop())
   }
   while (created_did_backlog.length) {
     created_did(null, created_did_backlog.pop())
   }
+  process.send({ready: true})
 }).catch(function(err) {
   console.log('did ---', err || 'no error message')
   process.send({ready: false})
