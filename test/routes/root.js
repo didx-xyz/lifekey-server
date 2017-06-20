@@ -93,8 +93,7 @@ describe('root', function() {
   })
 
   after(function(done) {
-    if (test_server) return test_server.close(done)
-    done()
+    test_server.close(done)
   })
 
   describe(`${web_auth.method.toUpperCase()} ${web_auth.uri}`, function() {
