@@ -172,9 +172,7 @@ module.exports = [
 
         var digest = crypto.createHash('sha256').update(nonce).digest()
 
-        console.log('private key', key.private_key)
-
-        return Promise.resolve([
+        return Promise.all([
           digest.toString('base64'),
           ec.sign(digest, key.private_key),
           key.public_key.toString('base64')
@@ -182,10 +180,10 @@ module.exports = [
       }).then(function(res) {
         var msg = JSON.stringify({
           nonce: nonce,
+          session_id: session_id,
           digest: res[0],
           signature: res[1].toString('base64'),
-          session_id: session_id,
-          public_key: res[1]
+          public_key: res[2]
         })
         return Promise.resolve(Buffer.from(msg, 'utf8'))
       }).then(function(msg) {
