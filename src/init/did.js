@@ -131,11 +131,9 @@ process.on('message', process_message)
 require('./database')(
   false
 ).then(function(database) {
-  user = database.models
-  crypto_key = database.models
-  user_datum = database.models
-
-  console.log(typeof crypto_key, typeof user_datum, typeof user, Object.keys(crypto_key))
+  user = database.models.user
+  crypto_key = database.models.crypto_key
+  user_datum = database.models.user_datum
   while (process_message_backlog.length) {
     process_message(process_message_backlog.pop())
   }
