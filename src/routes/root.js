@@ -172,6 +172,8 @@ module.exports = [
 
         var digest = crypto.createHash('sha256').update(nonce).digest()
 
+        console.log('private key', key.private_key)
+
         return Promise.resolve([
           digest.toString('base64'),
           ec.sign(digest, key.private_key),
