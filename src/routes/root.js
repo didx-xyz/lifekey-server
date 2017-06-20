@@ -1,8 +1,9 @@
 
+var crypto = require('crypto')
 var http = require('http')
 var url = require('url')
 
-var secp = require('secp256k1')
+var ec = require('eccrypto')
 
 module.exports = [
   
@@ -131,6 +132,26 @@ module.exports = [
         })
       }
 
+      try {
+        var addr = url.parse(auth_callback)
+      } catch (e) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'url not given for auth_callback',
+          body: null
+        })
+      }
+
+      if (!addr.hostname) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'url could not be parsed',
+          body: null
+        })
+      }
+
       var {crypto_key} = this.get('models')
       var errors = this.get('db_errors')
 
@@ -148,43 +169,23 @@ module.exports = [
             body: null
           })
         }
-        var signature = secp.sign(
-          Buffer.from(nonce, 'utf8'),
-          key.private_key
-        )
+
         return Promise.resolve([
-          signature.toString('base64'),
+          ec.sign(
+            crypto.createHash('sha256').update(nonce),
+            key.private_key
+          ),
           key.public_key.toString('base64')
         ])
       }).then(function(res) {
         var msg = JSON.stringify({
-          signature: res[0],
+          signature: res[0].toString('base64'),
           session_id: session_id,
           public_key: res[1]
         })
         return Promise.resolve(Buffer.from(msg, 'utf8'))
       }).then(function(msg) {
         return new Promise(function(resolve, reject) {
-          try {
-            var addr = url.parse(auth_callback)
-          } catch (e) {
-            return reject({
-              error: true,
-              status: 400,
-              message: 'url not given for auth_callback',
-              body: null
-            })
-          }
-
-          if (!addr.hostname) {
-            return reject({
-              error: true,
-              status: 400,
-              message: 'url could not be parsed',
-              body: null
-            })
-          }
-
           http.request({
             method: 'post',
             protocol: addr.protocol,
