@@ -65,7 +65,10 @@ describe('directory', function() {
   describe(`${ping.method.toUpperCase()} ${ping.uri}`, function() {
     it('should update the liveness record for the calling agent', function(done) {
       ping.callback.call(mock.express, {
-        user: {id: created_user_id}
+        user: {id: created_user_id},
+        headers: {
+          'x-real-ip': '0.0.0.0'
+        }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.body).to.equal('pong')
