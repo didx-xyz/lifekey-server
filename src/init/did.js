@@ -3,6 +3,8 @@
 
 var crypto = require('crypto')
 
+var eu = require('ethereumjs-util')
+
 var env = require('./env')()
 
 var registrants = {}, isw, user, crypto_key, user_datum
