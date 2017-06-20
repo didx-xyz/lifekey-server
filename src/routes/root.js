@@ -170,16 +170,18 @@ module.exports = [
           })
         }
 
+        var digest = crypto.createHash('sha256').update(nonce).digest()
+
         return Promise.resolve([
-          ec.sign(
-            crypto.createHash('sha256').update(nonce),
-            key.private_key
-          ),
+          digest.toString('base64'),
+          ec.sign(digest, key.private_key),
           key.public_key.toString('base64')
         ])
       }).then(function(res) {
         var msg = JSON.stringify({
-          signature: res[0].toString('base64'),
+          nonce: nonce,
+          digest: res[0],
+          signature: res[1].toString('base64'),
           session_id: session_id,
           public_key: res[1]
         })
