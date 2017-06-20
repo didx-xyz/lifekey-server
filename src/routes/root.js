@@ -27,23 +27,34 @@ module.exports = [
   // 1 GET /robots.txt
   {
     uri: '/robots.txt',
-    method: 'get',
+    method: 'all',
     secure: false,
     active: false,
     callback: function(req, res) {
       res.set('content-type', 'text/plain')
-      return res.status(200).end('User-agent: *\nDisallow: /')
+      return res.status(200).end(
+        'User-agent: *\nDisallow: /'
+      )
     }
   },
   
   // 2 GET /debug/unregister/:user_id
   {
+    // DEBUG unsafe due to GET method
     uri: '/debug/unregister',
     method: 'get',
     secure: false,
     active: false,
     callback: function(req, res) {
-      var {user_id, email} = req.query
+      var {email, did} = req.query
+      if (!(email || did)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
       var {
         user,
         user_action,
@@ -56,24 +67,24 @@ module.exports = [
       user.findOne({
         where: email ?
         {email: email} :
-        {id: user_id}
+        {did: did}
       }).then(function(found) {
-        if (found) {
-          return Promise.all([
-            user.destroy({where: {id: found.id}}),
-            user_action.destroy({where: {owner_id: found.id}}),
-            user_device.destroy({where: {owner_id: found.id}}),
-            crypto_key.destroy({where: {owner_id: found.id}}),
-            user_datum.destroy({where: {owner_id: found.id}}),
-            active_bot.destroy({where: {owner_id: found.id}})
-          ])
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
         }
-        return Promise.reject({
-          error: true,
-          status: 404,
-          message: 'user record not found',
-          body: null
-        })
+        return Promise.all([
+          user.destroy({where: {id: found.id}}),
+          user_action.destroy({where: {owner_id: found.id}}),
+          user_device.destroy({where: {owner_id: found.id}}),
+          crypto_key.destroy({where: {owner_id: found.id}}),
+          user_datum.destroy({where: {owner_id: found.id}}),
+          active_bot.destroy({where: {owner_id: found.id}})
+        ])
       }).then(function(deletes) {
         var [
           user_deleted,
@@ -85,7 +96,7 @@ module.exports = [
         return res.status(200).json({
           error: false,
           status: 200,
-          message: 'ok',
+          message: 'delete counts enclosed',
           body: {
             user: user_deleted,
             user_action: user_action_deleted,
