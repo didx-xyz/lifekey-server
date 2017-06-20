@@ -1,5 +1,5 @@
 
-var crypto = require('crypto')
+var crypto = require('../crypto')
 var http = require('http')
 var url = require('url')
 
@@ -147,7 +147,7 @@ module.exports = [
         return res.status(400).json({
           error: true,
           status: 400,
-          message: 'url could not be parsed',
+          message: 'could not determine hostname from given url',
           body: null
         })
       }
@@ -160,8 +160,8 @@ module.exports = [
           owner_id: req.user.id,
           alias: 'eis'
         }
-      }).then(function(key) {
-        if (!key) {
+      }).then(function(found) {
+        if (!found) {
           return Promise.reject({
             error: true,
             status: 500,
@@ -169,21 +169,20 @@ module.exports = [
             body: null
           })
         }
-
-        var digest = crypto.createHash('sha256').update(nonce).digest()
-
         return Promise.all([
-          digest.toString('base64'),
-          ec.sign(digest, key.private_key),
-          key.public_key.toString('base64')
+          crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            nonce
+          ),
+          found.public_key
         ])
       }).then(function(res) {
         var msg = JSON.stringify({
           nonce: nonce,
           session_id: session_id,
-          digest: res[0],
-          signature: res[1].toString('base64'),
-          public_key: res[2]
+          signature: res[0].toString('base64'),
+          public_key: res[1].toString('base64')
         })
         return Promise.resolve(Buffer.from(msg, 'utf8'))
       }).then(function(msg) {
@@ -196,10 +195,10 @@ module.exports = [
             port: addr.port,
             headers: {
               'content-type': 'application/json',
-              'content-length': Buffer.length(msg)
+              'content-length': Buffer.byteLength(msg)
             }
           }).on('response', function(res) {
-            if (res.status !== 200) {
+            if (res.statusCode !== 200) {
               return reject({
                 error: true,
                 status: 403,
@@ -209,14 +208,13 @@ module.exports = [
             }
             return resolve()
           }).on('error', function(err) {
-            console.log('error reaching remote service for auth hook')
             return reject({
               error: true,
               status: 500,
               message: 'network transport error',
               body: null
             })
-          }).end(msg.toString('utf8'))
+          }).end(msg)
         })
       }).then(function() {
         return res.status(200).json({
