@@ -1,5 +1,6 @@
 
 var crypto = require('../crypto')
+var https = require('https')
 var http = require('http')
 var url = require('url')
 
@@ -187,7 +188,7 @@ module.exports = [
         return Promise.resolve(Buffer.from(msg, 'utf8'))
       }).then(function(msg) {
         return new Promise(function(resolve, reject) {
-          http.request({
+          (addr.protocol === 'http:' ? http : https).request({
             method: 'post',
             protocol: addr.protocol,
             hostname: addr.hostname,
