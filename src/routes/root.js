@@ -175,7 +175,7 @@ module.exports = [
             found.private_key,
             nonce
           ),
-          found.public_key
+          crypto.asymmetric.get_public('secp256k1', found.private_key)
         ])
       }).then(function(res) {
         var msg = JSON.stringify({
