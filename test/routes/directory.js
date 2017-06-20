@@ -12,6 +12,7 @@ var list = routes[0]
 
 describe('directory', function() {
   
+  var created_user
   var created_user_id
 
   before(function(done) {
@@ -43,6 +44,7 @@ describe('directory', function() {
     }).then(function(created) {
       if (!created) return done(new Error('should not have been called'))
       created_user_id = created.id
+      created_user = created
       var ages_ago = new Date
       ages_ago.setFullYear(1999)
       return mock.express.models.active_bot.create({
@@ -65,9 +67,10 @@ describe('directory', function() {
   describe(`${ping.method.toUpperCase()} ${ping.uri}`, function() {
     it('should update the liveness record for the calling agent', function(done) {
       ping.callback.call(mock.express, {
-        user: {id: created_user_id},
-        headers: {
-          'x-real-ip': '0.0.0.0'
+        headers: {'x-real-ip': '0.0.0.0'},
+        user: {
+          id: created_user_id,
+          update: created_user.update.bind(created_user)
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
