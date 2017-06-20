@@ -69,7 +69,7 @@ describe('root', function() {
         user_without_eis_key = created[1]
         return Promise.resolve()
       }
-      return done(new Error('should not have been called'))
+      return Promise.reject(true)
     }).then(function() {
       do {
         var private_key = crypto.rng(32)
@@ -84,7 +84,7 @@ describe('root', function() {
       })
     }).then(function(created) {
       if (created) return Promise.resolve()
-      return done(new Error('should not have been called'))
+      return Promise.reject(true)
     }).then(function() {
       wait(function() {
         return !!test_server_ready
@@ -97,7 +97,7 @@ describe('root', function() {
     done()
   })
 
-  describe.only(`${web_auth.method.toUpperCase()} ${web_auth.uri}`, function() {
+  describe(`${web_auth.method.toUpperCase()} ${web_auth.uri}`, function() {
     
     it('should fail if missing required arguments', function(done) {
       web_auth.callback.call(mock.express, {
