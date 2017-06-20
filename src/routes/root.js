@@ -1,4 +1,9 @@
 
+var http = require('http')
+var url = require('url')
+
+var secp = require('secp256k1')
+
 module.exports = [
   
   // 0 GET /
@@ -86,6 +91,136 @@ module.exports = [
             crypto_key: crypto_key_deleted,
             user_datum: user_datum_deleted
           }
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 3 POST /web-auth
+  {
+    uri: '/web-auth',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+
+      var {
+        auth_callback,
+        nonce,
+        session_id
+      } = req.body
+
+      if (!(auth_callback &&
+            nonce &&
+            session_id)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var {crypto_key} = this.get('models')
+      var errors = this.get('db_errors')
+
+      crypto_key.findOne({
+        where: {
+          owner_id: req.user.id,
+          alias: 'eis'
+        }
+      }).then(function(key) {
+        if (!key) {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'user has no eis key',
+            body: null
+          })
+        }
+        var signature = secp.sign(
+          Buffer.from(nonce, 'utf8'),
+          key.private_key
+        )
+        return Promise.resolve([
+          signature.toString('base64'),
+          key.public_key.toString('base64')
+        ])
+      }).then(function(res) {
+        var msg = JSON.stringify({
+          signature: res[0],
+          session_id: session_id,
+          public_key: res[1]
+        })
+        return Promise.resolve(Buffer.from(msg, 'utf8'))
+      }).then(function(msg) {
+        return new Promise(function(resolve, reject) {
+          try {
+            var addr = url.parse(auth_callback)
+          } catch (e) {
+            return reject({
+              error: true,
+              status: 400,
+              message: 'url not given for auth_callback',
+              body: null
+            })
+          }
+
+          if (!addr.hostname) {
+            return reject({
+              error: true,
+              status: 400,
+              message: 'url could not be parsed',
+              body: null
+            })
+          }
+
+          http.request({
+            method: 'post',
+            protocol: addr.protocol,
+            hostname: addr.hostname,
+            path: addr.path,
+            port: addr.port,
+            headers: {
+              'content-type': 'application/json',
+              'content-length': Buffer.length(msg)
+            }
+          }).on('response', function(res) {
+            if (res.status !== 200) {
+              return reject({
+                error: true,
+                status: 403,
+                message: 'remote service denied access',
+                body: null
+              })
+            }
+            return resolve()
+          }).on('error', function(err) {
+            console.log('error reaching remote service for auth hook')
+            return reject({
+              error: true,
+              status: 500,
+              message: 'network transport error',
+              body: null
+            })
+          }).end(msg.toString('utf8'))
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
         })
       }).catch(function(err) {
         err = errors(err)
