@@ -135,7 +135,7 @@ require('./database')(
   crypto_key = database.models
   user_datum = database.models
 
-  console.log(typeof crypto_key, typeof user_datum, typeof user)
+  console.log(typeof crypto_key, typeof user_datum, typeof user, Object.keys(crypto_key))
   while (process_message_backlog.length) {
     process_message(process_message_backlog.pop())
   }
