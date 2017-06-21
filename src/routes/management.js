@@ -3375,6 +3375,72 @@ module.exports = [
         })
       })
     }
+  },
+
+  // 31 GET /qr-2/:user_id
+  {
+    uri: '/qr-2/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          var {SERVER_HOSTNAME} = this.get('env')
+          var profile = {
+            colour: found.branding_colour_code,
+            image_uri: found.branding_image_uri,
+            actions_url: found.actions_url,
+            display_name: found.display_name,
+            address: found.contact_address,
+            tel: found.contact_tel,
+            email: found.contact_email,
+            did: found.did
+          }
+          return qr.toFileStream(
+            res,
+            `${JSON.stringify(profile)}`,
+            // `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
+            function(err) {
+              if (err) {
+                throw {
+                  error: true,
+                  status: 500,
+                  message: 'qr code generation error',
+                  body: null
+                }
+              }
+            }
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }.bind(this)).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 
   // example
