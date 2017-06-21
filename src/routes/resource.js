@@ -642,5 +642,65 @@ module.exports = [
         }
       })
     }
+  },
+
+  // 13 POST /profile
+  {
+    uri: '/profile',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {
+        contactAddress,
+        contactTelephone,
+        displayName,
+        profileImageUri,
+        profileColour,
+        contactEmail
+      } = req.body
+      
+      if (!(typeof contactAddress === 'string' &&
+            typeof contactTelephone === 'string' &&
+            typeof contactEmail === 'string' &&
+            typeof displayName === 'string' &&
+            typeof profileImageUri === 'string' &&
+            typeof profileColour === 'string')) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected string values',
+          body: null
+        })
+      }
+
+      var errors = this.get('db_errors')
+
+      req.user.update({
+        contact_address: contactAddress,
+        contact_tel: contactTelephone,
+        contact_email: contactEmail,
+        display_name: displayName,
+        branding_image_uri: profileImageUri,
+        branding_colour_code: profileColour
+      }).then(function(updated) {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          err: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 ]
