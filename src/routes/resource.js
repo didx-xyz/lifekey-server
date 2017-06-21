@@ -679,7 +679,7 @@ module.exports = [
       req.user.update({
         contact_address: contactAddress,
         contact_tel: contactTelephone,
-        contact_email: contactEmail,
+        contact_email: contactEmail || null,
         display_name: displayName,
         branding_image_uri: profileImageUri,
         branding_colour_code: profileColour
