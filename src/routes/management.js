@@ -89,6 +89,7 @@ module.exports = [
         device_platform,
         webhook_url,
         actions_url,
+        web_auth_url,
         public_key_algorithm,
         public_key,
         plaintext_proof,
@@ -147,9 +148,9 @@ module.exports = [
               ),
               body: null
             })
-          } else {
-            is_programmatic_user = true
           }
+          is_programmatic_user = true
+          caught = false
         }
 
         if (actions_url) {
@@ -166,6 +167,28 @@ module.exports = [
                   caught ?
                   'expected string type for actions_url' :
                   'url not given for actions_url'
+                ),
+                body: null
+              })
+            }
+            caught = false
+          }
+        }
+
+        if (web_auth_url) {
+          try {
+            var web_auth_hook = url.parse(web_auth_url)
+          } catch (e) {
+            caught = true
+          } finally {
+            if (caught || !web_auth_hook.host) {
+              return res.status(400).json({
+                error: true,
+                status: 400,
+                message: (
+                  caught ?
+                  'expected string type for web_auth_url' :
+                  'url not given for web_auth_url'
                 ),
                 body: null
               })
@@ -312,6 +335,7 @@ module.exports = [
           nickname: nickname,
           webhook_url: webhook_url,
           actions_url: actions_url,
+          web_auth_url: web_auth_url,
           app_activation_code: activation_code
         })
       }).then(function(created) {
@@ -336,48 +360,52 @@ module.exports = [
       }).then(function(created) {
         if (created) {
           return Promise.all([
-            !is_programmatic_user ? user_datum.create({
-            owner_id: created_user_id,
-            entity: 'me',
-            attribute: 'email',
-            alias: 'consent-account',
-            value: JSON.stringify({
-              '@context': 'http://schema.cnsnt.io/contact_email',
-              email: email,
-              createdDate: new Date,
-              modifiedDate: new Date
-            }),
-            is_verifiable_claim: false,
-            schema: 'schema.cnsnt.io/contact_email',
-            mime: 'application/ld+json',
-            encoding: 'utf8'
-          }) : null,
-          !is_programmatic_user ? user_datum.create({
-              owner_id: created_user_id,
-              entity: 'person',
-              attribute: 'person',
-              alias: 'person',
-              mime: 'application/ld+json',
-              encoding: 'utf8',
-              schema: 'schema.cnsnt.io/person',
-              value: JSON.stringify({
-                '@context': ['http://schema.cnsnt.io/person'],
-                firstName: nickname,
-                lastName: null,
-                title: null,
-                nationality: null,
-                birthPlace: null,
-                birthDate: null,
-                alias: nickname,
-                avatar: null,
-                identityPhotograph: null,
-                maritalStatus: null,
-                maritalContractType: null,
-                preferredLanguage: null,
-                createdDate: new Date,
-                modifiedDate: null
-              }),
-            }) : null,
+            is_programmatic_user ? null : (
+              user_datum.create({
+                owner_id: created_user_id,
+                entity: 'me',
+                attribute: 'email',
+                alias: 'consent-account',
+                value: JSON.stringify({
+                  '@context': 'http://schema.cnsnt.io/contact_email',
+                  email: email,
+                  createdDate: new Date,
+                  modifiedDate: new Date
+                }),
+                is_verifiable_claim: false,
+                schema: 'schema.cnsnt.io/contact_email',
+                mime: 'application/ld+json',
+                encoding: 'utf8'
+              })
+            ),
+            is_programmatic_user ? null : (
+              user_datum.create({
+                owner_id: created_user_id,
+                entity: 'person',
+                attribute: 'person',
+                alias: 'person',
+                mime: 'application/ld+json',
+                encoding: 'utf8',
+                schema: 'schema.cnsnt.io/person',
+                value: JSON.stringify({
+                  '@context': ['http://schema.cnsnt.io/person'],
+                  firstName: nickname,
+                  lastName: null,
+                  title: null,
+                  nationality: null,
+                  birthPlace: null,
+                  birthDate: null,
+                  alias: nickname,
+                  avatar: null,
+                  identityPhotograph: null,
+                  maritalStatus: null,
+                  maritalContractType: null,
+                  preferredLanguage: null,
+                  createdDate: new Date,
+                  modifiedDate: null
+                }),
+              })
+            ),
             crypto_key.create({
               owner_id: created_user_id,
               algorithm: 'secp256k1',
@@ -392,13 +420,15 @@ module.exports = [
               alias: 'client-server-http',
               public_key: key_buffers[0]
             }),
-            using_fingerprint ? crypto_key.create({
-              owner_id: created_user_id,
-              algorithm: 'rsa',
-              purpose: 'verify',
-              alias: 'fingerprint',
-              public_key: fingerprint.public_key
-            }) : null
+            using_fingerprint ? (
+              crypto_key.create({
+                owner_id: created_user_id,
+                algorithm: 'rsa',
+                purpose: 'verify',
+                alias: 'fingerprint',
+                public_key: fingerprint.public_key
+              })
+            ) : null
           ])
         }
         return Promise.reject({
