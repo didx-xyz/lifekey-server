@@ -57,7 +57,9 @@ function service_init(name, onmessage, then) {
   if (typeof then === 'function') then()
 }
 
-// FIXME the boot order needs to be reversed here!!
+// FIXME
+// the boot order needs to be reversed here
+// otherwise messages from web will be dropped!!
 
 services.lifekey = cluster({
   workers: {
