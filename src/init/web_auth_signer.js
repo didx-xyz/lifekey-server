@@ -2,6 +2,8 @@
 'use strict'
 
 var url = require('url')
+var http = require('http')
+var https = require('https')
 
 var crypto = require('../crypto')
 
@@ -114,12 +116,6 @@ function process_message(msg) {
   }).then(function() {
     console.log('auth hook sent successfully to', return_addr.hostname)
   }).catch(function(err) {
-
-
-    // send PN?
-    // 
-
-
     console.log(errors(err))
   })
 }
