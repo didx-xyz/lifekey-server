@@ -107,7 +107,6 @@ function process_message(msg) {
 
 
         // retry?
-        // setImmediate(process_message.bind(process_message, msg))
 
 
         return reject(new Error('network transport error'))
