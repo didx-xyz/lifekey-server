@@ -57,6 +57,8 @@ function service_init(name, onmessage, then) {
   if (typeof then === 'function') then()
 }
 
+// FIXME the boot order needs to be reversed here!!
+
 services.lifekey = cluster({
   workers: {
     exec: 'src/init/worker.js',
@@ -76,19 +78,21 @@ services.lifekey = cluster({
         if (msg.ready) {
           worker_ready += 1
           if (worker_ready === worker_count) {
-            service_init.call(OUTER, 'did', function(msg) {
-              if (msg.notification_request) {
-                services.notifier.send(msg)
-              }
-            })
+            
             service_init.call(OUTER, 'notifier', function(msg) {})
             service_init.call(OUTER, 'sendgrid', function(msg) {})
+            service_init.call(OUTER, 'web_auth_signer', function(msg) {})
             service_init.call(OUTER, 'vc_generator', function(msg) {
               if (msg.notification_request) {
                 services.notifier.send(msg)
               }
             })
             service_init.call(OUTER, 'isa_ledger', function(msg) {
+              if (msg.notification_request) {
+                services.notifier.send(msg)
+              }
+            })
+            service_init.call(OUTER, 'did', function(msg) {
               if (msg.notification_request) {
                 services.notifier.send(msg)
               }
@@ -109,6 +113,9 @@ services.lifekey = cluster({
         }
         if (msg.isa_ledger_request) {
           services.isa_ledger.send(msg)
+        }
+        if (msg.web_auth_request) {
+          services.web_auth_signer.send(msg)
         }
       }
     }
