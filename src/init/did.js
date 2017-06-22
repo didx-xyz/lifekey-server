@@ -7,12 +7,14 @@ var eu = require('ethereumjs-util')
 
 var env = require('./env')()
 
-var registrants = {}, isw, user, crypto_key, user_datum
-
 var EIS_ADMIN_ADDRESS = `0x${eu.privateToAddress(Buffer.from(env.EIS_ADMIN_KEY, 'hex')).toString('hex')}`
 
+var registrants = {}
 var process_message_backlog = []
 var created_did_backlog = []
+
+// forward references to db and eth
+var isw, user, crypto_key, user_datum
 
 function process_message(msg) {
   if (!msg.did_allocation_request) return
