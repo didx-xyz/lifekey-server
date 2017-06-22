@@ -35,6 +35,11 @@ module.exports = function(instance, sqlize) {
       allowNull: true,
       unique: true
     },
+    web_auth_url: {
+      type: sqlize.STRING,
+      allowNull: true,
+      unique: true
+    },
     display_name: {
       type: sqlize.TEXT,
       allowNull: true,
