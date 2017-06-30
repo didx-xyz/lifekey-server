@@ -126,8 +126,8 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {did, uuid, sid} = req.body
-      if (!(did && uuid && sid)) {
+      var {did, challenge} = req.body
+      if (!(did && challenge)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -138,9 +138,14 @@ module.exports = [
       process.send({
         web_auth_request: {
           did: did,
-          challenge: uuid,
-          sid: sid
+          challenge: challenge
         }
+      })
+      return res.status(200).json({
+        error: false,
+        status: 200,
+        message: 'ok',
+        body: null
       })
     }
   }
