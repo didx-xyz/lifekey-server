@@ -53,7 +53,6 @@ before(function(done) {
         private_key: Buffer.from('foo'),
         public_key: Buffer.from('foo')
       })
-      return done()
     }
     return done(new Error('should not have been called'))
   }).then(function(created) {

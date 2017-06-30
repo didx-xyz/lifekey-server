@@ -126,16 +126,8 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-
-      var {
-        auth_callback,
-        nonce,
-        session_id
-      } = req.body
-
-      if (!(auth_callback &&
-            nonce &&
-            session_id)) {
+      var {did, challenge} = req.body
+      if (!(did && challenge)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -143,108 +135,17 @@ module.exports = [
           body: null
         })
       }
-
-      try {
-        var addr = url.parse(auth_callback)
-      } catch (e) {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'url not given for auth_callback',
-          body: null
-        })
-      }
-
-      if (!addr.hostname) {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'could not determine hostname from given url',
-          body: null
-        })
-      }
-
-      var {crypto_key} = this.get('models')
-      var errors = this.get('db_errors')
-
-      crypto_key.findOne({
-        where: {
-          owner_id: req.user.id,
-          alias: 'eis'
+      process.send({
+        web_auth_request: {
+          did: did,
+          challenge: challenge
         }
-      }).then(function(found) {
-        if (!found) {
-          return Promise.reject({
-            error: true,
-            status: 500,
-            message: 'user has no eis key',
-            body: null
-          })
-        }
-        return Promise.all([
-          crypto.asymmetric.sign(
-            'secp256k1',
-            found.private_key,
-            nonce
-          ),
-          crypto.asymmetric.get_public('secp256k1', found.private_key)
-        ])
-      }).then(function(res) {
-        var msg = JSON.stringify({
-          nonce: nonce,
-          session_id: session_id,
-          signature: res[0].toString('base64'),
-          public_key: res[1].toString('base64')
-        })
-        return Promise.resolve(Buffer.from(msg, 'utf8'))
-      }).then(function(msg) {
-        return new Promise(function(resolve, reject) {
-          (addr.protocol === 'http:' ? http : https).request({
-            method: 'post',
-            protocol: addr.protocol,
-            hostname: addr.hostname,
-            path: addr.path,
-            port: addr.port,
-            headers: {
-              'content-type': 'application/json',
-              'content-length': Buffer.byteLength(msg)
-            }
-          }).on('response', function(res) {
-            if (res.statusCode !== 200) {
-              return reject({
-                error: true,
-                status: 403,
-                message: 'remote service denied access',
-                body: null
-              })
-            }
-            return resolve()
-          }).on('error', function(err) {
-            return reject({
-              error: true,
-              status: 500,
-              message: 'network transport error',
-              body: null
-            })
-          }).end(msg)
-        })
-      }).then(function() {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: null
-        })
-      }).catch(function(err) {
-        err = errors(err)
-        return res.status(
-          err.status || 500
-        ).json({
-          error: err.error || true,
-          status: err.status || 500,
-          message: err.message || 'internal server error',
-          body: err.body || null
-        })
+      })
+      return res.status(200).json({
+        error: false,
+        status: 200,
+        message: 'ok',
+        body: null
       })
     }
   }

@@ -76,7 +76,6 @@ module.exports = {
           b_signature
         ).catch(function(err) {
           if (err.toString() === 'Error: couldn\'t parse DER signature') {
-            // console.log('hit')
             return Promise.reject({
               error: true,
               status: 400,

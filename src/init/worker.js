@@ -19,6 +19,14 @@ process.on('message', function(message) {
     })
   }
 
+  if (typeof message.web_auth_signer_service_ready === 'boolean') {
+    console.log('SLAVE updating web_auth_signer service availability to', (
+      message.web_auth_signer_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('web_auth_signer_service_ready', message.web_auth_signer_service_ready)
+  }
   if (typeof message.did_service_ready === 'boolean') {
     console.log('SLAVE updating DID service availability to', (
       message.did_service_ready ?
@@ -86,7 +94,12 @@ server.enable('trust proxy')
 if (!TESTING && env.NODE_ENV !== 'production') server.use(morgan('dev'))
 
 server.use(cors())
-server.use(bodyParser.json({ limit: '50mb' }))
+
+// HACK
+// binary data exchange mechanism needs to
+// be changed as this surely allocates
+// gigantic buffers
+server.use(bodyParser.json({limit: '50mb'}))
 
 require('./database')(
   false // disable logging
