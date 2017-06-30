@@ -18,7 +18,7 @@ function process_message(msg) {
     return
   }
 
-  var return_addr, {challenge, sid, did} = msg.web_auth_request
+  var return_addr, {challenge, did} = msg.web_auth_request
 
   user.findOne({
     where: {did: did}
@@ -62,17 +62,15 @@ function process_message(msg) {
 
       return Promise.reject(new Error('user has no eis key'))
     }
-    var plaintext = [challenge, sid].filter(x => !!x).join('')
     return Promise.all([
-      plaintext,
-      crypto.asymmetric.sign('secp256k1', found.private_key, plaintext),
+      challenge,
+      crypto.asymmetric.sign('secp256k1', found.private_key, Buffer.from(challenge, 'utf8')),
       crypto.asymmetric.get_public('secp256k1', found.private_key)
     ])
   }).then(function(res) {
     var [plaintext, signature, public_key] = res
     var msg = JSON.stringify({
       challenge: challenge,
-      socket_id: sid,
       plaintext: plaintext,
       signature: signature.toString('base64'),
       public_key: public_key.toString('base64')
