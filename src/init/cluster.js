@@ -71,6 +71,10 @@ services.lifekey = cluster({
       },
       message: function(msg) {
         // TODO it would be nice to allow the services (http workers included) to boot in any order
+
+        // TODO remove message type checks and proxy all messages to all services (services are responsible for ignoring messages that are not addressed to them)
+        // TODO measure message volume and ensure it will not bottleneck any services
+        
         if (msg.shutdown) {
           worker_shutdown_ready += 1
           if (worker_shutdown_ready === worker_count) {
@@ -83,7 +87,11 @@ services.lifekey = cluster({
             
             service_init.call(OUTER, 'notifier', function(msg) {})
             service_init.call(OUTER, 'sendgrid', function(msg) {})
-            service_init.call(OUTER, 'web_auth_signer', function(msg) {})
+            service_init.call(OUTER, 'web_auth_signer', function(msg) {
+              if (msg.notification_request) {
+                services.notifier.send(msg)
+              }
+            })
             service_init.call(OUTER, 'vc_generator', function(msg) {
               if (msg.notification_request) {
                 services.notifier.send(msg)
