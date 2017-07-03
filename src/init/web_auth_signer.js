@@ -18,28 +18,40 @@ function process_message(msg) {
     return
   }
 
-  var return_addr, {challenge, did} = msg.web_auth_request
+  var return_addr, {user_id, challenge, did} = msg.web_auth_request
 
   user.findOne({
     where: {did: did}
   }).then(function(found) {
     if (!found) {
-
-
-      // send PN?
-      // 
-
+      
+      process.send({
+        notification_request: {
+          user_id: user_id,
+          notification: {title: '', body: ''},
+          data: {
+            type: 'webauth_failure',
+            webauth_failure_type: 'user_not_found'
+          }
+        }
+      })
 
       return Promise.reject(
         new Error('user not found')
       )
     }
     if (!found.web_auth_url) {
-
-
-      // send PN?
-      // 
-
+      
+      process.send({
+        notification_request: {
+          user_id: user_id,
+          notification: {title: '', body: ''},
+          data: {
+            type: 'webauth_failure',
+            webauth_failure_type: 'user_has_no_webauth_address'
+          }
+        }
+      })
 
       return Promise.reject(
         new Error('user has no web_auth hook address')
@@ -55,10 +67,16 @@ function process_message(msg) {
   }).then(function(found) {
     if (!found) {
 
-
-      // send PN?
-      // 
-
+      process.send({
+        notification_request: {
+          user_id: user_id,
+          notification: {title: '', body: ''},
+          data: {
+            type: 'webauth_failure',
+            webauth_failure_type: 'user_has_no_crypto_key'
+          }
+        }
+      })
 
       return Promise.reject(new Error('user has no eis key'))
     }
@@ -94,9 +112,16 @@ function process_message(msg) {
         if (res.statusCode !== 200) {
 
 
-          // send PN to phone?
-          // 
-
+          process.send({
+            notification_request: {
+              user_id: user_id,
+              notification: {title: '', body: ''},
+              data: {
+                type: 'webauth_failure',
+                webauth_failure_type: 'remote_service_denied_access'
+              }
+            }
+          })
 
           return reject(new Error('remote service denied access'))
         }
@@ -104,8 +129,18 @@ function process_message(msg) {
       }).on('error', function(err) {
 
 
-        // retry?
-
+        // TODO retry?
+        
+        process.send({
+          notification_request: {
+            user_id: user_id,
+            notification: {title: '', body: ''},
+            data: {
+              type: 'webauth_failure',
+              webauth_failure_type: 'server_network_transport_error'
+            }
+          }
+        })
 
         return reject(new Error('network transport error'))
       }).end(msg)
