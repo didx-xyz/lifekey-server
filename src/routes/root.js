@@ -137,6 +137,7 @@ module.exports = [
       }
       process.send({
         web_auth_request: {
+          user_id: req.user.id,
           did: did,
           challenge: challenge
         }
