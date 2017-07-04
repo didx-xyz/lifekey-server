@@ -3,6 +3,8 @@
 
 // TODO query string parameters (limit,offset, etc)
 
+var sms = require('../messaging/clickatell')
+
 module.exports = [
   
   // 0 GET /resource
@@ -213,6 +215,15 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
+
+          if (schema.indexOf('schema.cnsnt.io/contact_mobile') !== -1) {
+            process.send({
+              sms_otp_request: {
+                user_id: req.user.id,
+                user_datum_id: created.id
+              }
+            })
+          }
           return res.status(201).json({
             error: false,
             status: 201,
