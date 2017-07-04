@@ -149,5 +149,63 @@ module.exports = [
         body: null
       })
     }
+  },
+
+  // 4 GET /sms-verify/:otp
+  {
+    uri: '/sms-verify/:otp',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {otp} = req.params
+      var {sms_verification} = this.get('models')
+      var errors = this.get('db_errors')
+
+      sms_verification.findOne({
+        where: {otp: otp}
+      }).then(function(found) {
+        if (found) {
+          process.send({
+            vc_generation_request: {
+              user_id: found.owner_id,
+              user_datum_id: found.user_datum_id,
+
+              // FIXME
+              // specifying a single field cannot scale
+              // for one, it doesnt support multiple fields
+              // and having to hardcode the field name
+              // lowers agility in changing schema fields
+              field: 'mobile'
+            }
+          })
+          return found.destroy()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'otp not found',
+          body: null
+        })
+      }).then(function() {
+        // TODO respond with html deeplink
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 ]
