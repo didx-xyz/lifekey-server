@@ -56,10 +56,95 @@ require('./database')(
   private_key = Buffer.from(env.EIS_ADMIN_KEY, 'hex')
 
   process.on('message', function(msg) {
-    var {user_id, field} = msg.vc_generation_request
-    var user
+    var {user_id, field, user_datum_id} = msg.vc_generation_request
+    var user, schema
+    
+    if (user_datum_id) {
+      return Promise.all([
+        models.user.findOne({
+          where: {
+            $or: [
+              {did: user_id},
+              {id: user_id}
+            ]
+          }
+        }),
+        models.user_datum.findOne({
+          where: {id: user_datum_id}
+        })
+      ]).then(function(res) {
+        var [found_user, found_user_datum] = res
+        if (!found_user) return Promise.reject('user not found')
+        if (!found_user_datum) return Promise.reject('user datum record not found')
+        user = found_user
+        schema = found_user_datum.schema
+        try {
+          var res = JSON.parse(found_user_datum.value)
+        } catch (e) {
+          return Promise.reject(e)
+        }
+        if (typeof res[field] === 'undefined' || res[field] === null) {
+          return Promise.reject('expected truthy value for resource field value')
+        }
+        var additional_fields = {}
+        additional_fields[field] = res[field]
+        return Promise.resolve(
+          generate({
+            context: found_user_datum.schema,
+            is_credential: true,
+            issued_for: user.did,
+            created_at: new Date,
+            additional_fields: additional_fields
+          })
+        )
+      }).then(function(instance) {
+        return Promise.all([
+          instance,
+          crypto.asymmetric.sign(
+            'secp256k1',
+            private_key,
+            JSON.stringify(instance.claim)
+          )
+        ])
+      }).then(function(res) {
+        var [instance, signature] = res
+        instance.signatureValue = signature.toString('base64')
+        return models.user_datum.create({
+          owner_id: user.id,
+          entity: 'verifiable-claim',
+          attribute: 'email',
+          alias: 'from-lifekey-server',
+          value: JSON.stringify(instance),
+          encoding: 'utf8',
+          mime: 'application/ld+json',
+          is_verifiable_claim: true,
+          schema: schema
+        })
+      }).then(function(created) {
+        if (!created) {
+          return Promise.reject(
+            new Error(
+              'unable to create resource record for user id ' +
+              user.id
+            )
+          )
+        }
+        process.send({
+          notification_request: {
+            user_id: user.id,
+            notification: {title: '', body: ''},
+            data: {
+              type: 'resource_pushed',
+              isa_id: null,
+              resource_ids: [created.id]
+            }
+          }
+        })
+      }).catch(console.log)
+    }
+
     if (field === 'email') {
-      var schema = 'http://schema.cnsnt.io/contact_email'
+      schema = 'http://schema.cnsnt.io/contact_email'
     } else {
       console.log('unknown field and schema type, exiting...')
       return
