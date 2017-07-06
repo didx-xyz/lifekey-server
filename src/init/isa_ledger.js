@@ -123,7 +123,7 @@ require('./database')(
         return reject()
       } else {
         // no error that we can identify
-        console.log('isa_ledger --- account balance', balance.toNumber())
+        // console.log('isa_ledger --- account balance', balance.toNumber())
         return resolve()
       }
     })
