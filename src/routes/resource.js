@@ -216,8 +216,7 @@ module.exports = [
       }).then(function(created) {
         if (created) {
 
-          // out of band vc generation for mobile phone
-          if (schema.indexOf('schema.cnsnt.io/contact_mobile') !== -1) {
+          if ((schema || '').indexOf('schema.cnsnt.io/contact_mobile') !== -1) {
             process.send({
               sms_otp_request: {
                 user_id: req.user.id,
