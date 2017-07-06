@@ -108,24 +108,6 @@ function process_message(msg) {
           'content-type': 'application/json',
           'content-length': Buffer.byteLength(msg)
         }
-      }).on('response', function(res) {
-        if (res.statusCode !== 200) {
-
-
-          process.send({
-            notification_request: {
-              user_id: user_id,
-              notification: {title: '', body: ''},
-              data: {
-                type: 'webauth_failure',
-                webauth_failure_type: 'remote_service_denied_access'
-              }
-            }
-          })
-
-          return reject(new Error('remote service denied access'))
-        }
-        return resolve()
       }).on('error', function(err) {
 
 
@@ -143,7 +125,7 @@ function process_message(msg) {
         })
 
         return reject(new Error('network transport error'))
-      }).end(msg)
+      }).on('response', resolve).end(msg)
     })
   }).then(function() {
     console.log('auth hook sent successfully to', return_addr.hostname)
