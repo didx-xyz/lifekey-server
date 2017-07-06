@@ -8,7 +8,7 @@ var mock = require('../mock/express')
 var routes = require('../../src/routes/resource')
 
 var resource_index = routes[0]
-var resource_get_one  = routes[1]
+var resource_get_one = routes[1]
 var resource_create = routes[2]
 var resource_update = routes[3]
 var resource_delete = routes[4]

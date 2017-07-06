@@ -87,6 +87,7 @@ services.lifekey = cluster({
             
             service_init.call(OUTER, 'notifier', function(msg) {})
             service_init.call(OUTER, 'sendgrid', function(msg) {})
+            service_init.call(OUTER, 'sms_otp', function(msg) {})
             service_init.call(OUTER, 'web_auth_signer', function(msg) {
               if (msg.notification_request) {
                 services.notifier.send(msg)
@@ -109,24 +110,13 @@ services.lifekey = cluster({
             })
           }
         }
-        if (msg.did_allocation_request) {
-          services.did.send(msg)
-        }
-        if (msg.notification_request) {
-          services.notifier.send(msg)
-        }
-        if (msg.send_email_request) {
-          services.sendgrid.send(msg)
-        }
-        if (msg.vc_generation_request) {
-          services.vc_generator.send(msg)
-        }
-        if (msg.isa_ledger_request) {
-          services.isa_ledger.send(msg)
-        }
-        if (msg.web_auth_request) {
-          services.web_auth_signer.send(msg)
-        }
+        if (msg.sms_otp_request) services.sms_otp.send(msg)
+        if (msg.did_allocation_request) services.did.send(msg)
+        if (msg.notification_request) services.notifier.send(msg)
+        if (msg.send_email_request) services.sendgrid.send(msg)
+        if (msg.vc_generation_request) services.vc_generator.send(msg)
+        if (msg.isa_ledger_request) services.isa_ledger.send(msg)
+        if (msg.web_auth_request) services.web_auth_signer.send(msg)
       }
     }
   }

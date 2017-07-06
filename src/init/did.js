@@ -64,18 +64,21 @@ function created_did(err, event) {
   if (err) {
     return console.log('did --- EIS created_did event error', err)
   }
-  if (!(crypto_key || user || user_datum)) {
+  if (!(crypto_key && user && user_datum)) {
     created_did_backlog.push(event)
     return
   }
   var {did, sender, owner, admin, ddo} = event.args
+
+  // is this significant?
   if (!(owner in registrants)) return
+  
+  var did_with_urn = `did:cnsnt:${did}`
   var user_id = registrants[owner]
-  delete registrants[owner]
-  var fixed_did_value = `did:cnsnt:${did}`
+  
   user.update({
     did_address: did,
-    did: fixed_did_value
+    did: did_with_urn
   }, {
     where: {id: user_id}
   }).then(function(updated) {
@@ -93,7 +96,7 @@ function created_did(err, event) {
       alias: 'DID',
       value: JSON.stringify({
         '@context': 'http://schema.cnsnt.io/decentralised_identifier',
-        decentralisedIdentifier: fixed_did_value,
+        decentralisedIdentifier: did_with_urn,
         createdDate: new Date,
         modifiedDate: new Date
       }),
@@ -103,6 +106,9 @@ function created_did(err, event) {
       encoding: 'utf8'
     })
   }).then(function(updated) {
+
+    delete registrants[owner]
+
     console.log('EIS ddo updated for user', user_id)
     console.log('EIS pending registrations', Object.keys(registrants).length, registrants)
     process.send({
@@ -112,7 +118,7 @@ function created_did(err, event) {
         data: {
           type: 'received_did',
           received_did: true,
-          did_value: fixed_did_value,
+          did_value: did_with_urn,
           did_address: did
         },
         notification: {
@@ -136,11 +142,9 @@ require('./database')(
   user = database.models.user
   crypto_key = database.models.crypto_key
   user_datum = database.models.user_datum
-  while (process_message_backlog.length) {
-    process_message(process_message_backlog.pop())
-  }
-  while (created_did_backlog.length) {
-    created_did(null, created_did_backlog.pop())
+  while (process_message_backlog.length || created_did_backlog.length) {
+    setImmediate(process_message, process_message_backlog.shift())
+    setImmediate(created_did, null, created_did_backlog.shift())
   }
   process.send({ready: true})
 }).catch(function(err) {

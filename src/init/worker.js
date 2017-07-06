@@ -19,6 +19,15 @@ process.on('message', function(message) {
     })
   }
 
+  if (typeof message.sms_otp_service_ready === 'boolean') {
+    console.log('SLAVE updating sms_otp service availability to', (
+      message.sms_otp_service_ready ?
+      '[AVAILABLE]' :
+      '[UNAVAILABLE]'
+    ))
+    server.set('sms_otp_service_ready', message.sms_otp_service_ready)
+  }
+
   if (typeof message.web_auth_signer_service_ready === 'boolean') {
     console.log('SLAVE updating web_auth_signer service availability to', (
       message.web_auth_signer_service_ready ?
