@@ -12,13 +12,13 @@ var send = url.parse(gateway)
 
 module.exports = function(to, content, sent) {
   var has_callback = typeof sent === 'function'
-  
+
   if (!(to &&
         typeof to === 'string' &&
         to.length === 10 &&
         content &&
         typeof content === 'string' &&
-        content.lenth <= 160)
+        content.length <= 160)
   ) {
     var args_error = new Error('missing required arguments')
     if (has_callback) return sent(args_error)
@@ -27,7 +27,7 @@ module.exports = function(to, content, sent) {
 
   var recipient = `27${to.slice(1)}`
   var message = content.split(' ').join('+')
-  
+
   https.request({
     protocol: send.protocol,
     hostname: send.hostname,
