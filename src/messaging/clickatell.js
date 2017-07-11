@@ -25,6 +25,7 @@ module.exports = function(to, content, sent) {
     throw args_error
   }
 
+  // FIXME i18n
   var recipient = `27${to.slice(1)}`
   var message = content.split(' ').join('+')
 
