@@ -20,7 +20,7 @@ var base64_resource
 var base64_resource_value
 
 describe('resource', function() {
-  
+
   var test_user
 
   before(function(done) {
@@ -50,7 +50,7 @@ describe('resource', function() {
 
   // 4 POST /resource
   describe(`${resource_create.method.toUpperCase()} ${resource_create.uri}`, function() {
-    
+
     it('should respond with an error if required arguments are missing', function(done) {
       resource_create.callback.call(mock.express, {
         body: {
@@ -120,6 +120,27 @@ describe('resource', function() {
         expect(res.message).to.equal('created')
         expect(!!res.body).to.equal(true)
         base64_resource = res.body.id
+        done()
+      }))
+    })
+
+    it('should send a message to sms_otp service if the created resource describes mobile contact information', function(done) {
+      resource_create.callback.call(mock.express, {
+        user: {id: test_user.id, did: test_user.did},
+        body: {
+          value: 'foo bar baz qux',
+          schema: 'http://schema.cnsnt.io/contact_mobile',
+          entity: 'foo 2',
+          attribute: 'bar 2',
+          alias: 'bazbaz 2'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
+        expect(!!res.body).to.equal(true)
+        var call_data = process.get_last_call_data()
+        expect(!!call_data.sms_otp_request).to.equal(true)
         done()
       }))
     })
@@ -211,7 +232,7 @@ describe('resource', function() {
         done()
       }))
     })
-    
+
     it('should update the specified record if it exists', function(done) {
       resource_update.callback.call(mock.express, {
         user: {id: test_user.id, did: test_user.did},
@@ -224,7 +245,7 @@ describe('resource', function() {
         done()
       }))
     })
-    
+
   })
 
   // 6 DELETE /resource/:resource_id
@@ -281,7 +302,7 @@ describe('resource', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
-        expect(res.body.length).to.equal(4)
+        expect(res.body.length).to.equal(5)
         done()
       }))
     })
@@ -294,7 +315,7 @@ describe('resource', function() {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
-        expect(res.body.length).to.equal(4)
+        expect(res.body.length).to.equal(5)
         done()
       }))
     })
@@ -325,7 +346,7 @@ describe('resource', function() {
         expect(res.body).to.equal(null)
         done()
       }))
-      
+
     })
     it('should allow the update of the colour field', function(done) {
       profile_colour_update.callback.call(mock.express, {
