@@ -278,7 +278,7 @@ describe('management endpoints', function() {
 
   this.timeout(10000) // these cases do real database calls
                       // increase the timeout to cover for this
-  
+
   var mgmt_register = routes[0]
   var mgmt_update_device = routes[1]
   var mgmt_cxn_req_create = routes[2]
@@ -324,7 +324,7 @@ describe('management endpoints', function() {
           return done(new Error('should not be called'))
         }
         test_users[1].id = res.body.id
-        
+
         mgmt_register.callback.call(mock.express, {
           body: test_users[2]
         }, mock.res(function(res) {
@@ -332,7 +332,7 @@ describe('management endpoints', function() {
             return done(new Error('should not be called'))
           }
           test_users[2].id = res.body.id
-          
+
           mgmt_register.callback.call(mock.express, {
             body: test_users[3]
           }, mock.res(function(res) {
@@ -340,7 +340,7 @@ describe('management endpoints', function() {
               return done(new Error('should not be called'))
             }
             test_users[3].id = res.body.id
-            
+
             var user = mock.express.get('models').user
             Promise.all([
               test_users[0].id,
@@ -355,9 +355,9 @@ describe('management endpoints', function() {
         }))
       }))
     })
-    
+
     describe('-- failure cases --', function() {
-      
+
       it('should fail if required parameters are missing', function(done) {
         mgmt_register.callback.call(mock.express, {
           body: {}
@@ -407,7 +407,7 @@ describe('management endpoints', function() {
           done()
         }))
       })
-      
+
       it('should fail if an attempting to create a user without an email address', function(done) {
         mgmt_register.callback.call(mock.express, {
           body: test_users_fail_cases[3]
@@ -424,7 +424,7 @@ describe('management endpoints', function() {
         }, mock.res(function(res) {
           expect(res.status).to.equal(400)
           expect(res.message).to.equal('expected string type for webhook_url')
-          
+
           mgmt_register.callback.call(mock.express, {
             body: test_users_fail_cases[5]
           }, mock.res(function(res) {
@@ -484,7 +484,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_update_device.method.toUpperCase()} ${mgmt_update_device.uri}`, function() {
-    
+
     it('should not allow the update of a hook record if required arguments are missing', function(done) {
       mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
@@ -534,7 +534,7 @@ describe('management endpoints', function() {
         enabled: true
       }).then(done.bind(done, null)).catch(done)
     })
-    
+
     it('should fail if required arguments are missing', function(done) {
       mgmt_cxn_req_create.callback.call(mock.express, {
         user: {did: test_users[0].id},
@@ -647,7 +647,6 @@ describe('management endpoints', function() {
         },
         body: {accepted: true}
       }, mock.res(function(res) {
-        
         // assert that the acceptance was successful
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('user_connection created')
@@ -655,14 +654,9 @@ describe('management endpoints', function() {
         expect(typeof res.body.id).to.equal('number')
 
         // ensure mock contains call data with actions url
-        var call_data = process.get_call_data().call_args
-        
+        var call_data = process.get_last_call_data()
         expect(
-          !!(
-            call_data[
-              Object.keys(call_data).length
-            ].notification_request.data.actions_url
-          )
+          !!call_data.notification_request.data.actions_url
         ).to.equal(true)
 
         update_uc = res.body.id
@@ -709,7 +703,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_app_activate.method.toUpperCase()} ${mgmt_app_activate.uri}`, function() {
-    
+
     var activation_code
     before(function(done) {
       mock.express.models.user.findOne({
@@ -727,10 +721,9 @@ describe('management endpoints', function() {
       mgmt_app_activate.callback.call(mock.express, {
         params: {activation_code: activation_code}
       }, mock.res(function(res) {
-        var cd = process.get_call_data()
-        var last_send = cd.call_args[cd.call_count]
-        expect('vc_generation_request' in last_send).to.equal(true)
-        expect(last_send.vc_generation_request.field).to.equal('email')
+        var call_data = process.get_last_call_data()
+        expect('vc_generation_request' in call_data).to.equal(true)
+        expect(call_data.vc_generation_request.field).to.equal('email')
         expect(typeof res).to.equal('string')
         done()
       }))
@@ -765,14 +758,14 @@ describe('management endpoints', function() {
         body: {target: test_users[1].id}
       }, mock.res(function(res) {
         if (res.status !== 201) return done(`should not have been called ${res.status}`)
-        
+
         mgmt_cxn_req_res.callback.call(mock.express, {
           params: {user_connection_request_id: res.body.id},
           user: {did: test_users[1].id},
           body: {accepted: true}
         }, mock.res(function(res) {
           if (res.status !== 201) return done(`should not have been called ${res.status}`)
-          
+
           done()
         }))
       }))
@@ -802,7 +795,7 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
         expect(res.message).to.equal('expected lengthy arrayish type for required_entities field')
-        
+
         mgmt_isa_req_create.callback.call(mock.express, {
           body: {
             to: 'bar',
@@ -871,7 +864,7 @@ describe('management endpoints', function() {
         expect(typeof res.body.id).to.equal('number')
 
         isar_respond1 = res.body.id
-        
+
         mgmt_isa_req_create.callback.call(mock.express, {
           body: {
             to: test_users[1].id,
@@ -918,7 +911,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_isa_req_res.method.toUpperCase()} ${mgmt_isa_req_res.uri}`, function() {
-    
+
     var requested1, requested2
     before(function(done) {
       mgmt_isa_list.callback.call(mock.express, {
@@ -926,7 +919,7 @@ describe('management endpoints', function() {
       }, mock.res(function(res) {
         if (res.error) return done(new Error('should not have been called'))
         requested1 = res.body.unacked[0].required_entities
-        
+
         mgmt_isa_list.callback.call(mock.express, {
           user: {did: test_users[1].id}
         }, mock.res(function(res) {
@@ -1017,9 +1010,8 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('created information_sharing_agreement record')
         created_isa_id = res.body.id
-        var cd = process.get_call_data()
-        var msg = cd.call_args[cd.call_count - 1].isa_ledger_request
-        expect(msg.isa_id).to.equal(created_isa_id)
+        var call_data = process.get_nth_call_data(-2)
+        expect(call_data.isa_ledger_request.isa_id).to.equal(created_isa_id)
         done()
       }))
     })
@@ -1028,7 +1020,7 @@ describe('management endpoints', function() {
   describe(`${mgmt_isa_get_one.method.toUpperCase()} ${mgmt_isa_get_one.uri}`, function() {
 
     it('should respond with an error if the isa record does not exist or does not belong to the calling agent', function(done) {
-      
+
       mgmt_isa_get_one.callback.call(mock.express, {
         params: {isa_id: created_isa_id},
         user: {did: test_users[0].id}
@@ -1103,7 +1095,7 @@ describe('management endpoints', function() {
           }
         }, mock.res(function(res) {
           expect(typeof res.body.id).to.equal('number')
-          
+
           created_isa = res.body.id
           done()
         }))
@@ -1119,7 +1111,7 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
         expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
-        
+
         mgmt_isa_update.callback.call(mock.express, {
           user: {did: test_users[3].id},
           params: {isa_id: 'foo'},
@@ -1186,13 +1178,13 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_isa_pull_from.method.toUpperCase()} ${mgmt_isa_pull_from.uri}`, function() {
-    
+
     var created_resource
     var expired_isa_2
     var expired_isa = created_isa_id
     var created_isa
     before(function(done) {
-      
+
       mgmt_isa_req_create.callback.call(mock.express, {
         user: {did: test_users[2].id},
         body: {
@@ -1229,9 +1221,9 @@ describe('management endpoints', function() {
             }
           }, mock.res(function(res) {
             expect(typeof res.body.id).to.equal('number')
-            
+
             created_isa = res.body.id
-            
+
             mgmt_isa_req_create.callback.call(mock.express, {
               user: {did: test_users[2].id},
               body: {
@@ -1254,7 +1246,7 @@ describe('management endpoints', function() {
                 }
               }, mock.res(function(res) {
                 expect(typeof res.body.id).to.equal('number')
-                
+
                 expired_isa_2 = res.body.id
                 mgmt_isa_delete.callback.call(mock.express, {
                   params: {isa_id: res.body.id},
@@ -1311,7 +1303,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_isa_push_to.method.toUpperCase()} ${mgmt_isa_push_to.uri}`, function() {
-    
+
     var expired_isa = created_isa_id
     var created_isa
     before(function(done) {
@@ -1337,7 +1329,7 @@ describe('management endpoints', function() {
           }
         }, mock.res(function(res) {
           expect(typeof res.body.id).to.equal('number')
-          
+
           created_isa = res.body.id
           done()
         }))
@@ -1353,7 +1345,7 @@ describe('management endpoints', function() {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
         expect(res.message).to.equal('missing required arguments')
-        
+
         mgmt_isa_push_to.callback.call(mock.express, {
           user: {did: test_users[1].id},
           params: {isa_id: Number.MAX_VALUE},
@@ -1421,7 +1413,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_key_create.method.toUpperCase()} ${mgmt_key_create.uri}`, function() {
-    
+
     var known_signature
 
     it('should fail if missing required arguments', function(done) {
@@ -1533,7 +1525,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_key_get.method.toUpperCase()} ${mgmt_key_get.uri}`, function() {
-    
+
     it('should respond with an error if the specified user has no key', function(done) {
       mgmt_key_get.callback.call(mock.express, {
         params: {user_did: Date.now()},
@@ -1764,16 +1756,16 @@ describe('management endpoints', function() {
       mgmt_action_get_all.callback.call(mock.express, {
         params: {user_did: test_users[4].id}
       }, mock.res(function(res) {
-        
+
         var action_name = res.body[0].name
-        
+
         mgmt_action_get_one.callback.call(mock.express, {
           params: {
             user_did: test_users[4].id,
             action_name: action_name
           }
         }, mock.res(function(res) {
-          
+
           mgmt_isa_by_action.callback.call(mock.express, {
             user: {did: test_users[0].id},
             params: {user_did: test_users[4].id, action_name: action_name},
@@ -1793,7 +1785,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_isa_receipt.method.toUpperCase()} ${mgmt_isa_receipt.uri}`, function() {
-    
+
     it('should respond with an error if the caller is not related to the isa record', function(done) {
       mgmt_isa_receipt.callback.call(mock.express, {
         user: {did: ''+test_users[2].id},
@@ -1806,7 +1798,7 @@ describe('management endpoints', function() {
         done()
       }))
     })
-    
+
     it('should respond with an error if the isa record does not exist', function(done) {
       mgmt_isa_receipt.callback.call(mock.express, {
         user: {did: ''+test_users[2].id},
@@ -1819,7 +1811,7 @@ describe('management endpoints', function() {
         done()
       }))
     })
-    
+
     it('should respond with a receipt object that has signatures attached', function(done) {
       mgmt_isa_receipt.callback.call(mock.express, {
         user: {did: ''+test_users[4].id},
@@ -1884,7 +1876,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_face_verify_get.method.toUpperCase()} ${mgmt_face_verify_get.uri}`, function() {
-    
+
     before(function(done) {
       mock.express.models.user_datum.create({
         owner_id: test_users[1].id,
@@ -1961,7 +1953,7 @@ describe('management endpoints', function() {
   })
 
   describe(`${mgmt_message.method.toUpperCase()} ${mgmt_message.uri}`, function() {
-    
+
     before(function(done) {
       mock.express.models.user_connection.create({
         from_did: test_users[3].id,
@@ -2010,11 +2002,10 @@ describe('management endpoints', function() {
           recipient: test_users[2].id
         }
       }, mock.res(function(res) {
-        var cd = process.get_call_data()
-        var msg = cd.call_args[cd.call_count].notification_request
+        var call_data = process.get_last_call_data()
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
-        expect(msg.data.type).to.equal('user_message_received')
+        expect(call_data.notification_request.data.type).to.equal('user_message_received')
         done()
       }))
     })
@@ -2031,9 +2022,8 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
         expect(res.body).to.equal(null)
-        var cd = process.get_call_data()
-        var last_send = cd.call_args[cd.call_count]
-        expect(last_send.notification_request.user_id).to.equal(test_users[2].id)
+        var call_data = process.get_last_call_data()
+        expect(call_data.notification_request.user_id).to.equal(test_users[2].id)
         done()
       }))
     })
