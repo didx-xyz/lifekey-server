@@ -6,24 +6,12 @@
 // TODO some of the procedures (like registration) are not atomic - if they fail at any point, the state of the database might be partially corrupt
 // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
-var send_is_undefined = !process.send
-if (send_is_undefined) {
-  var process_send_called = 0
-  var process_send_calls = {}
-  process.send = function(msg, on_send) {
-    process_send_called += 1
-    process_send_calls[process_send_called] = msg
-    if (typeof on_send === 'function') {
-      on_send()
-    }
-    return true
-  }
-  process.get_call_data = function() {
-    return {
-      call_count: process_send_called,
-      call_args: process_send_calls
-    }
-  }
+var TESTING = process.env._.indexOf('istanbul') >= 0
+
+if (TESTING) {
+  // running from inside test suite
+  // monkey-patch process so we can spy on its method calls
+  Object.assign(process, require('../../test/spies/process'))
 }
 
 var url = require('url')
@@ -42,11 +30,9 @@ var thanks_balance_check_available = false
 var w3, thanks
 
 ;(function() {
-  if (!send_is_undefined) {
-    
-    var THANKS_TOKEN_CONTRACT_ABI = [
-      { "constant": true, "inputs": [], "name": "name", "outputs": [ { "name": "", "type": "string", "value": "Thanks" } ], "payable": false, "type": "function" }, { "constant": false, "inputs": [ { "name": "_spender", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "approve", "outputs": [ { "name": "success", "type": "bool" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [], "name": "totalSupply", "outputs": [ { "name": "", "type": "uint256", "value": "1000000000" } ], "payable": false, "type": "function" }, { "constant": false, "inputs": [ { "name": "_from", "type": "address" }, { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transferFrom", "outputs": [ { "name": "success", "type": "bool" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [], "name": "decimals", "outputs": [ { "name": "", "type": "uint8", "value": "0" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [], "name": "standard", "outputs": [ { "name": "", "type": "string", "value": "Token 0.1" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [ { "name": "", "type": "address" } ], "name": "balanceOf", "outputs": [ { "name": "", "type": "uint256", "value": "0" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [], "name": "symbol", "outputs": [ { "name": "", "type": "string", "value": "TNX" } ], "payable": false, "type": "function" }, { "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [], "payable": false, "type": "function" }, { "constant": false, "inputs": [ { "name": "_spender", "type": "address" }, { "name": "_value", "type": "uint256" }, { "name": "_extraData", "type": "bytes" } ], "name": "approveAndCall", "outputs": [ { "name": "success", "type": "bool" } ], "payable": false, "type": "function" }, { "constant": true, "inputs": [ { "name": "", "type": "address" }, { "name": "", "type": "address" } ], "name": "allowance", "outputs": [ { "name": "", "type": "uint256", "value": "0" } ], "payable": false, "type": "function" }, { "inputs": [ { "name": "initialSupply", "type": "uint256", "index": 0, "typeShort": "uint", "bits": "256", "displayName": "initial Supply", "template": "elements_input_uint", "value": "1000000000" }, { "name": "tokenName", "type": "string", "index": 1, "typeShort": "string", "bits": "", "displayName": "token Name", "template": "elements_input_string", "value": "Thanks" }, { "name": "decimalUnits", "type": "uint8", "index": 2, "typeShort": "uint", "bits": "8", "displayName": "decimal Units", "template": "elements_input_uint", "value": "0" }, { "name": "tokenSymbol", "type": "string", "index": 3, "typeShort": "string", "bits": "", "displayName": "token Symbol", "template": "elements_input_string", "value": "TNX" } ], "payable": false, "type": "constructor" }, { "payable": false, "type": "fallback" }, { "anonymous": false, "inputs": [ { "indexed": true, "name": "from", "type": "address" }, { "indexed": true, "name": "to", "type": "address" }, { "indexed": false, "name": "value", "type": "uint256" } ], "name": "Transfer", "type": "event" }
-    ]
+  if (!TESTING) {
+
+    var THANKS_TOKEN_CONTRACT_ABI = require('../../etc/eth/abi/thanks.json')
 
     try {
       w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
@@ -73,7 +59,7 @@ var w3, thanks
 })()
 
 module.exports = [
-  
+
   // 0 POST /management/register
   {
     uri: '/management/register',
@@ -81,7 +67,7 @@ module.exports = [
     secure: false,
     active: false,
     callback: function(req, res) {
-      
+
       var {
         email,
         nickname,
@@ -96,15 +82,15 @@ module.exports = [
         signed_proof,
         fingerprint
       } = req.body
-      
+
       if (!~this.get('env')._.indexOf('istanbul')) {
         console.log(req.body)
       }
-      
+
       var using_fingerprint = false
       var is_programmatic_user, activation_code,
           created_user_id, key_buffers
-      
+
       // ensure all required args are present
       if (!(email &&
             nickname &&
@@ -196,7 +182,7 @@ module.exports = [
           }
         }
       }
-      
+
       if (!our_crypto.asymmetric.is_supported_algorithm(public_key_algorithm)) {
         return res.status(400).json({
           error: true,
@@ -208,7 +194,7 @@ module.exports = [
 
       // FIXME this'll throw if string not given
       var lower_algo = public_key_algorithm.toLowerCase()
-      
+
       if (typeof fingerprint === 'object' && fingerprint !== null) {
         if (!(fingerprint.public_key_algorithm && fingerprint.public_key &&
               fingerprint.plaintext_proof && fingerprint.signed_proof)) {
@@ -232,7 +218,7 @@ module.exports = [
       } = this.get('models')
 
       var errors = this.get('db_errors')
-      
+
       // first, make sure the given sig and
       // pubkey haven't been used before
       http_request_verification.findOne({
@@ -500,7 +486,7 @@ module.exports = [
       })
     }
   },
-  
+
   // 1 POST /management/device
   {
     uri: '/management/device',
@@ -572,7 +558,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       // send a connection request
       var {target} = req.body
       var {
@@ -583,7 +569,7 @@ module.exports = [
       } = this.get('models')
       var errors = this.get('db_errors')
       var ucr, target_user
-      
+
       if (!target) {
         return res.status(400).json({
           error: true,
@@ -604,7 +590,7 @@ module.exports = [
           body: null
         })
       }
-      
+
       // find any existing user_connection
       user_connection.findOne({
         where: {
@@ -635,7 +621,7 @@ module.exports = [
             body: null
           })
         }
-        
+
         // find any existing unresponded-to connection request
         return user_connection_request.findOne({
           where: {
@@ -732,7 +718,7 @@ module.exports = [
       })
     }
   },
-  
+
   // 3 GET /management/connection
   {
     uri: '/management/connection',
@@ -799,7 +785,7 @@ module.exports = [
       })
     }
   },
-  
+
   // 4 POST /management/connection/:user_connection_request_id
   {
     uri: '/management/connection/:user_connection_request_id',
@@ -895,7 +881,7 @@ module.exports = [
           var from_pnr_data = Object.assign({}, pnr_data)
           from_pnr_data.actions_url = req.user.actions_url
           from_pnr_data.other_user_did = ucr.to_did
-          
+
           process.send({
             notification_request: {
               user_id: ucr.to_did,
@@ -956,7 +942,7 @@ module.exports = [
       var {user, user_connection} = this.get('models')
       var errors = this.get('db_errors')
       var uc
-      
+
       user_connection.findOne({
         where: {
           id: user_connection_id,
@@ -1127,7 +1113,7 @@ module.exports = [
           body: null
         })
       }
-      
+
       if (!(Array.isArray(required_entities) && required_entities.length)) {
         return res.status(400).json({
           error: true,
@@ -1260,7 +1246,7 @@ module.exports = [
 
       var {isar_id} = req.params
       var {accepted, permitted_resources} = req.body
-      
+
       if (typeof accepted !== 'boolean') {
         return res.status(400).json({
           error: true,
@@ -1271,7 +1257,7 @@ module.exports = [
       }
 
       if (accepted &&
-          !(Array.isArray(permitted_resources) && 
+          !(Array.isArray(permitted_resources) &&
             permitted_resources.length)) {
         return res.status(400).json({
           error: true,
@@ -1424,13 +1410,13 @@ module.exports = [
         information_sharing_agreement
       } = this.get('models')
       var errors = this.get('db_errors')
-      
+
       var body = {
         unacked: [],
         enabled: [],
         disabled: []
       }
-      
+
       information_sharing_agreement_request.findAll({
         where: {
           acknowledged: null,
@@ -1715,7 +1701,7 @@ module.exports = [
           body: err.body || null
         })
       })
-      
+
     }
   },
 
@@ -1958,11 +1944,11 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       var {isa_id} = req.params
       var {resources} = req.body
       var other_user_id
-      
+
       if (!(Array.isArray(resources) && resources.length)) {
         return res.status(400).json({
           error: true,
@@ -1978,7 +1964,7 @@ module.exports = [
         user_datum
       } = this.get('models')
       var errors = this.get('db_errors')
-      
+
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
@@ -2615,7 +2601,7 @@ module.exports = [
 
       var errors = this.get('db_errors')
       var isar_id, isa_id, {entities, optional_entities} = req.body
-      
+
       if (!(Array.isArray(entities) && entities.length)) {
         return res.status(400).json({
           error: true,
@@ -2624,7 +2610,7 @@ module.exports = [
           body: null
         })
       }
-      
+
       user.findOne({
         where: {did: user_did}
       }).then(function(found) {
@@ -3474,7 +3460,7 @@ module.exports = [
   }
 
   // example
-  // 
+  //
   // N METHOD /:VERSION/:URI
   // {
   //   uri: '/:VERSION/:URI',
