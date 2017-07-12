@@ -3,10 +3,18 @@
 
 // TODO query string parameters (limit,offset, etc)
 
+var TESTING = process.env._.indexOf('istanbul') >= 0
+
+if (TESTING) {
+  // running from inside test suite
+  // monkey-patch process so we can spy on its method calls
+  Object.assign(process, require('../../test/spies/process'))
+}
+
 var sms = require('../messaging/clickatell')
 
 module.exports = [
-  
+
   // 0 GET /resource
   {
     uri: '/resource',
@@ -75,7 +83,7 @@ module.exports = [
           })
         }
       }
-      
+
       dispatch().catch(function(err) {
         err = errors(err)
         return res.status(
@@ -97,7 +105,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
       var errors = this.get('db_errors')
@@ -151,7 +159,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       var {
         entity, attribute, alias,
         encoding, mime, value, uri,
@@ -224,7 +232,7 @@ module.exports = [
               }
             })
           }
-          
+
           return res.status(201).json({
             error: false,
             status: 201,
@@ -259,7 +267,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       var {resource_id} = req.params
       var {user_datum} = this.get('models')
       var errors = this.get('db_errors')
@@ -271,7 +279,7 @@ module.exports = [
         is_verifiable_claim,
         is_archived
       } = req.body
-      
+
       var updatefields = {}
       if (typeof entity !== 'undefined') updatefields.entity = entity
       if (typeof attribute !== 'undefined') updatefields.attribute = attribute
@@ -284,7 +292,7 @@ module.exports = [
       if (typeof is_default !== 'undefined') updatefields.is_default = is_default
       if (typeof is_verifiable_claim !== 'undefined') updatefields.is_verifiable_claim = is_verifiable_claim
       if (typeof is_archived !== 'undefined') updatefields.is_archived = is_archived
-      
+
       return user_datum.update(updatefields, {
         where: {
           owner_id: req.user.id,
@@ -671,7 +679,7 @@ module.exports = [
         profileColour,
         contactEmail
       } = req.body
-      
+
       if (!(typeof contactAddress === 'string' &&
             typeof contactTelephone === 'string' &&
             typeof contactEmail === 'string' &&
