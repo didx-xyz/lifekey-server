@@ -48,10 +48,11 @@ function process_message(msg) {
       )
     }
     try {
-      return Promise.resolve(JSON.parse(found.value).mobile)
+      var resource = JSON.parse(found.value)
     } catch (e) {
       return Promise.reject(e)
     }
+    return resource.mobile || resource.telephone || null
   }).then(function(recipient) {
     var otp = cuid()
     return Promise.all([
