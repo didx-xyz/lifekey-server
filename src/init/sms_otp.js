@@ -56,7 +56,7 @@ function process_message(msg) {
     var otp = cuid()
     return Promise.all([
       sms_verification.create({
-        owner_id: owner_id,
+        owner_id: user_id,
         user_datum_id: user_datum_id,
         otp: otp
       }),
@@ -64,7 +64,7 @@ function process_message(msg) {
     ])
   }).then(function(res) {
     var [created] = res
-    // DONE
+    console.log('otp sms in flight for user', user_id)
   }).catch(function(err) {
     console.log('sms_otp service error', err)
   })
