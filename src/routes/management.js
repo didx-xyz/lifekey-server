@@ -351,7 +351,7 @@ module.exports = [
                 owner_id: created_user_id,
                 entity: 'me',
                 attribute: 'email',
-                alias: 'consent-account',
+                alias: 'My Email',
                 value: JSON.stringify({
                   '@context': 'http://schema.cnsnt.io/contact_email',
                   email: email,
@@ -369,7 +369,7 @@ module.exports = [
                 owner_id: created_user_id,
                 entity: 'person',
                 attribute: 'person',
-                alias: 'person',
+                alias: 'My person profile',
                 mime: 'application/ld+json',
                 encoding: 'utf8',
                 schema: 'schema.cnsnt.io/person',
