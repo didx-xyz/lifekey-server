@@ -680,6 +680,8 @@ module.exports = [
         contactEmail
       } = req.body
 
+      console.log('profile image', profileImageUri.length, profileImageUri.slice(0, 60))
+
       if (!(typeof contactAddress === 'string' &&
             typeof contactTelephone === 'string' &&
             typeof contactEmail === 'string' &&
