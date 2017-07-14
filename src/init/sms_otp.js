@@ -17,6 +17,7 @@ function otp_message(otp) {
 function process_message(msg) {
   if (!(sms_verification && user_datum && errors)) {
     process_message_backlog.push(msg)
+    return
   }
 
   if (!msg.sms_otp_request) return
