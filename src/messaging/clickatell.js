@@ -36,8 +36,8 @@ module.exports = function(to, content, sent) {
     path: `${send.pathname}?apiKey=${env.CLICKATELL_API_KEY}&to=${recipient}&content=${message}`,
     method: 'get'
   }).on('response', function(res) {
-    if ([200, 202].indexOf(res.statusCode) >= 0) {
-      console.log('message accepted by clickatell gateway')
+    if (res.statusCode >= 100 && res.statusCode < 400) {
+      console.log('message accepted by clickatell gateway with', res.statusCode)
       if (has_callback) return sent()
       return
     }
