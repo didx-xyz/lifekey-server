@@ -74,7 +74,6 @@ var http_cluster = cluster({
         console.log(`SLAVE#${this.id} error`, err)
       },
       message: function(msg) {
-        // TODO remove message type checks and proxy all messages to all services (services are responsible for ignoring messages that are not addressed to them)
         // TODO measure message volume and ensure it will not bottleneck any services
 
         if (msg.shutdown) {
