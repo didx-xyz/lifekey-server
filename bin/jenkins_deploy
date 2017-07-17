@@ -17,8 +17,7 @@ fi
 DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
 # build dependencies here
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+. /root/.nvm/nvm.sh
 nvm use || nvm install
 npm install --production
 
