@@ -17,12 +17,12 @@ fi
 DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
 # build dependencies here
-eval "$(ssh-agent -s)"
-echo $(whoami)
-ssh-add -k /root/.ssh/temp_deploy
-. /root/.nvm/nvm.sh
-nvm use || nvm install
-npm install
+# eval "$(ssh-agent -s)"
+# echo $(whoami)
+# ssh-add -k /root/.ssh/temp_deploy
+# . /root/.nvm/nvm.sh
+# nvm use || nvm install
+# npm install
 
 # stop the sevice and remove current source code
 ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
