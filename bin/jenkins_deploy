@@ -18,7 +18,6 @@ DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
 # build dependencies here
 eval "$(ssh-agent -s)"
-# echo $(whoami)
 ssh-add -k /root/.ssh/ant_deploy
 . /root/.nvm/nvm.sh
 nvm use || nvm install
