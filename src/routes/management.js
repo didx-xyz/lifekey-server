@@ -3428,6 +3428,7 @@ module.exports = [
             did: found.did
           }
           console.log('qr-2', 5)
+          res.on('error', console.log)
           return qr.toFileStream(
             res,
             JSON.stringify(profile),
