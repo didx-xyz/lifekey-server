@@ -21,6 +21,7 @@ eval "$(ssh-agent -s)"
 ssh-add -k /root/.ssh/ant_deploy
 . /root/.nvm/nvm.sh
 nvm use || nvm install
+rm -rf node_modules
 npm install || echo "npm install failed"
 
 # stop the sevice and remove current source code
