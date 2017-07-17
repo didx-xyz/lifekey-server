@@ -3431,7 +3431,6 @@ module.exports = [
           return qr.toFileStream(
             res,
             JSON.stringify(profile),
-            // `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
             function(err) {
               console.log('qr-2', 6)
               if (err) {
