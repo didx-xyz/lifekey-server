@@ -9,27 +9,21 @@ var cluster = require('fluster')
 
 var env = require('./env')()
 
-// keep a reference to the outermost context
-// to avoid typeerrors when respawning the service
 var OUTER = this
-
-var worker_shutdown_ready = 0
 
 process.on('SIGUSR2', function() {
   cluster_send({shutdown: true})
 })
 
-// we can only initialiase the DID service
-// once everyone's accounted for
-var worker_count = os.cpus().length, worker_ready = 0
+var worker_count = os.cpus().length, worker_shutdown_ready = 0
 
 var services = {}
 
 function cluster_send(msg) {
   Object.keys(
-    services.lifekey.cluster.workers
+    http_cluster.cluster.workers
   ).forEach(function(id) {
-    services.lifekey.cluster.workers[id].send(msg)
+    http_cluster.cluster.workers[id].send(msg)
   })
 }
 
@@ -43,25 +37,35 @@ function service_init(name, onmessage, then) {
     var msg = {}
     msg[`${name}_service_ready`] = false
     cluster_send(msg)
-    service_init.apply(OUTER, [name, onmessage, then])
+    service_init.call(OUTER, name, onmessage, then)
   }).on('message', function(msg) {
     if (msg.ready) {
       msg = {}
       msg[`${name}_service_ready`] = true
       cluster_send(msg)
-    } else {
-      // nothin' doing...
     }
   })
   if (onmessage) services[name].on('message', onmessage)
   if (typeof then === 'function') then()
 }
 
-// FIXME
-// the boot order needs to be reversed here
-// otherwise messages from web will be dropped!!
+function services_send(msg) {
+  Object.keys(
+    services
+  ).forEach(function(name) {
+    services[name].send(msg)
+  })
+}
 
-services.lifekey = cluster({
+service_init.call(OUTER, 'notifier', services_send)
+service_init.call(OUTER, 'sendgrid', services_send)
+service_init.call(OUTER, 'sms_otp', services_send)
+service_init.call(OUTER, 'web_auth_signer', services_send)
+service_init.call(OUTER, 'vc_generator', services_send)
+service_init.call(OUTER, 'isa_ledger', services_send)
+service_init.call(OUTER, 'did', services_send)
+
+var http_cluster = cluster({
   workers: {
     exec: 'src/init/worker.js',
     respawn: true,
@@ -70,53 +74,17 @@ services.lifekey = cluster({
         console.log(`SLAVE#${this.id} error`, err)
       },
       message: function(msg) {
-        // TODO it would be nice to allow the services (http workers included) to boot in any order
-
-        // TODO remove message type checks and proxy all messages to all services (services are responsible for ignoring messages that are not addressed to them)
         // TODO measure message volume and ensure it will not bottleneck any services
-        
+
         if (msg.shutdown) {
           worker_shutdown_ready += 1
           if (worker_shutdown_ready === worker_count) {
             process.exit(0)
           }
+          return
         }
-        if (msg.ready) {
-          worker_ready += 1
-          if (worker_ready === worker_count) {
-            
-            service_init.call(OUTER, 'notifier', function(msg) {})
-            service_init.call(OUTER, 'sendgrid', function(msg) {})
-            service_init.call(OUTER, 'sms_otp', function(msg) {})
-            service_init.call(OUTER, 'web_auth_signer', function(msg) {
-              if (msg.notification_request) {
-                services.notifier.send(msg)
-              }
-            })
-            service_init.call(OUTER, 'vc_generator', function(msg) {
-              if (msg.notification_request) {
-                services.notifier.send(msg)
-              }
-            })
-            service_init.call(OUTER, 'isa_ledger', function(msg) {
-              if (msg.notification_request) {
-                services.notifier.send(msg)
-              }
-            })
-            service_init.call(OUTER, 'did', function(msg) {
-              if (msg.notification_request) {
-                services.notifier.send(msg)
-              }
-            })
-          }
-        }
-        if (msg.sms_otp_request) services.sms_otp.send(msg)
-        if (msg.did_allocation_request) services.did.send(msg)
-        if (msg.notification_request) services.notifier.send(msg)
-        if (msg.send_email_request) services.sendgrid.send(msg)
-        if (msg.vc_generation_request) services.vc_generator.send(msg)
-        if (msg.isa_ledger_request) services.isa_ledger.send(msg)
-        if (msg.web_auth_request) services.web_auth_signer.send(msg)
+
+        services_send(msg)
       }
     }
   }

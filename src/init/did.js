@@ -18,12 +18,14 @@ var isw, user, crypto_key, user_datum
 
 function process_message(msg) {
   if (!msg.did_allocation_request) return
-  var {user_id} = msg.did_allocation_request
+
   if (!(crypto_key || user || user_datum)) {
     process_message_backlog.push(msg)
     return
   }
-  
+
+  var {user_id} = msg.did_allocation_request
+
   crypto_key.findOne({
     where: {
       owner_id: user_id,
@@ -42,7 +44,7 @@ function process_message(msg) {
 
     // generate a did value
     var did_value = crypto.rng(32).toString('hex')
-    
+
     // create the did contract with initial ddo
     isw.spawn(
       EIS_ADMIN_ADDRESS,
@@ -56,7 +58,7 @@ function process_message(msg) {
         registrants[user_address] = user_id
       }
     )
-    
+
   }).catch(console.log)
 }
 
@@ -72,10 +74,10 @@ function created_did(err, event) {
 
   // is this significant?
   if (!(owner in registrants)) return
-  
+
   var did_with_urn = `did:cnsnt:${did}`
   var user_id = registrants[owner]
-  
+
   user.update({
     did_address: did,
     did: did_with_urn

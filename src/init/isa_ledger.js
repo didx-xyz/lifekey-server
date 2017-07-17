@@ -144,8 +144,10 @@ require('./database')(
   // register service message handler
   process.on('message', function(msg) {
 
+    if (!msg.isa_ledger_request) return
+
     var {isa_id} = msg.isa_ledger_request
-    
+
     if (isa_id in all_time) {
       return console.log(
         'isa_ledger --- skipping receipt ledgering for',
@@ -162,10 +164,10 @@ require('./database')(
       params: {isa_id: isa_id}
     }, mock.res(function(res) {
       if (res.error) {
-        
+
         // UNLOCK
         delete all_time[isa_id]
-        
+
         return console.log(
           'isa_ledger --- error calling GET /management/receipt/:isa_id',
           res
@@ -203,10 +205,10 @@ require('./database')(
           })
           transaction.sign(private_key)
         } catch (e) {
-          
+
           // UNLOCK
           delete all_time[isa_id]
-          
+
           return console.log(
             'isa_ledger --- error generating or signing raw transaction for isa',
             isa_id,
@@ -219,10 +221,10 @@ require('./database')(
             `0x${transaction.serialize().toString('hex')}`,
             function(err, txhash) {
               if (err) {
-                
+
                 // UNLOCK
                 delete all_time[isa_id]
-                
+
                 return console.log('isa_ledger --- error sending txn for', isa_id, err)
               }
               receipts[txhash] = {
@@ -236,10 +238,10 @@ require('./database')(
             }
           )
         } catch (e) {
-          
+
           // UNLOCK
           delete all_time[isa_id]
-          
+
           return console.log(
             'isa_ledger --- error serialising transaction for raw send for isa',
             isa_id,

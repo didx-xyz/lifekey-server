@@ -56,9 +56,11 @@ require('./database')(
   private_key = Buffer.from(env.EIS_ADMIN_KEY, 'hex')
 
   process.on('message', function(msg) {
+    if (!msg.vc_generation_request) return
     var {user_id, field, user_datum_id} = msg.vc_generation_request
     var user, schema
-    
+
+    // generic vc generation
     if (user_datum_id) {
       return Promise.all([
         models.user.findOne({
@@ -149,7 +151,7 @@ require('./database')(
       console.log('unknown field and schema type, exiting...')
       return
     }
-    
+
     models.user.findOne({
       where: {
         $or: [

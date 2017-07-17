@@ -17,7 +17,7 @@ module.exports = {
     return process_send_call_data[
       nth < 0 ?
       process_send_call_data.length + nth :
-      nth
+      nth - 1
     ]
   }
 }

@@ -22,13 +22,7 @@ require('./database')(
   models = database.models
 
   process.on('message', function(msg) {
-    if (!msg.notification_request) {
-      return console.log(
-        'ERROR',
-        'received a message with an unknown type',
-        Object.keys(msg)
-      )
-    }
+    if (!msg.notification_request) return
     var {user_id, notification, data} = msg.notification_request
     models.user.findOne({
       where: (
@@ -79,7 +73,7 @@ require('./database')(
 
 var retryTimer = setInterval(function() {
   // TODO fcm retries
-  
+
   Promise.all(
     failures.webhook.map(function(hook) {
       return webhook(
