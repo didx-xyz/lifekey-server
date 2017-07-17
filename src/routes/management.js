@@ -3400,9 +3400,11 @@ module.exports = [
     secure: false,
     active: false,
     callback: function(req, res) {
+      console.log('qr-2', 1)
       var {user_id} = req.params
       var {user} = this.get('models')
       var errors = this.get('db_errors')
+      console.log('qr-2', 2)
       user.findOne({
         where: {
           $or: [
@@ -3411,7 +3413,9 @@ module.exports = [
           ]
         }
       }).then(function(found) {
+        console.log('qr-2', 3)
         if (found) {
+          console.log('qr-2', 4)
           var {SERVER_HOSTNAME} = this.get('env')
           var profile = {
             colour: found.branding_colour_code,
@@ -3423,12 +3427,15 @@ module.exports = [
             email: found.contact_email,
             did: found.did
           }
+          console.log('qr-2', 5)
           return qr.toFileStream(
             res,
             `${JSON.stringify(profile)}`,
             // `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
             function(err) {
+              console.log('qr-2', 6)
               if (err) {
+                console.log('qr-2', 7, err)
                 throw {
                   error: true,
                   status: 500,
@@ -3439,6 +3446,7 @@ module.exports = [
             }
           )
         }
+        console.log('qr-2', 8)
         return Promise.reject({
           error: true,
           status: 404,
@@ -3446,7 +3454,9 @@ module.exports = [
           body: null
         })
       }.bind(this)).catch(function(err) {
+        console.log('qr-2', 9)
         err = errors(err)
+        console.log('qr-2', 10, err)
         return res.status(
           err.status || 500
         ).json({
