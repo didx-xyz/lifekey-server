@@ -18,6 +18,7 @@ DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 
 # build dependencies here
 eval "$(ssh-agent -s)"
+echo $(whoami)
 ssh-add -k /root/.ssh/temp_deploy
 . /root/.nvm/nvm.sh
 nvm use || nvm install
