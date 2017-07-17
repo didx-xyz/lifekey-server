@@ -3400,11 +3400,11 @@ module.exports = [
     secure: false,
     active: false,
     callback: function(req, res) {
-      console.log('qr-2', 1)
+      // console.log('qr-2', 1)
       var {user_id} = req.params
       var {user} = this.get('models')
       var errors = this.get('db_errors')
-      console.log('qr-2', 2)
+      // console.log('qr-2', 2)
       user.findOne({
         where: {
           $or: [
@@ -3413,10 +3413,10 @@ module.exports = [
           ]
         }
       }).then(function(found) {
-        console.log('qr-2', 3)
+        // console.log('qr-2', 3)
         if (found) {
-          console.log('qr-2', 4)
-          var {SERVER_HOSTNAME} = this.get('env')
+          // console.log('qr-2', 4)
+          // var {SERVER_HOSTNAME} = this.get('env')
           var profile = {
             colour: found.branding_colour_code,
             image_uri: found.branding_image_uri,
@@ -3427,36 +3427,62 @@ module.exports = [
             email: found.contact_email,
             did: found.did
           }
-          console.log('qr-2', 5)
-          res.on('error', console.log)
-          return qr.toFileStream(
-            res,
-            JSON.stringify(profile),
-            function(err) {
-              console.log('qr-2', 6)
-              if (err) {
-                console.log('qr-2', 7, err)
-                throw {
-                  error: true,
-                  status: 500,
-                  message: 'qr code generation error',
-                  body: null
+          // console.log('qr-2', 5)
+          // res.on('error', console.log)
+          // return qr.toFileStream(
+          //   res,
+          //   JSON.stringify(profile),
+          //   function(err) {
+          //     console.log('qr-2', 6)
+          //     if (err) {
+          //       console.log('qr-2', 7, err)
+          //       throw {
+          //         error: true,
+          //         status: 500,
+          //         message: 'qr code generation error',
+          //         body: null
+          //       }
+          //     }
+          //   }
+          // )
+          try {
+            qr.toFileStream(
+              res,
+              JSON.stringify(profile),
+              function(err) {
+                console.log('qr-2', 6)
+                if (err) {
+                  console.log('qr-2', 7, err)
+                  throw {
+                    error: true,
+                    status: 500,
+                    message: 'qr code generation error',
+                    body: null
+                  }
                 }
               }
-            }
-          )
+            )
+          } catch (err) {
+            console.log(err)
+            return Promise.reject({
+              error: true,
+              status: 500,
+              message: 'internal server error',
+              body: null
+            })
+          }
         }
-        console.log('qr-2', 8)
+        // console.log('qr-2', 8)
         return Promise.reject({
           error: true,
           status: 404,
           message: 'user record not found',
           body: null
         })
-      }.bind(this)).catch(function(err) {
-        console.log('qr-2', 9)
+      }).catch(function(err) {
+        // console.log('qr-2', 9)
         err = errors(err)
-        console.log('qr-2', 10, err)
+        // console.log('qr-2', 10, err)
         return res.status(
           err.status || 500
         ).json({
