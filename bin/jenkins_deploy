@@ -19,7 +19,7 @@ DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
 # build dependencies here
 eval "$(ssh-agent -s)"
 ssh-add -k /root/.ssh/temp_deploy
-source /root/.nvm/nvm.sh
+. /root/.nvm/nvm.sh
 nvm use || nvm install
 npm install
 
