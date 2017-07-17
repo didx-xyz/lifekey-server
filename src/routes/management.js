@@ -3424,7 +3424,7 @@ module.exports = [
             res,
             JSON.stringify({
               colour: found.branding_colour_code,
-              image_uri: found.branding_image_uri,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
               actions_url: found.actions_url,
               display_name: found.display_name,
               address: found.contact_address,
