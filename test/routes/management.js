@@ -12,6 +12,7 @@ var mock = require('../mock/express')
 
 // the test subject
 var routes = require('../../src/routes/management')
+var register_route = require('../../src/routes/register')
 
 // user record fixtures
 var now = Date.now()
@@ -279,39 +280,39 @@ describe('management endpoints', function() {
   this.timeout(10000) // these cases do real database calls
                       // increase the timeout to cover for this
 
-  var mgmt_register = routes[0]
-  var mgmt_update_device = routes[1]
-  var mgmt_cxn_req_create = routes[2]
-  var mgmt_connection_list = routes[3]
-  var mgmt_cxn_req_res = routes[4]
-  var mgmt_cxn_delete = routes[5]
-  var mgmt_app_activate = routes[6]
-  var mgmt_isa_req_create = routes[7]
-  var mgmt_isa_req_res = routes[8]
-  var mgmt_isa_list = routes[9]
-  var mgmt_isa_get_one = routes[10]
-  var mgmt_isa_delete = routes[11]
+  var mgmt_register = register_route
+  var mgmt_update_device = routes[0]
+  var mgmt_cxn_req_create = routes[1]
+  var mgmt_connection_list = routes[2]
+  var mgmt_cxn_req_res = routes[3]
+  var mgmt_cxn_delete = routes[4]
+  var mgmt_app_activate = routes[5]
+  var mgmt_isa_req_create = routes[6]
+  var mgmt_isa_req_res = routes[7]
+  var mgmt_isa_list = routes[8]
+  var mgmt_isa_get_one = routes[9]
+  var mgmt_isa_delete = routes[10]
   var resource_create = require('../../src/routes/resource')[2]
-  var mgmt_isa_update = routes[13]
-  var mgmt_isa_pull_from = routes[14]
-  var mgmt_isa_push_to = routes[15]
-  var mgmt_thanks_balance_get = routes[16]
-  var mgmt_key_create = routes[17]
-  var mgmt_key_get = routes[18]
-  var mgmt_action_create = routes[19]
-  var mgmt_action_user_get_all = routes[28]
-  var mgmt_action_get_all = routes[20]
-  var mgmt_action_get_one = routes[21]
-  var mgmt_isa_by_action = routes[22]
-  var mgmt_isa_receipt = routes[23]
-  var mgmt_action_delete = routes[24]
-  var mgmt_face_verify_create = routes[25]
-  var mgmt_face_verify_get = routes[26]
-  var mgmt_face_verify_respond = routes[27]
+  var mgmt_isa_update = routes[12]
+  var mgmt_isa_pull_from = routes[13]
+  var mgmt_isa_push_to = routes[14]
+  var mgmt_thanks_balance_get = routes[15]
+  var mgmt_key_create = routes[16]
+  var mgmt_key_get = routes[17]
+  var mgmt_action_create = routes[18]
+  var mgmt_action_user_get_all = routes[27]
+  var mgmt_action_get_all = routes[19]
+  var mgmt_action_get_one = routes[20]
+  var mgmt_isa_by_action = routes[21]
+  var mgmt_isa_receipt = routes[22]
+  var mgmt_action_delete = routes[23]
+  var mgmt_face_verify_create = routes[24]
+  var mgmt_face_verify_get = routes[25]
+  var mgmt_face_verify_respond = routes[26]
 
-  var mgmt_send_thanks = routes[29]
+  var mgmt_send_thanks = routes[28]
 
-  var mgmt_message = routes[30]
+  var mgmt_message = routes[29]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
