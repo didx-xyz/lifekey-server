@@ -2,12 +2,9 @@
 var url = require('url')
 var crypto = require('crypto')
 
-var web3 = require('web3')
-var qr = require('qrcode')
 var cuid = require('cuid')
 
 var env = require('../init/env')()
-
 var our_crypto = require('../crypto')
 
 var TESTING = process.env._.indexOf('istanbul') >= 0
@@ -17,6 +14,8 @@ if (TESTING) {
   // monkey-patch process so we can spy on its method calls
   Object.assign(process, require('../../test/spies/process'))
 }
+
+// FIXME blocking crypto.rng
 
 module.exports = {
   uri: '/management/register',
