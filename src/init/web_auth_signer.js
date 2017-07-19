@@ -90,7 +90,7 @@ function process_message(msg) {
     var msg = JSON.stringify({
       challenge: challenge,
       plaintext: plaintext,
-      signature: signature.toString('base64'),
+      signed_challenge: signature.toString('base64'),
       public_key: public_key.toString('base64')
     })
     return Promise.resolve(Buffer.from(msg, 'utf8'))
