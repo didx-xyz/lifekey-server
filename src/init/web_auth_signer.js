@@ -24,7 +24,7 @@ function process_message(msg) {
     where: {did: did}
   }).then(function(found) {
     if (!found) {
-      
+
       process.send({
         notification_request: {
           user_id: user_id,
@@ -41,7 +41,7 @@ function process_message(msg) {
       )
     }
     if (!found.web_auth_url) {
-      
+
       process.send({
         notification_request: {
           user_id: user_id,
@@ -60,7 +60,7 @@ function process_message(msg) {
     return_addr = url.parse(found.web_auth_url)
     return crypto_key.findOne({
       where: {
-        owner_id: found.id,
+        owner_id: user_id,
         alias: 'eis'
       }
     })
@@ -112,7 +112,7 @@ function process_message(msg) {
 
 
         // TODO retry?
-        
+
         process.send({
           notification_request: {
             user_id: user_id,

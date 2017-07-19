@@ -7,7 +7,7 @@ var url = require('url')
 var ec = require('eccrypto')
 
 module.exports = [
-  
+
   // 0 GET /
   {
     uri: '/',
@@ -23,7 +23,7 @@ module.exports = [
       })
     }
   },
-  
+
   // 1 GET /robots.txt
   {
     uri: '/robots.txt',
@@ -37,7 +37,7 @@ module.exports = [
       )
     }
   },
-  
+
   // 2 GET /debug/unregister/:user_id
   {
     // DEBUG unsafe due to GET method
@@ -126,8 +126,8 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {did, challenge} = req.body
-      if (!(did && challenge)) {
+      var {did, challenge, created_by} = req.body
+      if (!((did || created_by) && challenge)) {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -138,7 +138,7 @@ module.exports = [
       process.send({
         web_auth_request: {
           user_id: req.user.id,
-          did: did,
+          did: did || created_by,
           challenge: challenge
         }
       })
