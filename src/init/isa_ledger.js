@@ -9,7 +9,7 @@ var ut = require('ethereumjs-util')
 
 var env = require('./env')()
 
-var get_receipt = require('../routes/management')[23]
+var get_receipt = require('../routes/management')[22]
 var mock = require('../../test/mock/express')
 
 // forward references
