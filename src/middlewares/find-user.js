@@ -23,9 +23,9 @@ module.exports = function(req, res, next) {
       body: null
     })
   }
-  
+
   var {user, crypto_key} = this.get('models')
-  
+
   user.findOne({
     where: {
       $or: [
