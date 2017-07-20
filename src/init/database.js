@@ -29,6 +29,14 @@ module.exports = function(logging) {
         }
       ),
       errors: function(err) {
+
+        var e = {
+          error: err.error,
+          status: err.status,
+          message: err.message,
+          body: err.body
+        }
+
         if (err instanceof sqlize.ValidationError) {
           // message | string | An error message
           // type | string | The type of the validation error
@@ -39,31 +47,30 @@ module.exports = function(logging) {
             validation_errors.push({
               message: err.errors[i].message,
               type: err.errors[i].type,
-              path: err.errors[i].path,
-              value: err.errors[i].value
+              field: err.errors[i].path
             })
           }
-          err.status = 400
-          err.message = 'validation error'
-          err.body = {
-            code: 'todo',
+          e.status = 400
+          e.message = 'validation error'
+          e.body = {
+            code: 'e_field_violation',
             validation_errors: validation_errors
           }
         }
-        
+
         if (err instanceof sqlize.UniqueConstraintError ||
             err instanceof sqlize.ForeignKeyConstraintError ||
             err instanceof sqlize.ExclusionConstraintError) {
-          err.status = 400
-          err.message = 'unique constraint error'
-          err.body = {
-            code: 'todo',
+          e.status = 400
+          e.message = 'constraint violation error'
+          e.body = {
+            code: 'e_constraint_violation',
             fields: err.fields,
             index: err.index,
             value: err.value
           }
         }
-        
+
         if (err instanceof sqlize.TimeoutError ||
             err instanceof sqlize.ConnectionRefusedError ||
             err instanceof sqlize.AccessDeniedError ||
@@ -72,15 +79,15 @@ module.exports = function(logging) {
             err instanceof sqlize.InvalidConnectionError ||
             err instanceof sqlize.ConnectionTimedOutError ||
             err instanceof sqlize.InstanceError) {
-          err.status = 503
-          err.message = 'service unavailable'
-          err.body = {code: 'todo'}
+          e.status = 503
+          e.message = 'service unavailable'
+          e.body = {code: 'e_service_unavailable'}
         }
-        
-        return err
+
+        return e
       }
     }
-    
+
     instance.db.authenticate().then(function() {
       // initialise all the table models
       instance.models = {}
