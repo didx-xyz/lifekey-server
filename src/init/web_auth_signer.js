@@ -143,7 +143,7 @@ require('./database')(
   crypto_key = database.models.crypto_key
   errors = database.errors
   while (process_message_backlog.length) {
-    process_message(process_message_backlog.pop())
+    setImmediate(process_message, process_message_backlog.pop())
   }
   process.send({ready: true})
 }).catch(function(err) {
