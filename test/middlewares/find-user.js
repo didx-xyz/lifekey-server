@@ -13,7 +13,7 @@ before(function(done) {
   this.timeout(20000) // it takes a while to load these models
 
   var user, crypto_key
-  
+
   require('../../src/init/database')(
     false // disable sql logging
   ).then(function(database) {
@@ -65,7 +65,7 @@ before(function(done) {
 })
 
 describe('middleware find-user', function() {
-  
+
   it('should respond with error if required headers are missing', function(done) {
     subject.call(mock.express, {
       headers: {}
