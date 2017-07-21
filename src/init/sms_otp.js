@@ -7,12 +7,10 @@ var sms = require('../messaging/clickatell')
 var process_message_backlog = []
 var sms_verification, user_datum, errors
 
-function otp_message(otp) {
-  return (
-    'Please open the following URL to verify your mobile number with Lifekey: ' +
-    `http://${env.SERVER_HOSTNAME}/sms-verify/${otp}`
-  )
-}
+var otp_message = (
+  'Please open the following URL to verify your mobile number with Lifekey: ' +
+  `http://${env.SERVER_HOSTNAME}/sms-verify/`
+)
 
 function process_message(msg) {
   if (!msg.sms_otp_request) return
@@ -62,7 +60,7 @@ function process_message(msg) {
         user_datum_id: user_datum_id,
         otp: otp
       }),
-      sms(recipient, otp_message(otp))
+      sms(recipient, otp_message + otp)
     ])
   }).then(function(res) {
     var [created] = res
