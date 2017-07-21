@@ -110,7 +110,6 @@ function process_message(msg) {
         }
       }).on('error', function(err) {
 
-
         // TODO retry?
 
         process.send({
