@@ -10,12 +10,19 @@ var assertAppActivated = (
 module.exports = function(req, res, next) {
   var OUTER = this
 
-  var errors = this.get('db_errors')
+  // the calling agent's identity
+  var has_did_or_id = (
+    'x-cnsnt-did' in req.headers ||
+    'x-cnsnt-id' in req.headers
+  )
 
-  if (!((req.headers['x-cnsnt-did'] || req.headers['x-cnsnt-id']) &&
-        ('x-cnsnt-plain' in req.headers &&
-        'x-cnsnt-signed' in req.headers))) {
-    // if missing any of the above
+  // the calling agent's identity proof
+  var has_plaintext_and_signature = (
+    'x-cnsnt-plain' in req.headers &&
+    'x-cnsnt-signed' in req.headers
+  )
+
+  if (!(has_did_or_id && has_plaintext_and_signature)) {
     return res.status(400).json({
       error: true,
       status: 400,
@@ -24,6 +31,7 @@ module.exports = function(req, res, next) {
     })
   }
 
+  var errors = this.get('db_errors')
   var {user, crypto_key} = this.get('models')
 
   user.findOne({
@@ -34,9 +42,17 @@ module.exports = function(req, res, next) {
       ]
     }
   }).then(function(found) {
-    if (found) {
-      req.user = found
-      return crypto_key.findOne({
+    if (!found) {
+      return Promise.reject({
+        error: true,
+        status: 404,
+        message: 'user record not found',
+        body: null
+      })
+    }
+    req.user = found
+    return Promise.all([
+      crypto_key.findOne({
         where: {
           owner_id: found.id,
           alias: (
@@ -45,25 +61,27 @@ module.exports = function(req, res, next) {
             'client-server-http'
           )
         }
+      }),
+      crypto_key.findOne({
+        where: {
+          owner_id: found.id,
+          alias: 'eis'
+        }
+      })
+    ])
+  }).then(function(found) {
+    var [master, eis] = found
+    if (!master) {
+      return Promise.reject({
+        error: true,
+        status: 404,
+        message: 'crypto_key record not found',
+        body: null
       })
     }
-    return Promise.reject({
-      error: true,
-      status: 404,
-      message: 'user record not found',
-      body: null
-    })
-  }).then(function(found) {
-    if (found) {
-      req.user.crypto = found
-      return assertAppActivated.call(OUTER, req, res, next)
-    }
-    return Promise.reject({
-      error: true,
-      status: 404,
-      message: 'crypto_key record not found',
-      body: null
-    })
+    req.user.crypto = master
+    if (eis) req.user.eis = eis
+    return assertAppActivated.call(OUTER, req, res, next)
   }).catch(function(err) {
     err = errors(err)
     return res.status(
