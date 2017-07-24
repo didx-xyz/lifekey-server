@@ -394,6 +394,7 @@ module.exports = [
             message: 'ok',
             body: {
               user: {
+                is_human: !!found.webhook_url,
                 colour: found.branding_colour_code,
                 image_uri: found.branding_image_uri,
                 actions_url: found.actions_url,

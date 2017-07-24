@@ -1236,6 +1236,13 @@ module.exports = [
           return qr.toFileStream(
             res,
             `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
+            {
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
             function(err) {
               if (err) {
                 throw {
@@ -2515,6 +2522,13 @@ module.exports = [
         qr.toFileStream(
           res,
           `${SERVER_HOSTNAME}/facial-verification/${fv.subject_did}/${fv.token}`,
+          {
+            margin: env.QR_MARGIN,
+            color: {
+              light: env.QR_COLOUR_LIGHT,
+              dark: env.QR_COLOUR_DARK
+            }
+          },
           function(err) {
             if (err) {
               throw {
@@ -2996,6 +3010,13 @@ module.exports = [
               email: found.contact_email,
               did: found.did
             }),
+            {
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
             function(err) {
               if (err) {
                 console.log('qr code generation error', err)
