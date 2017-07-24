@@ -18,118 +18,75 @@ function process_message(msg) {
     return
   }
 
-  var return_addr, {user_id, challenge, did} = msg.web_auth_request
+  var {user_id, challenge, did} = msg.web_auth_request
 
-  user.findOne({
-    where: {did: did}
-  }).then(function(found) {
-    if (!found) {
-
-      process.send({
-        notification_request: {
-          user_id: user_id,
-          notification: {title: '', body: ''},
-          data: {
-            type: 'webauth_failure',
-            webauth_failure_type: 'user_not_found'
-          }
-        }
-      })
-
-      return Promise.reject(
-        new Error('user not found')
-      )
+  Promise.all([
+    user.findOne({where: {did: did}}),
+    crypto_key.findOne({where: {owner_id: user_id, alias: 'eis'}}),
+    user.findOne({where: {id: user_id}})
+  ]).then(function(res) {
+    var [authentication_service, authenticating_user_key, authenticating_user] = res
+    if (!authentication_service) {
+      return Promise.reject('user_not_found')
     }
-    if (!found.web_auth_url) {
-
-      process.send({
-        notification_request: {
-          user_id: user_id,
-          notification: {title: '', body: ''},
-          data: {
-            type: 'webauth_failure',
-            webauth_failure_type: 'user_has_no_webauth_address'
-          }
-        }
-      })
-
-      return Promise.reject(
-        new Error('user has no web_auth hook address')
-      )
+    if (!authentication_service.web_auth_url) {
+      return Promise.reject('user_has_no_webauth_address')
     }
-    return_addr = url.parse(found.web_auth_url)
-    return crypto_key.findOne({
-      where: {
-        owner_id: user_id,
-        alias: 'eis'
-      }
-    })
-  }).then(function(found) {
-    if (!found) {
-
-      process.send({
-        notification_request: {
-          user_id: user_id,
-          notification: {title: '', body: ''},
-          data: {
-            type: 'webauth_failure',
-            webauth_failure_type: 'user_has_no_crypto_key'
-          }
-        }
-      })
-
-      return Promise.reject(new Error('user has no eis key'))
+    if (!authenticating_user_key) {
+      return Promise.reject('user_has_no_crypto_key')
+    }
+    if (!authenticating_user) {
+      return Promise.reject('user_not_found')
     }
     return Promise.all([
+      authentication_service.web_auth_url,
+      authenticating_user.did,
       challenge,
-      crypto.asymmetric.sign('secp256k1', found.private_key, Buffer.from(challenge, 'utf8')),
-      crypto.asymmetric.get_public('secp256k1', found.private_key)
+      crypto.asymmetric.sign('secp256k1', authenticating_user_key.private_key, Buffer.from(challenge, 'utf8')),
+      crypto.asymmetric.get_public('secp256k1', authenticating_user_key.private_key)
     ])
   }).then(function(res) {
-    var [plaintext, signature, public_key] = res
+    var [return_address, user_did, plaintext, signature, public_key] = res
     var msg = JSON.stringify({
       challenge: challenge,
       plaintext: plaintext,
       signed_challenge: signature.toString('base64'),
+      did: user_did,
       public_key: public_key.toString('base64')
     })
-    return Promise.resolve(Buffer.from(msg, 'utf8'))
-  }).then(function(msg) {
+    return Promise.all([return_address, Buffer.from(msg, 'utf8')])
+  }).then(function(res) {
+    var [return_address, msg] = res
     return new Promise(function(resolve, reject) {
       (
-        return_addr.protocol === 'http:' ? http : https
+        return_address.protocol === 'http:' ? http : https
       ).request({
         method: 'post',
-        protocol: return_addr.protocol,
-        hostname: return_addr.hostname,
-        path: return_addr.path,
-        port: return_addr.port,
+        protocol: return_address.protocol,
+        hostname: return_address.hostname,
+        path: return_address.path,
+        port: return_address.port,
         headers: {
           'content-type': 'application/json',
           'content-length': Buffer.byteLength(msg)
         }
       }).on('error', function(err) {
-
-        // TODO retry?
-
-        process.send({
-          notification_request: {
-            user_id: user_id,
-            notification: {title: '', body: ''},
-            data: {
-              type: 'webauth_failure',
-              webauth_failure_type: 'server_network_transport_error'
-            }
-          }
-        })
-
-        return reject(new Error('network transport error'))
+        return reject('server_network_transport_error')
       }).on('response', resolve).end(msg)
     })
   }).then(function() {
-    console.log('auth hook sent successfully to', return_addr.hostname)
+    console.log('auth service successfully hooked for', user_id)
   }).catch(function(err) {
-    console.log(errors(err))
+    process.send({
+      notification_request: {
+        user_id: user_id,
+        notification: {title: '', body: ''},
+        data: {
+          type: 'webauth_failure',
+          webauth_failure_type: err
+        }
+      }
+    })
   })
 }
 
