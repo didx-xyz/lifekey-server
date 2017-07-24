@@ -607,7 +607,7 @@ describe('management endpoints', function() {
         expect(res.status).to.equal(200)
         expect(Array.isArray(res.body.unacked)).to.be.ok
         expect(res.body.unacked.length).to.equal(1)
-        expect(res.body.unacked[0]).to.equal(respondid)
+        expect(res.body.unacked[0].ucr_id).to.equal(respondid)
         expect(Array.isArray(res.body.enabled)).to.be.ok
         expect(res.body.enabled.length).to.equal(0)
         done()
