@@ -5,7 +5,7 @@
   "private": true,
   "main": "src/init",
   "scripts": {
-    "test": "NODE_ENV=development istanbul test _mocha -- --recursive --use_strict --bail --prof --check-leaks --no-exit -R spec",
+    "test": "NODE_ENV=development istanbul test _mocha -- --recursive --bail --no-exit -R spec",
     "start": "node src/init",
     "todo": "leasot --skip-unsupported --ignore=node_modules/**/* {test,src}/**/*.js; exit 0",
     "db:update": "bin/docker_database_pull",
