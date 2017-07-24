@@ -313,7 +313,14 @@ module.exports = [
       }).then(function(user_connections) {
         if (user_connections) {
           // append to data structure
-          body.enabled = user_connections.map(uc => uc.id)
+          body.enabled = user_connections.map(uc => {
+            return {
+              uc_id: uc.id,
+              user_connection_id: uc.id,
+              from_did: uc.from_did,
+              to_did: uc.to_did
+            }
+          })
         }
         // enumerate all unacknowledged user_connection_requests
         return user_connection_request.findAll({
