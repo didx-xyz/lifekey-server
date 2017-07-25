@@ -52,6 +52,7 @@ module.exports = function(req, res, next) {
       body: null
     })
   }).catch(function(err) {
+    console.log('HEIN debug', err)
     return res.status(
       err.status || 500
     ).json({

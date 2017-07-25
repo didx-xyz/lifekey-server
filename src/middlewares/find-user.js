@@ -85,6 +85,7 @@ module.exports = function(req, res, next) {
     return assertAppActivated.call(OUTER, req, res, next)
   }).catch(function(err) {
     err = errors(err)
+    console.log('HEIN debug', err)
     return res.status(
       err.status || 500
     ).json({
