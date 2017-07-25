@@ -27,6 +27,7 @@ module.exports = function(req, res, next) {
     }
   }).then(function(found) {
     if (found) {
+      console.log('HEIN debug', 'known sig')
       return Promise.reject({
         error: true,
         status: 400,

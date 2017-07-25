@@ -26,6 +26,7 @@ module.exports = function(req, res, next) {
   ) return replayAttack.call(this, req, res, next)
 
   if (!(skip_active && is_activated)) {
+    console.log('HEIN debug', 'if (!(skip_active && is_activated)) {')
     return res.status(400).json({
       error: true,
       status: 400,

@@ -23,6 +23,7 @@ module.exports = function(req, res, next) {
   )
 
   if (!(has_did_or_id && has_plaintext_and_signature)) {
+    console.log('HEIN debug if (!(has_did_or_id && has_plaintext_and_signature)) {')
     return res.status(400).json({
       error: true,
       status: 400,

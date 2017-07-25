@@ -13,6 +13,7 @@ module.exports = function(req, res, next) {
   var b_signed = Buffer.from(req.headers['x-cnsnt-signed'], 'base64')
 
   if (!(b_signable.length && b_signed.length && b_plain.length)) {
+    console.log('HEIN debug', 'request header parse fail')
     return res.status(400).json({
       error: true,
       status: 400,
@@ -22,7 +23,7 @@ module.exports = function(req, res, next) {
   }
 
   var {algorithm, public_key} = req.user.crypto
-  
+
   if (algorithm === 'secp256k1') {
 
     var verified = secp.verify(
@@ -30,9 +31,9 @@ module.exports = function(req, res, next) {
       b_signed,
       req.user.crypto.public_key
     )
-    
+
     if (verified) return next()
-    
+    console.log('HEIN debug', 'sig verify fail')
     return res.status(400).json({
       error: true,
       status: 400,
@@ -41,10 +42,11 @@ module.exports = function(req, res, next) {
     })
 
   } else if (algorithm === 'rsa') {
-    
+
     try {
       var ursapublickey = ursa.coercePublicKey(req.user.crypto.public_key.toString('utf8'))
     } catch (e) {
+      console.log('HEIN debug', 'key parse fail')
       return res.status(400).json({
         error: true,
         status: 400,
@@ -62,6 +64,7 @@ module.exports = function(req, res, next) {
         false
       )
     } catch (e) {
+      console.log('HEIN debug', 'sig verify fail')
       return res.status(400).json({
         error: true,
         status: 400,
@@ -69,9 +72,10 @@ module.exports = function(req, res, next) {
         body: null
       })
     }
-    
+
     if (verified) return next()
-    
+
+    console.log('HEIN debug', 'sig verify fail')
     return res.status(400).json({
       error: true,
       status: 400,
@@ -80,7 +84,7 @@ module.exports = function(req, res, next) {
     })
 
   } else {
-    
+
     return res.status(500).json({
       error: true,
       status: 500, // TODO can this ever happen?
@@ -89,5 +93,5 @@ module.exports = function(req, res, next) {
     })
 
   }
-  
+
 }
