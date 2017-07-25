@@ -694,6 +694,7 @@ module.exports = [
       }
 
       if (!(Array.isArray(required_entities) && required_entities.length)) {
+        console.log('HEIN debug', 'required_entities')
         return res.status(400).json({
           error: true,
           status: 400,
