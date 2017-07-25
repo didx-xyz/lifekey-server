@@ -1015,7 +1015,8 @@ module.exports = [
         }
         return information_sharing_agreement.findAll({
           where: {
-            to_did: req.user.did
+            to_did: req.user.did,
+            from_did: req.user.did
           }
         })
       }).then(function(isas) {
