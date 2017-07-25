@@ -685,7 +685,7 @@ module.exports = [
       } = req.body
 
       if (!(to && purpose && license)) {
-        console.log('HEIN debug', 'to purpose license')
+        console.log('HEIN debug', 'to purpose license', to, purpose, license, to && purpose && license)
         return res.status(400).json({
           error: true,
           status: 400,
