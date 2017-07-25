@@ -23,7 +23,6 @@ module.exports = function(req, res, next) {
   )
 
   if (!(has_did_or_id && has_plaintext_and_signature)) {
-    console.log('HEIN debug if (!(has_did_or_id && has_plaintext_and_signature)) {')
     return res.status(400).json({
       error: true,
       status: 400,
@@ -85,7 +84,6 @@ module.exports = function(req, res, next) {
     return assertAppActivated.call(OUTER, req, res, next)
   }).catch(function(err) {
     err = errors(err)
-    console.log('HEIN debug', err)
     return res.status(
       err.status || 500
     ).json({
