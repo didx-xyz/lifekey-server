@@ -376,12 +376,14 @@ module.exports = [
       var {user, user_connection_request_id} = req.params
       var {accepted} = req.body
       var uc, ucr, requested_id // user id of target
-
+      var implicit_sharing, from, to
       var {
         user,
         user_device,
         user_connection,
-        user_connection_request
+        user_connection_request,
+        information_sharing_agreement_request,
+        information_sharing_agreement
       } = this.get('models')
       var errors = this.get('db_errors')
 
@@ -425,10 +427,17 @@ module.exports = [
               from_did: ucr.from_did,
               enabled: accepted
             }),
-            user.findOne({where: {did: ucr.from_did}})
+            user.findOne({where: {did: ucr.from_did}}),
+            user.findOne({where: {did: ucr.to_did}})
           ])
         } else if (!accepted) {
-          return Promise.resolve(false)
+          // break out early
+          return Promise.reject({
+            error: false,
+            status: 200,
+            message: 'user_connection rejected',
+            body: null
+          })
         } else {
           return Promise.reject({
             error: true,
@@ -437,46 +446,75 @@ module.exports = [
             body: null
           })
         }
-      }).then(function(create_find) {
-        if (create_find) {
-          uc = create_find[0]
-          var pnr_notif = {
-            title: 'User Connection',
-            body: 'User connection successfully created!'
-          }
-          var pnr_data = {
-            type: 'user_connection_created',
-            is_user_connection_created: true,
-            user_connection_id: uc.id,
-            uc_id: uc.id,
+      }).then(function(res) {
+        // establish an implicit sharing isa if both users are humans
+        uc = res[0]
+        from = res[1]
+        to = res[2]
+        implicit_sharing = !(from.webhook_url || to.webhook_url)
+        if (implicit_sharing) {
+          return information_sharing_agreement_request.create({
+            from_did: ucr.from_did,
             to_did: ucr.to_did,
-            from_did: ucr.from_did
-          }
-
-          var to_pnr_data = Object.assign({}, pnr_data)
-          to_pnr_data.actions_url = create_find[1].actions_url
-          to_pnr_data.other_user_did = ucr.from_did
-
-          var from_pnr_data = Object.assign({}, pnr_data)
-          from_pnr_data.actions_url = req.user.actions_url
-          from_pnr_data.other_user_did = ucr.to_did
-
-          process.send({
-            notification_request: {
-              user_id: ucr.to_did,
-              notification: pnr_notif,
-              data: to_pnr_data
-            }
-          }, function() {
-            process.send({
-              notification_request: {
-                user_id: ucr.from_did,
-                notification: pnr_notif,
-                data: from_pnr_data
-              }
-            })
+            acknowledged: true,
+            optional_entities: '[]',
+            required_entities: '[]',
+            purpose: 'general purpose sharing',
+            license: 'unlicensed',
+            accepted: true,
+            acknowledged_at: new Date,
+            resolved_at: new Date
           })
         }
+        return Promise.resolve()
+      }).then(function(created) {
+        if (created) {
+          return information_sharing_agreement.create({
+            isar_id: created.id,
+            from_did: ucr.from_did,
+            to_did: ucr.to_did
+          })
+        }
+        return Promise.resolve()
+      }).then(function(created) {
+        var pnr_notif = {
+          title: 'User Connection',
+          body: 'User connection successfully created!'
+        }
+        var pnr_data = {
+          type: 'user_connection_created',
+          is_user_connection_created: true,
+          user_connection_id: uc.id,
+          uc_id: uc.id,
+          to_did: ucr.to_did,
+          from_did: ucr.from_did
+        }
+
+        // inform the users of the sharing isa id if exists
+        if (created) pnr_data.sharing_isa_id = created.id
+
+        var to_pnr_data = Object.assign({}, pnr_data)
+        to_pnr_data.actions_url = from.actions_url
+        to_pnr_data.other_user_did = ucr.from_did
+
+        var from_pnr_data = Object.assign({}, pnr_data)
+        from_pnr_data.actions_url = to.actions_url
+        from_pnr_data.other_user_did = ucr.to_did
+
+        process.send({
+          notification_request: {
+            user_id: ucr.to_did,
+            notification: pnr_notif,
+            data: to_pnr_data
+          }
+        })
+        process.send({
+          notification_request: {
+            user_id: ucr.from_did,
+            notification: pnr_notif,
+            data: from_pnr_data
+          }
+        })
         return Promise.resolve()
       }).then(function() {
         return Promise.resolve(
@@ -501,7 +539,7 @@ module.exports = [
         return res.status(
           err.status || 500
         ).json({
-          error: err.error || true,
+          error: typeof err.error === 'boolean' ? err.error : true,
           status: err.status || 500,
           message: err.message || 'internal server error',
           body: err.body || null
@@ -685,7 +723,6 @@ module.exports = [
       } = req.body
 
       if (!(to && purpose && license)) {
-        console.log('HEIN debug', 'to purpose license', to, purpose, license, to && purpose && license)
         return res.status(400).json({
           error: true,
           status: 400,
@@ -695,7 +732,6 @@ module.exports = [
       }
 
       if (!(Array.isArray(required_entities) && required_entities.length)) {
-        console.log('HEIN debug', 'required_entities')
         return res.status(400).json({
           error: true,
           status: 400,
@@ -802,10 +838,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
-        console.log('HEIN', err)
         err = errors(err)
-        console.log('HEIN', err)
-
         return res.status(
           err.status || 500
         ).json({
