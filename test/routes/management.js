@@ -16,7 +16,7 @@ var register_route = require('../../src/routes/register')
 
 // user record fixtures
 var now = Date.now()
-var respondid, respondid2 // sender of connection requests
+var respondid, respondid2, respondid3 // sender of connection requests
 var actions_receipts_isa_id
 var action_delete_id
 var isar_respond1, isar_respond2
@@ -536,6 +536,16 @@ describe('management endpoints', function() {
       }).then(done.bind(done, null)).catch(done)
     })
 
+    after(function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
+        body: {target: test_users[3].id}
+      }, mock.res(function(res) {
+        respondid3 = res.body.id
+        done(res.error && true || null)
+      }))
+    })
+
     it('should fail if required arguments are missing', function(done) {
       mgmt_cxn_req_create.callback.call(mock.express, {
         user: {did: test_users[0].id},
@@ -610,7 +620,18 @@ describe('management endpoints', function() {
         expect(res.body.unacked[0].ucr_id).to.equal(respondid)
         expect(Array.isArray(res.body.enabled)).to.be.ok
         expect(res.body.enabled.length).to.equal(0)
-        done()
+
+        mgmt_connection_list.callback.call(mock.express, {
+          user: {did: test_users[3].id}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(200)
+          expect(Array.isArray(res.body.unacked)).to.be.ok
+          expect(res.body.unacked.length).to.equal(1)
+          expect(res.body.unacked[0].ucr_id).to.equal(respondid3)
+          expect(Array.isArray(res.body.enabled)).to.be.ok
+          expect(res.body.enabled.length).to.equal(1)
+          done()
+        }))
       }))
     })
   })
@@ -639,7 +660,40 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should 201 if the connection was created', function(done) {
+    it('should return 201 if the connection was created and return sharing isa id if both users are not programmatic', function(done) {
+      mgmt_cxn_req_res.callback.call(mock.express, {
+        params: {user_connection_request_id: respondid3},
+        user: {
+          did: test_users[3].id
+        },
+        body: {accepted: true}
+      }, mock.res(function(res) {
+        // assert that the acceptance was successful
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('user_connection created')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+
+        var call_data = process.get_last_call_data()
+        expect(
+          !!call_data.notification_request.data.sharing_isa_id
+        ).to.equal(false)
+
+        // enumerate list of connections again to assert correct
+        mgmt_connection_list.callback.call(mock.express, {
+          user: {did: test_users[3].id}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(200)
+          expect(Array.isArray(res.body.unacked)).to.be.ok
+          expect(res.body.unacked.length).to.equal(0)
+          expect(Array.isArray(res.body.enabled)).to.be.ok
+          expect(res.body.enabled.length).to.equal(2)
+          done()
+        }))
+      }))
+    })
+
+    it('should return 201 if the connection was created and return actions url for connection with programmatic user', function(done) {
       mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
         user: {
@@ -654,11 +708,10 @@ describe('management endpoints', function() {
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.id).to.equal('number')
 
-        // ensure mock contains call data with actions url
         var call_data = process.get_last_call_data()
         expect(
           !!call_data.notification_request.data.actions_url
-        ).to.equal(true)
+        ).to.equal(false)
 
         update_uc = res.body.id
 
@@ -839,7 +892,7 @@ describe('management endpoints', function() {
           license: 'none',
           required_entities: ['/resource/foo/bar']
         },
-        user: {did: test_users[0].id}
+        user: {did: test_users[4].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
