@@ -800,7 +800,10 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        console.log('HEIN', err)
         err = errors(err)
+        console.log('HEIN', err)
+
         return res.status(
           err.status || 500
         ).json({
