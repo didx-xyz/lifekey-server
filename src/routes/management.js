@@ -318,7 +318,8 @@ module.exports = [
               uc_id: uc.id,
               user_connection_id: uc.id,
               from_did: uc.from_did,
-              to_did: uc.to_did
+              to_did: uc.to_did,
+              other_user_did: req.user.did === uc.from_did ? uc.to_did : uc.from_did
             }
           })
         }
@@ -336,7 +337,8 @@ module.exports = [
             return {
               user_connection_request_id: ucr.id,
               ucr_id: ucr.id,
-              from_did: ucr.from_did
+              from_did: ucr.from_did,
+              other_user_did: req.user.did === ucr.from_did ? ucr.to_did : ucr.from_did
             }
           })
         }
