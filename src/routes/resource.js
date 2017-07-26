@@ -33,8 +33,9 @@ module.exports = [
             'SELECT id, encoding, mime, `schema`, from_user_did, alias, is_verifiable_claim',
             'FROM user_data',
             'WHERE owner_id = :owner_id AND',
-            'from_user_did IS NOT NULL' + (pushed_by ? (' AND from_user_did = :pushed_by') : ''),
-            'ORDER BY entity, attribute, alias ASC'
+            'from_user_did IS NOT NULL',
+            (pushed_by ? (' AND from_user_did = :pushed_by') : ''),
+            'ORDER BY id ASC'
           ].join(' '), {
             replacements: {
               owner_id: req.user.id,
