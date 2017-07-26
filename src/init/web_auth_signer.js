@@ -71,6 +71,7 @@ function process_message(msg) {
           'content-length': Buffer.byteLength(msg)
         }
       }).on('error', function(err) {
+        console.log('webauth hook', err)
         return reject('server_network_transport_error')
       }).on('response', resolve).end(msg)
     })
