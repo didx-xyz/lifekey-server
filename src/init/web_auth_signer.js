@@ -83,7 +83,7 @@ function process_message(msg) {
         notification: {title: '', body: ''},
         data: {
           type: 'webauth_failure',
-          webauth_failure_type: err
+          webauth_failure_type: err instanceof Error ? err.toString() : err
         }
       }
     })
