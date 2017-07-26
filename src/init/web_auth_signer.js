@@ -39,7 +39,7 @@ function process_message(msg) {
       return Promise.reject('user_not_found')
     }
     return Promise.all([
-      authentication_service.web_auth_url,
+      url.parse(authentication_service.web_auth_url),
       authenticating_user.did,
       challenge,
       crypto.asymmetric.sign('secp256k1', authenticating_user_key.private_key, Buffer.from(challenge, 'utf8')),
@@ -71,7 +71,6 @@ function process_message(msg) {
           'content-length': Buffer.byteLength(msg)
         }
       }).on('error', function(err) {
-        console.log('webauth hook', err)
         return reject('server_network_transport_error')
       }).on('response', resolve).end(msg)
     })
