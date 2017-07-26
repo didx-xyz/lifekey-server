@@ -376,7 +376,7 @@ module.exports = [
       var {user, user_connection_request_id} = req.params
       var {accepted} = req.body
       var uc, ucr, requested_id // user id of target
-      var implicit_sharing, from, to
+      var from, to
       var {
         user,
         user_device,
@@ -405,8 +405,8 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
-          // accept/reject the ucr
           ucr = {
+            id: found.id,
             to_did: req.user.did,
             from_did: found.from_did
           }
@@ -419,6 +419,24 @@ module.exports = [
           body: null
         })
       }).then(function(destroyed) {
+        if (!destroyed) {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'user_connection_request response failed',
+            body: {
+              code: 'e_retry'
+            }
+          })
+        }
+        if (accepted === false) {
+          return Promise.reject({
+            error: false,
+            status: 200,
+            message: 'user_connection rejected',
+            body: null
+          })
+        }
         if (accepted) {
           // update the associated uc record
           return Promise.all([
@@ -430,29 +448,20 @@ module.exports = [
             user.findOne({where: {did: ucr.from_did}}),
             user.findOne({where: {did: ucr.to_did}})
           ])
-        } else if (!accepted) {
-          // break out early
-          return Promise.reject({
-            error: false,
-            status: 200,
-            message: 'user_connection rejected',
-            body: null
-          })
-        } else {
-          return Promise.reject({
-            error: true,
-            status: 500,
-            message: 'update failed',
-            body: null
-          })
         }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
       }).then(function(res) {
         // establish an implicit sharing isa if both users are humans
         uc = res[0]
         from = res[1]
         to = res[2]
-        implicit_sharing = !(from.webhook_url || to.webhook_url)
-        if (implicit_sharing) {
+        var humans = !(from.webhook_url || to.webhook_url)
+        if (humans) {
           return information_sharing_agreement_request.create({
             from_did: ucr.from_did,
             to_did: ucr.to_did,
