@@ -1761,6 +1761,7 @@ module.exports = [
               data: {
                 type: 'resource_pushed',
                 isa_id: isa_id,
+                from_did: req.user.did,
                 resource_ids: created.map(function(c) {
                   return c.id
                 })
