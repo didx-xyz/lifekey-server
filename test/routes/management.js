@@ -538,7 +538,7 @@ describe('management endpoints', function() {
 
     after(function(done) {
       mgmt_cxn_req_create.callback.call(mock.express, {
-        user: {did: test_users[0].id},
+        user: {did: test_users[1].id},
         body: {target: test_users[3].id}
       }, mock.res(function(res) {
         respondid3 = res.body.id
@@ -644,7 +644,7 @@ describe('management endpoints', function() {
       mock.express.models.user.update({
         actions_url: 'http://example.com/foo' + now
       }, {
-        where: {id: test_users[0].id}
+        where: {id: test_users[1].id}
       }).then(done.bind(done, null)).catch(done)
     })
 
@@ -677,7 +677,9 @@ describe('management endpoints', function() {
         var call_data = process.get_last_call_data()
         expect(
           !!call_data.notification_request.data.sharing_isa_id
-        ).to.equal(false)
+        ).to.equal(true)
+
+        var sharing_isa_id = call_data.notification_request.data.sharing_isa_id
 
         // enumerate list of connections again to assert correct
         mgmt_connection_list.callback.call(mock.express, {
@@ -697,8 +699,7 @@ describe('management endpoints', function() {
       mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
         user: {
-          did: test_users[1].id,
-          actions_url: 'http://example.com/foo_' + Date.now()
+          did: test_users[1].id
         },
         body: {accepted: true}
       }, mock.res(function(res) {
@@ -711,7 +712,9 @@ describe('management endpoints', function() {
         var call_data = process.get_last_call_data()
         expect(
           !!call_data.notification_request.data.actions_url
-        ).to.equal(false)
+        ).to.equal(true)
+
+        var actions_url = call_data.notification_request.data.actions_url
 
         update_uc = res.body.id
 
@@ -723,7 +726,7 @@ describe('management endpoints', function() {
           expect(Array.isArray(res.body.unacked)).to.be.ok
           expect(res.body.unacked.length).to.equal(0)
           expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(1)
+          expect(res.body.enabled.length).to.equal(2)
           done()
         }))
       }))
@@ -1447,7 +1450,7 @@ describe('management endpoints', function() {
     //   }))
     // })
 
-    it('should respond affirmatively if all given resource descriptions are written to database', function(done) {
+    it('should respond affirmatively if all given new resources are shared to push target', function(done) {
       mgmt_isa_push_to.callback.call(mock.express, {
         user: {did: test_users[2].id},
         params: {isa_id: created_isa},
@@ -1463,6 +1466,34 @@ describe('management endpoints', function() {
         expect(res.message).to.equal('created')
         done()
       }))
+    })
+
+    it('should respond affirmatively if all given existing resources are shared to push target', function(done) {
+      mock.express.get('models').user_datum.findOne({
+        where: {
+          owner_id: test_users[2].id,
+          entity: 'me',
+          attribute: 'email',
+          alias: 'My Email',
+          is_verifiable_claim: false,
+          schema: 'schema.cnsnt.io/contact_email',
+          mime: 'application/ld+json',
+          encoding: 'utf8'
+        }
+      }).then(function(found) {
+        mgmt_isa_push_to.callback.call(mock.express, {
+          user: {did: test_users[2].id},
+          params: {isa_id: created_isa},
+          body: {
+            resources: [found.id]
+          }
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(false)
+          expect(res.status).to.equal(201)
+          expect(res.message).to.equal('created')
+          done()
+        }))
+      }).catch(done)
     })
   })
 
