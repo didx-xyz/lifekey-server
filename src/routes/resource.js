@@ -22,7 +22,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {pushed, all} = req.query
+      var {pushed, pushed_by, all} = req.query
       var db = this.get('db')
       var {user_datum} = this.get('models')
       var errors = this.get('db_errors')
@@ -33,7 +33,7 @@ module.exports = [
             'SELECT id, entity, attribute, alias, is_verifiable_claim',
             'FROM user_data',
             'WHERE owner_id = :owner_id AND',
-            'from_user_did IS NOT NULL',
+            'from_user_did IS NOT NULL' + (pushed_by ? (' AND from_user_did = \'' + pushed_by + '\'') : ''),
             'ORDER BY entity, attribute, alias ASC'
           ].join(' '), {
             replacements: {owner_id: req.user.id},
