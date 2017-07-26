@@ -1653,7 +1653,10 @@ module.exports = [
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
-          from_did: req.user.did
+          $or: [
+            {from_did: req.user.did},
+            {to_did: req.user.did}
+          ]
         }
       }).then(function(found) {
         if (found) {
