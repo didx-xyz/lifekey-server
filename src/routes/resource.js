@@ -33,10 +33,13 @@ module.exports = [
             'SELECT id, entity, attribute, alias, is_verifiable_claim',
             'FROM user_data',
             'WHERE owner_id = :owner_id AND',
-            'from_user_did IS NOT NULL' + (pushed_by ? (' AND from_user_did = \'' + pushed_by + '\'') : ''),
+            'from_user_did IS NOT NULL' + (pushed_by ? (' AND from_user_did = :pushed_by') : ''),
             'ORDER BY entity, attribute, alias ASC'
           ].join(' '), {
-            replacements: {owner_id: req.user.id},
+            replacements: {
+              owner_id: req.user.id,
+              pushed_by: pushed_by
+            },
             type: db.QueryTypes.SELECT
           }).then(function(found) {
             return res.status(200).json({
