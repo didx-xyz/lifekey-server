@@ -292,10 +292,16 @@ module.exports = [
     callback: function(req, res) {
 
       // load models
-      var {user_connection, user_connection_request} = this.get('models')
+      var {
+        user_connection,
+        user_connection_request,
+        information_sharing_agreement_request,
+        information_sharing_agreement
+      } = this.get('models')
 
       // response body data structure
       var body = {unacked: [], enabled: []}
+      var gp_share_table = {}, all_isas, isa_table = {}
 
       // enumerate all enabled user_connections
       user_connection.findAll({
@@ -342,7 +348,52 @@ module.exports = [
             }
           })
         }
-
+        return information_sharing_agreement.findAll({
+          where: {
+            $or: [
+              {from_did: req.user.did},
+              {to_did: req.user.did}
+            ]
+          }
+        })
+      }).then(function(isas) {
+        all_isas = isas.map(function(isa) {
+          return isa.toJSON()
+        })
+        return Promise.all(
+          isas.map(function(isa) {
+            return information_sharing_agreement_request.findOne({
+              where: {id: isa.isar_id}
+            })
+          })
+        )
+      }).then(function(isars) {
+        isars.filter(function(isar) {
+          return (
+            isar.purpose === 'general purpose sharing' &&
+            isar.license === 'unlicensed' &&
+            isar.optional_entities === '[]' &&
+            isar.required_entities === '[]'
+          )
+        }).map(function(isar) {
+          return isar.toJSON()
+        }).forEach(function(isar) {
+          var other_user_did = isar.to_did === req.user.did ? isar.from_did : isar.to_did
+          gp_share_table[other_user_did] = isar
+        })
+        all_isas.forEach(function(isa) {
+          isa_table[isa.isar_id] = isa.id
+        })
+        return Promise.resolve()
+      }).then(function() {
+        body.enabled = body.enabled.map(function(uc) {
+          var other_user_did = uc.to_did === req.user.did ? uc.from_did : uc.to_did
+          return (
+            gp_share_table[other_user_did] ?
+            Object.assign(uc, {sharing_isa_id: isa_table[gp_share_table[other_user_did].id]}) :
+            uc
+          )
+        })
         // respond!
         return Promise.resolve(
           res.status(200).json({
@@ -1633,6 +1684,42 @@ module.exports = [
         })
       }).then(function(found) {
         if (found) {
+          var push_target_id = found.id
+          // NOTE you can only send entirely new or existing resources
+          var existing_resources = typeof resources[0] === 'number'
+
+          // creating copies of existing resources for push target
+          if (existing_resources) {
+
+            return new Promise(function(resolve, reject) {
+              Promise.all(
+                resources.map(function(resource_id, idx) {
+                  return user_datum.findOne({id: resource_id})
+                })
+              ).then(function(found) {
+                return Promise.all(
+                  found.map(function(resource, idx) {
+                    return user_datum.create({
+                      owner_id: push_target_id,
+                      entity: resource.entity,
+                      attribute: 'from ' + req.user.nickname,
+                      alias: 'from ' + req.user.nickname,
+                      mime: resource.mime,
+                      value: resource.value,
+                      uri: resource.uri,
+                      from_user_did: req.user.did,
+                      from_resource_name: null,
+                      from_resource_description: null,
+                      is_verifiable_claim: resource.is_verifiable_claim,
+                      encoding: resource.encoding,
+                      schema: resource.schema
+                    })
+                  })
+                )
+              }).then(resolve).catch(reject)
+            })
+          }
+          // creating new resources for push target
           return Promise.all(
             resources.map(function(resource, idx) {
               return user_datum.create({
@@ -1643,7 +1730,7 @@ module.exports = [
                 mime: resource.mime,
                 value: resource.value,
                 uri: resource.uri,
-                from_user_did: req.user.id,
+                from_user_did: req.user.did,
                 from_resource_name: resource.name,
                 from_resource_description: resource.description,
                 is_verifiable_claim: resource.is_verifiable_claim,
