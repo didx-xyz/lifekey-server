@@ -135,6 +135,7 @@ module.exports = [
       var ucr, target_user
 
       if (!target) {
+        console.log('HEIN DEBUG', '!target')
         return res.status(400).json({
           error: true,
           status: 400,
@@ -147,6 +148,7 @@ module.exports = [
           req.user.id === target ||
           (''+req.user.id) === target ||
           (''+req.user.did === target)) {
+        console.log('HEIN DEBUG', 'self connect')
         return res.status(400).json({
           error: true,
           status: 400,
@@ -178,6 +180,7 @@ module.exports = [
         if (found) {
           // cannot send connection request
           // if a connection already exists
+          console.log('HEIN DEBUG', 'cxn already exists')
           return Promise.reject({
             error: true,
             status: 400,
@@ -211,6 +214,7 @@ module.exports = [
         if (found) {
           // cannot send connection request
           // if a connection request already exists
+          console.log('HEIN DEBUG', 'cxn req already exists')
           return Promise.reject({
             error: true,
             status: 400,
