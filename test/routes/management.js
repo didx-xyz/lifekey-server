@@ -20,6 +20,7 @@ var respondid, respondid2, respondid3 // sender of connection requests
 var actions_receipts_isa_id
 var action_delete_id
 var isar_respond1, isar_respond2
+var sharing_isa_id
 var created_isa_id
 var face_verify_token
 var update_uc, update_uc2
@@ -199,6 +200,7 @@ before(function(done) {
       _: process.env._,
       SERVER_HOSTNAME: 'localhost'
     })
+    mock.express.set('db', database.db)
     mock.express.set('models', database.models)
     mock.express.set('db_errors', database.errors)
     console.log('✓ initialised database models')
@@ -679,7 +681,7 @@ describe('management endpoints', function() {
           !!call_data.notification_request.data.sharing_isa_id
         ).to.equal(true)
 
-        var sharing_isa_id = call_data.notification_request.data.sharing_isa_id
+        sharing_isa_id = call_data.notification_request.data.sharing_isa_id
 
         // enumerate list of connections again to assert correct
         mgmt_connection_list.callback.call(mock.express, {
@@ -1469,30 +1471,94 @@ describe('management endpoints', function() {
     })
 
     it('should respond affirmatively if all given existing resources are shared to push target', function(done) {
-      mock.express.get('models').user_datum.findOne({
-        where: {
-          owner_id: test_users[2].id,
-          entity: 'me',
-          attribute: 'email',
-          alias: 'My Email',
-          is_verifiable_claim: false,
-          schema: 'schema.cnsnt.io/contact_email',
-          mime: 'application/ld+json',
-          encoding: 'utf8'
-        }
+      // TODO refactor this to somewhere outside the test case
+      var {user_datum, user} = mock.express.get('models')
+      var push_res_1 = 'foo'
+      var push_res_2 = 'bar'
+      Promise.all([
+        test_users[1].did ? null : user.update({did: ''+test_users[1].id}, {where: {id: test_users[1].id}}),
+        test_users[3].did ? null : user.update({did: ''+test_users[3].id}, {where: {id: test_users[3].id}})
+      ]).then(function(updated) {
+        test_users[1].did = test_users[1].id
+        test_users[3].did = test_users[3].id
+        return Promise.all([
+          user_datum.create({
+            owner_id: test_users[3].id,
+            value: push_res_1,
+            entity: 'foo',
+            attribute: 'foo',
+            alias: 'foo'
+          }),
+          user_datum.create({
+            owner_id: test_users[3].id,
+            value: push_res_2,
+            entity: 'bar',
+            attribute: 'bar',
+            alias: 'bar'
+          })
+        ])
+      }).then(function(res) {
+        return new Promise(function(resolve, reject) {
+          var [found, created] = res
+          mgmt_isa_push_to.callback.call(mock.express, {
+            user: {
+              nickname: 'baz',
+              id: test_users[3].id,
+              did: ''+test_users[3].did
+            },
+            params: {isa_id: sharing_isa_id},
+            body: {
+              resources: [found.id, created.id]
+            }
+          }, mock.res(function(res) {
+            expect(res.error).to.equal(false)
+            expect(res.status).to.equal(201)
+            expect(res.message).to.equal('created')
+            return resolve()
+          }))
+        })
+      }).then(function() {
+        return new Promise(function(resolve, reject) {
+          var resource_index = require('../../src/routes/resource')[0]
+          resource_index.callback.call(mock.express, {
+            user: {id: test_users[1].id, did: ''+test_users[1].did},
+            query: {pushed: 1, pushed_by: test_users[3].did}
+          }, mock.res(function(res) {
+            expect(res.error).to.equal(false)
+            expect(res.status).to.equal(200)
+            expect(res.message).to.equal('ok')
+            expect(res.body.length === 2).to.equal(true)
+            return resolve(res.body)
+          }))
+        })
+      }).then(function(body) {
+        return Promise.all(
+          body.map(function(resource) {
+            return user_datum.findOne({
+              where: {
+                id: resource.id,
+                owner_id: test_users[1].id
+              }
+            })
+          })
+        )
       }).then(function(found) {
-        mgmt_isa_push_to.callback.call(mock.express, {
-          user: {did: test_users[2].id},
-          params: {isa_id: created_isa},
-          body: {
-            resources: [found.id]
+        var found_res_1 = false
+        var found_res_2 = false
+        found.forEach(function(resource) {
+          if (resource.value.toString() === push_res_1) {
+            found_res_1 = true
+            return
           }
-        }, mock.res(function(res) {
-          expect(res.error).to.equal(false)
-          expect(res.status).to.equal(201)
-          expect(res.message).to.equal('created')
-          done()
-        }))
+          if (resource.value.toString() === push_res_2) {
+            found_res_2 = true
+            return
+          }
+        })
+        if (!(found_res_1 && found_res_2)) {
+          return done(new Error('didnt receive all new pushed resources'))
+        }
+        done()
       }).catch(done)
     })
   })
