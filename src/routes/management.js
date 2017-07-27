@@ -1632,7 +1632,7 @@ module.exports = [
 
       var {isa_id} = req.params
       var {resources} = req.body
-      var other_user_id
+      var other_user_did
 
       if (!(Array.isArray(resources) && resources.length)) {
         return res.status(400).json({
@@ -1653,9 +1653,13 @@ module.exports = [
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
-          $or: [
-            {from_did: req.user.did},
-            {to_did: req.user.did}
+          $and: [
+            {
+              $or: [
+                {from_did: req.user.did},
+                {to_did: req.user.did}
+              ]
+            }
           ]
         }
       }).then(function(found) {
@@ -1668,15 +1672,13 @@ module.exports = [
               body: null
             })
           }
-          other_user_id = (
+          other_user_did = (
             req.user.did === found.to_did ?
             found.from_did :
             found.to_did
           )
           return user.findOne({
-            where: {
-              did: other_user_id
-            }
+            where: {did: other_user_did}
           })
         }
         return Promise.reject({
@@ -1690,14 +1692,17 @@ module.exports = [
           var push_target_id = found.id
           // NOTE you can only send entirely new or existing resources
           var existing_resources = typeof resources[0] === 'number'
-
           // creating copies of existing resources for push target
           if (existing_resources) {
-
             return new Promise(function(resolve, reject) {
               Promise.all(
                 resources.map(function(resource_id, idx) {
-                  return user_datum.findOne({id: resource_id})
+                  return user_datum.findOne({
+                    where: {
+                      id: resource_id,
+                      owner_id: req.user.id
+                    }
+                  })
                 })
               ).then(function(found) {
                 return Promise.all(
@@ -1726,7 +1731,7 @@ module.exports = [
           return Promise.all(
             resources.map(function(resource, idx) {
               return user_datum.create({
-                owner_id: found.id,
+                owner_id: push_target_id,
                 entity: resource.name,
                 attribute: 'from ' + req.user.nickname,
                 alias: idx + 1,
@@ -1753,7 +1758,7 @@ module.exports = [
         if (created) {
           process.send({
             notification_request: {
-              user_id: other_user_id,
+              user_id: other_user_did,
               notification: {
                 title: 'ISA Resources Pushed',
                 body: 'One or more resources were pushed to you'
