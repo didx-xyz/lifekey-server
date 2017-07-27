@@ -1528,37 +1528,26 @@ describe('management endpoints', function() {
             expect(res.status).to.equal(200)
             expect(res.message).to.equal('ok')
             expect(res.body.length === 2).to.equal(true)
-            return resolve(res.body)
-          }))
-        })
-      }).then(function(body) {
-        return Promise.all(
-          body.map(function(resource) {
-            return user_datum.findOne({
-              where: {
-                id: resource.id,
-                owner_id: test_users[1].id
+            var found_res_1 = false
+            var found_res_2 = false
+            res.body.forEach(function(resource) {
+              console.log(resource)
+              expect(resource.from_user_did).to.equal(''+test_users[3].did)
+              if (resource.entity === push_res_1) {
+                found_res_1 = true
+                return
+              }
+              if (resource.entity === push_res_2) {
+                found_res_2 = true
+                return
               }
             })
-          })
-        )
-      }).then(function(found) {
-        var found_res_1 = false
-        var found_res_2 = false
-        found.forEach(function(resource) {
-          if (resource.value.toString() === push_res_1) {
-            found_res_1 = true
-            return
-          }
-          if (resource.value.toString() === push_res_2) {
-            found_res_2 = true
-            return
-          }
+            if (!(found_res_1 && found_res_2)) {
+              return done(new Error('didnt receive all new pushed resources'))
+            }
+            done()
+          }))
         })
-        if (!(found_res_1 && found_res_2)) {
-          return done(new Error('didnt receive all new pushed resources'))
-        }
-        done()
       }).catch(done)
     })
   })
