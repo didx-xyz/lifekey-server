@@ -1518,36 +1518,33 @@ describe('management endpoints', function() {
           }))
         })
       }).then(function() {
-        return new Promise(function(resolve, reject) {
-          var resource_index = require('../../src/routes/resource')[0]
-          resource_index.callback.call(mock.express, {
-            user: {id: test_users[1].id, did: ''+test_users[1].did},
-            query: {pushed: 1, pushed_by: test_users[3].did}
-          }, mock.res(function(res) {
-            expect(res.error).to.equal(false)
-            expect(res.status).to.equal(200)
-            expect(res.message).to.equal('ok')
-            expect(res.body.length === 2).to.equal(true)
-            var found_res_1 = false
-            var found_res_2 = false
-            res.body.forEach(function(resource) {
-              console.log(resource)
-              expect(resource.from_user_did).to.equal(''+test_users[3].did)
-              if (resource.entity === push_res_1) {
-                found_res_1 = true
-                return
-              }
-              if (resource.entity === push_res_2) {
-                found_res_2 = true
-                return
-              }
-            })
-            if (!(found_res_1 && found_res_2)) {
-              return done(new Error('didnt receive all new pushed resources'))
+        var resource_index = require('../../src/routes/resource')[0]
+        resource_index.callback.call(mock.express, {
+          user: {id: test_users[1].id, did: ''+test_users[1].did},
+          query: {pushed: 1, pushed_by: test_users[3].did}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(false)
+          expect(res.status).to.equal(200)
+          expect(res.message).to.equal('ok')
+          expect(res.body.length === 2).to.equal(true)
+          var found_res_1 = false
+          var found_res_2 = false
+          res.body.forEach(function(resource) {
+            expect(resource.from_user_did).to.equal(''+test_users[3].did)
+            if (resource.entity === push_res_1) {
+              found_res_1 = true
+              return
             }
-            done()
-          }))
-        })
+            if (resource.entity === push_res_2) {
+              found_res_2 = true
+              return
+            }
+          })
+          if (!(found_res_1 && found_res_2)) {
+            return done(new Error('didnt receive all new pushed resources'))
+          }
+          done()
+        }))
       }).catch(done)
     })
   })
