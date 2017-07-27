@@ -2,7 +2,7 @@
 'use strict'
 
 module.exports = [
-  
+
   // 0 GET /directory
   {
     uri: '/directory',
@@ -59,6 +59,7 @@ module.exports = [
     callback: function(req, res) {
       var {active_bot} = this.get('models')
       var errors = this.get('db_errors')
+      console.log('bot ping from', req.user, 'at', req.headers['x-real-ip'])
       req.user.update({
         host_address: req.headers['x-real-ip']
       }, {where: {
