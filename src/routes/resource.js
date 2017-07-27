@@ -30,7 +30,7 @@ module.exports = [
       function dispatch() {
         if (pushed) {
           return db.query([
-            'SELECT id, encoding, mime, `schema`, from_user_did, alias, is_verifiable_claim',
+            'SELECT id, entity, encoding, mime, `schema`, from_user_did, alias, is_verifiable_claim',
             'FROM user_data',
             'WHERE owner_id = :owner_id AND',
             'from_user_did IS NOT NULL',
