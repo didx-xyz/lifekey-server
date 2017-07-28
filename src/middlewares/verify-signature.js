@@ -4,7 +4,6 @@
 var crypto = require('crypto')
 
 var secp = require('secp256k1')
-var ursa = require('ursa')
 
 module.exports = function(req, res, next) {
 
@@ -42,24 +41,9 @@ module.exports = function(req, res, next) {
   } else if (algorithm === 'rsa') {
 
     try {
-      var ursapublickey = ursa.coercePublicKey(req.user.crypto.public_key.toString('utf8'))
-    } catch (e) {
-      return res.status(400).json({
-        error: true,
-        status: 400,
-        message: 'parsing of pem-encoded public key failed',
-        body: null
-      })
-    }
-
-    try {
-      var verified = ursapublickey.hashAndVerify(
-        'sha256',
-        b_plain,
-        b_signed.toString('base64'),
-        'base64',
-        false
-      )
+      var verifier = crypto.createVerify('RSA-SHA256')
+      verifier.update(b_plain)
+      var verified = verifier.verify(req.user.crypto.public_key, b_signed)
     } catch (e) {
       return res.status(400).json({
         error: true,
