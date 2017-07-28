@@ -238,7 +238,12 @@ module.exports = {
     }).then(function() {
       if (using_fingerprint) {
         return Promise.all([
-          our_crypto.asymmetric.verify('rsa', fingerprint.public_key, fingerprint.plaintext_proof, fingerprint.signed_proof),
+          our_crypto.asymmetric.verify(
+            'rsa',
+            fingerprint.public_key,
+            fingerprint.plaintext_proof,
+            fingerprint.signed_proof
+          ),
           (function() {
             return http_request_verification.findOne({
               where: {
