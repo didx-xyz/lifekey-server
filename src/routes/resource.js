@@ -193,6 +193,7 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
+          console.log('HEIN DEBUG 2')
           return Promise.reject({
             error: true,
             status: 400,
@@ -204,7 +205,7 @@ module.exports = [
         try {
           var resource_value = Buffer.from(value, encoding || 'utf8')
         } catch (e) {
-          console.log('HEIN DBEUG 2')
+          console.log('HEIN DBEUG 3')
           return Promise.reject({
             error: true,
             status: 400,
@@ -254,7 +255,7 @@ module.exports = [
         })
       }).catch(function(err) {
         err = errors(err)
-        console.log('HEIN DBEUG 3')
+        console.log('HEIN DBEUG 4')
         return res.status(
           err.status || 500
         ).json({
