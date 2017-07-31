@@ -172,6 +172,7 @@ module.exports = [
       } = req.body
 
       if (!(entity && attribute && alias && value)) {
+        console.log('HEIN DBEUG 1')
         return res.status(400).json({
           error: true,
           status: 400,
@@ -203,6 +204,7 @@ module.exports = [
         try {
           var resource_value = Buffer.from(value, encoding || 'utf8')
         } catch (e) {
+          console.log('HEIN DBEUG 2')
           return Promise.reject({
             error: true,
             status: 400,
@@ -252,6 +254,7 @@ module.exports = [
         })
       }).catch(function(err) {
         err = errors(err)
+        console.log('HEIN DBEUG 3')
         return res.status(
           err.status || 500
         ).json({
