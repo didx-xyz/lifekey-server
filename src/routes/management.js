@@ -3209,6 +3209,252 @@ module.exports = [
         })
       })
     }
+  },
+
+  // 31 GET /qr-scale1/:user_id
+  {
+    uri: '/qr-scale1/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 1,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 32 GET /qr-scale2/:user_id
+  {
+    uri: '/qr-scale2/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 2,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 33 GET /qr-scale3/:user_id
+  {
+    uri: '/qr-scale3/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 3,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
   }
 
   // example
