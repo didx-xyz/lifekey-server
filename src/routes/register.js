@@ -329,7 +329,7 @@ module.exports = {
               owner_id: created_user_id,
               entity: 'person',
               attribute: 'person',
-              alias: 'My person profile',
+              alias: 'My Person',
               mime: 'application/ld+json',
               encoding: 'utf8',
               schema: 'schema.cnsnt.io/person',
