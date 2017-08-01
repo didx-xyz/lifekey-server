@@ -189,12 +189,7 @@ module.exports = [
         })
       }).then(function() {
         // TODO respond with html deeplink
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: null
-        })
+        return res.status(200).end('Thank you for verifying your mobile phone number.')
       }).catch(function(err) {
         err = errors(err)
         return res.status(
