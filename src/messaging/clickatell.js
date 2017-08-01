@@ -31,7 +31,6 @@ module.exports = function(to, content, sent) {
   var message = content.split(' ').join('+')
   var query = qs.stringify({
     to: recipient,
-    content: message,
     apiKey: env.CLICKATELL_API_KEY
   })
 
@@ -39,7 +38,7 @@ module.exports = function(to, content, sent) {
     protocol: send.protocol,
     hostname: send.hostname,
     port: send.port,
-    path: `${send.pathname}?${query}`,
+    path: `${send.pathname}?${query}&content=${message}`,
     method: 'get'
   }).on('response', function(res) {
     if (res.statusCode > 99 && res.statusCode < 400) {
