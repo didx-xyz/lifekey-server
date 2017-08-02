@@ -316,7 +316,8 @@ module.exports = {
                 '@context': 'http://schema.cnsnt.io/contact_email',
                 email: email,
                 createdDate: new Date,
-                modifiedDate: new Date
+                modifiedDate: new Date,
+                label: 'My Email'
               }),
               is_verifiable_claim: false,
               schema: 'schema.cnsnt.io/contact_email',
@@ -348,8 +349,9 @@ module.exports = {
                 maritalContractType: null,
                 preferredLanguage: null,
                 createdDate: new Date,
-                modifiedDate: null
-              }),
+                modifiedDate: null,
+                label: 'My Person'
+              })
             })
           ),
           crypto_key.create({
