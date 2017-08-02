@@ -114,7 +114,7 @@ require('./database')(
         return models.user_datum.create({
           owner_id: user.id,
           entity: 'verifiable-claim',
-          attribute: 'email',
+          attribute: field,
           alias: 'from-lifekey-server',
           value: JSON.stringify(instance),
           encoding: 'utf8',
