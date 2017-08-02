@@ -12,6 +12,7 @@ var gateway = 'https://platform.clickatell.com/messages/http/send'
 var send = url.parse(gateway)
 
 module.exports = function(to, content, sent) {
+  console.log('args for sms call', to, content)
   var has_callback = typeof sent === 'function'
 
   if (!(to &&
