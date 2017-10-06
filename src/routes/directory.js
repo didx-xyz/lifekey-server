@@ -60,17 +60,19 @@ module.exports = [
       var {active_bot} = this.get('models')
       var errors = this.get('db_errors')
       console.log('bot ping from', req.user.nickname, 'at', req.headers['x-real-ip'])
+
       req.user.update({
         host_address: req.headers['x-real-ip']
       }, {where: {
         owner_id: req.user.id
       }}).then(function() {
-        return active_bot.update({
+        return active_bot.upsert({
           last_ping: new Date
         }, {where: {
           owner_id: req.user.id
         }})
-      }).then(function(updated) {
+      }).then(function(upserted) {
+        console.log('upsert', upserted)
         return res.status(200).json({
           error: false,
           status: 200,
