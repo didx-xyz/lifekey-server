@@ -60,6 +60,7 @@ module.exports = [
       var {active_bot} = this.get('models')
       var errors = this.get('db_errors')
       console.log('bot ping from', req.user.nickname, 'at', req.headers['x-real-ip'])
+      console.log(req.user.toJSON())
 
       req.user.update({
         host_address: req.headers['x-real-ip']
