@@ -5,7 +5,8 @@ module.exports = function(instance, sqlize) {
   return instance.define('active_bot', {
     owner_id: {
       type: sqlize.INTEGER,
-      allowNull: false
+      allowNull: false,
+      unique: true
     },
     last_ping: {
       type: sqlize.DATE,
