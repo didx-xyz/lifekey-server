@@ -81,6 +81,7 @@ module.exports = [
         })
       }).catch(function(err) {
         err = errors(err)
+        console.log(err)
         return res.status(
           err.status || 500
         ).json({
