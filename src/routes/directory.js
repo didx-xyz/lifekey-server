@@ -81,7 +81,7 @@ module.exports = [
         })
       }).catch(function(err) {
         err = errors(err)
-        console.log(err)
+        console.log(err.body.validation_errors)
         return res.status(
           err.status || 500
         ).json({
