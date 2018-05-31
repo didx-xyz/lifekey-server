@@ -20,7 +20,7 @@
   "author": "Ant Cosentino <ant@io.co.za>",
   "license": "UNLICENSED",
   "dependencies": {
-    "lifekey-crypto": "git@github.com:consent-global/lifekey-crypto.git",
+    "lifekey-crypto": "~/repo/lifekey-crypto",
     "blocked": "^1.2.1",
     "body-parser": "^1.15.2",
     "cors": "^2.8.1",
@@ -29,7 +29,7 @@
     "ethereumjs-util": "^5.1.1",
     "express": "^4.14.0",
     "fluster": "0.0.15",
-    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#0a2a31b55a341a88ed74cc3786d62d8cf88988ea",
+    "identity-service-wrapper": "~/repo/identity-service-wrapper",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
