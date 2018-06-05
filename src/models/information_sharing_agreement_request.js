@@ -3,37 +3,29 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('information_sharing_agreement_request', {
-    from_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
-    },
     from_did: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    from_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    to_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     to_did: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    to_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    document: {
-      type: sqlize.TEXT,
       allowNull: false
+    },
+    action_id: {
+      type: sqlize.INTEGER,
+      allowNull: true
     },
     acknowledged: {
       type: sqlize.BOOLEAN,
       allowNull: true
+    },
+    optional_entities: {
+      type: sqlize.TEXT,
+      allowNull: true
+    },
+    required_entities: {
+      type: sqlize.TEXT,
+      allowNull: false
     },
     purpose: {
       type: sqlize.STRING,
@@ -43,16 +35,12 @@ module.exports = function(instance, sqlize) {
       type: sqlize.STRING,
       allowNull: true
     },
-    resolution: {
+    accepted: {
       type: sqlize.BOOLEAN,
       allowNull: true
     },
-    resolver_signature: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    resolver_signing_key_id: {
-      type: sqlize.INTEGER,
+    expires_at: {
+      type: sqlize.DATE,
       allowNull: true
     },
     acknowledged_at: {
@@ -60,10 +48,6 @@ module.exports = function(instance, sqlize) {
       allowNull: true
     },
     resolved_at: {
-      type: sqlize.DATE,
-      allowNull: true
-    },
-    expires_at: {
       type: sqlize.DATE,
       allowNull: true
     }

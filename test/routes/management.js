@@ -4,6 +4,7 @@
 var crypto = require('crypto')
 
 var ec = require('eccrypto')
+var rsa = require('ursa')
 var {expect} = require('chai')
 
 // mock express instance
@@ -11,12 +12,17 @@ var mock = require('../mock/express')
 
 // the test subject
 var routes = require('../../src/routes/management')
+var register_route = require('../../src/routes/register')
 
 // user record fixtures
 var now = Date.now()
-var respondid, respondid2 // sender of connection requests
+var respondid, respondid2, respondid3 // sender of connection requests
+var actions_receipts_isa_id
+var action_delete_id
 var isar_respond1, isar_respond2
+var sharing_isa_id
 var created_isa_id
+var face_verify_token
 var update_uc, update_uc2
 var test_users = [
   {
@@ -46,7 +52,7 @@ var test_users = [
     nickname: `u_3${now}`,
     device_id: `u_3${now}`,
     device_platform: 'ios',
-    public_key_algorithm: 'secp256k1',
+    public_key_algorithm: 'rsa',
     public_key: '',
     plaintext_proof: `u_3${now}`,
     signable_proof: crypto.createHash('sha256').update(`u_3${now}`).digest(),
@@ -57,10 +63,39 @@ var test_users = [
     nickname: `u_4${now}`,
     device_id: `u_4${now}`,
     device_platform: 'ios',
-    public_key_algorithm: 'secp256k1',
+    public_key_algorithm: 'rsa',
     public_key: '',
     plaintext_proof: `u_4${now}`,
     signable_proof: crypto.createHash('sha256').update(`u_4${now}`).digest(),
+    signed_proof: ''
+  },
+  {
+    email: `u_5${now}@example.com`,
+    nickname: `u_5${now}`,
+    device_id: `u_5${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: '',
+    plaintext_proof: `u_5${now}`,
+    signable_proof: crypto.createHash('sha256').update(`u_5${now}`).digest(),
+    signed_proof: '',
+    fingerprint: {
+      public_key_algorithm: 'rsa',
+      public_key: '',
+      signable_proof: crypto.createHash('sha256').update(`u_5${now}`).digest(),
+      plaintext_proof: `u_5${now}`,
+      signed_proof: ''
+    }
+  },
+  {
+    email: `u_6${now}@example.com`,
+    nickname: `u_5${now}`,
+    device_id: `u_6${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: '',
+    plaintext_proof: `u_6${now}`,
+    signable_proof: crypto.createHash('sha256').update(`u_6${now}`).digest(),
     signed_proof: ''
   }
 ]
@@ -80,9 +115,9 @@ var test_users_fail_cases = [
   },
   // mgmt_register - non-hex case
   {
-    email: `u_5${now}@example.com`,
-    nickname: `u_5${now}`,
-    device_id: `u_5${now}2`,
+    email: `u_8${now}@example.com`,
+    nickname: `u_8${now}`,
+    device_id: `u_8${now}`,
     device_platform: 'android',
     public_key_algorithm: 'secp256k1',
     public_key: 'qux',
@@ -101,7 +136,57 @@ var test_users_fail_cases = [
     plaintext_proof: 'qux',
     signable_proof: 'qux',
     signed_proof: 'qux'
-  }
+  },
+
+  // mgmt_register - no email
+  {
+    email: 'foofa',
+    nickname: `u_5${now}`,
+    webhook_url: 'http://example.com/abc123' + now,
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`foofa_1${now}`).digest(),
+    signed_proof: 'qux'
+  },
+
+  // mgmt_register - no string for webhook_url
+  {
+    email: `u_6${now}@example.com`,
+    nickname: `u_6${now}`,
+    webhook_url: 1234,
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_6${now}`).digest(),
+    signed_proof: 'qux'
+  },
+
+  // mgmt_register - no url given for webhook_url
+  {
+    email: `u_7${now}@example.com`,
+    nickname: `u_7${now}`,
+    webhook_url: 'i hope this isnt a real url',
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_7${now}`).digest(),
+    signed_proof: 'qux'
+  },
+
+  // mgmt_register - missing fingerprint args
+  {
+    email: `u_8${now}@example.com`,
+    nickname: `u_8${now}`,
+    device_id: `u_8${now}`,
+    device_platform: 'ios',
+    public_key_algorithm: 'rsa',
+    public_key: 'qux',
+    plaintext_proof: 'qux',
+    signable_proof: crypto.createHash('sha256').update(`u_8${now}`).digest(),
+    signed_proof: 'qux',
+    fingerprint: {}
+  },
 ]
 
 before(function(done) {
@@ -111,52 +196,82 @@ before(function(done) {
   require('../../src/init/database')(
     false // disable sql logging
   ).then(function(database) {
+    mock.express.set('env', {
+      _: process.env._,
+      SERVER_HOSTNAME: 'localhost'
+    })
+    mock.express.set('db', database.db)
     mock.express.set('models', database.models)
+    mock.express.set('db_errors', database.errors)
     console.log('✓ initialised database models')
     return Promise.resolve()
   }).then(function() {
     test_users[0].private_key = crypto.randomBytes(32)
     test_users[1].private_key = crypto.randomBytes(32)
-    test_users[2].private_key = crypto.randomBytes(32)
-    test_users[3].private_key = crypto.randomBytes(32)
+    test_users[2].private_key = rsa.generatePrivateKey()
+    test_users[3].private_key = rsa.generatePrivateKey()
+    test_users[4].private_key = rsa.generatePrivateKey()
+    test_users[4].fingerprint.private_key = rsa.generatePrivateKey()
+    test_users[5].private_key = rsa.generatePrivateKey()
+    test_users_fail_cases[3].private_key = rsa.generatePrivateKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.getPublic(test_users[0].private_key),
       ec.getPublic(test_users[1].private_key),
-      ec.getPublic(test_users[2].private_key),
-      ec.getPublic(test_users[3].private_key)
+      test_users[2].private_key.toPublicPem().toString('utf8'),
+      test_users[3].private_key.toPublicPem().toString('utf8'),
+      test_users[4].private_key.toPublicPem().toString('utf8'),
+      test_users[4].fingerprint.private_key.toPublicPem().toString('utf8'),
+      test_users[5].private_key.toPublicPem().toString('utf8'),
+      test_users_fail_cases[3].private_key.toPublicPem().toString('utf8')
     ])
   }).then(function(public_keys) {
     console.log('✓ calculated public keys')
-    test_users[0].public_key = public_keys[0].toString('hex')
-    test_users[1].public_key = public_keys[1].toString('hex')
-    test_users[2].public_key = public_keys[2].toString('hex')
-    test_users[3].public_key = public_keys[3].toString('hex')
-    console.log('✓ hexified public keys')
+    test_users[0].public_key = public_keys[0].toString('base64')
+    test_users[1].public_key = public_keys[1].toString('base64')
+    test_users[2].public_key = public_keys[2]
+    test_users[3].public_key = public_keys[3]
+    test_users[4].public_key = public_keys[4]
+    test_users[4].fingerprint.public_key = public_keys[5]
+    test_users[5].public_key = public_keys[6]
+    test_users_fail_cases[3].public_key = public_keys[7]
+    console.log('✓ base64ified public keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.sign(test_users[0].private_key, test_users[0].signable_proof),
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
-      ec.sign(test_users[2].private_key, test_users[2].signable_proof),
-      ec.sign(test_users[3].private_key, test_users[3].signable_proof)
+      test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', false),
+      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false),
+      test_users[4].private_key.hashAndSign('sha256', test_users[4].plaintext_proof, 'utf8', 'base64', false),
+      test_users[4].fingerprint.private_key.hashAndSign('sha256', test_users[4].fingerprint.plaintext_proof, 'utf8', 'base64', false),
+      test_users[5].private_key.hashAndSign('sha256', test_users[5].plaintext_proof, 'utf8', 'base64', false),
+      test_users_fail_cases[3].private_key.hashAndSign('sha256', test_users_fail_cases[3].plaintext_proof, 'utf8', 'base64', false)
     ])
   }).then(function(signatures) {
     console.log('✓ signed initial key proofs')
-    test_users[0].signed_proof = signatures[0].toString('hex')
-    test_users[1].signed_proof = signatures[1].toString('hex')
-    test_users[2].signed_proof = signatures[2].toString('hex')
-    test_users[3].signed_proof = signatures[3].toString('hex')
-    console.log('✓ hexified signed proofs')
+    test_users[0].signed_proof = signatures[0].toString('base64')
+    test_users[1].signed_proof = signatures[1].toString('base64')
+    test_users[2].signed_proof = signatures[2]
+    test_users[3].signed_proof = signatures[3]
+    test_users[4].signed_proof = signatures[4]
+    test_users[4].fingerprint.signed_proof = signatures[5]
+    test_users[5].signed_proof = signatures[6]
+    test_users_fail_cases[3].signed_proof = signatures[7]
+    console.log('✓ base64ified signed proofs')
     return Promise.resolve()
   }).then(function() {
     test_users[0].signable_proof = test_users[0].signable_proof.toString('hex')
     test_users[1].signable_proof = test_users[1].signable_proof.toString('hex')
     test_users[2].signable_proof = test_users[2].signable_proof.toString('hex')
     test_users[3].signable_proof = test_users[3].signable_proof.toString('hex')
-    console.log('✓ hexified signable proofs')
+    test_users[4].signable_proof = test_users[4].signable_proof.toString('hex')
+    test_users[4].fingerprint.signable_proof = test_users[4].fingerprint.signable_proof.toString('hex')
+    test_users[5].signable_proof = test_users[5].signable_proof.toString('hex')
+    test_users_fail_cases[3].signable_proof = test_users_fail_cases[3].signable_proof.toString('hex')
+    console.log('✓ base64ified signable proofs')
     console.log('✓ before done')
     done()
   }).catch(done)
@@ -166,19 +281,40 @@ describe('management endpoints', function() {
 
   this.timeout(10000) // these cases do real database calls
                       // increase the timeout to cover for this
-  
-  var mgmt_register = routes[0]
-  var mgmt_device = routes[1]
-  var mgmt_connection_create = routes[2]
-  var mgmt_connection_list = routes[3]
-  var mgmt_connection_respond = routes[4]
-  var mgmt_connection_update = routes[5]
-  var mgmt_app_activate = routes[6]
-  var mgmt_isar_create = routes[7]
-  var mgmt_isar_respond = routes[8]
-  var mgmt_isa_list = routes[9]
-  var mgmt_isa_getone = routes[10]
-  var mgmt_isa_remove = routes[11]
+
+  var mgmt_register = register_route
+  var mgmt_update_device = routes[0]
+  var mgmt_cxn_req_create = routes[1]
+  var mgmt_connection_list = routes[2]
+  var mgmt_cxn_req_res = routes[3]
+  var mgmt_cxn_delete = routes[4]
+  var mgmt_app_activate = routes[5]
+  var mgmt_isa_req_create = routes[6]
+  var mgmt_isa_req_res = routes[7]
+  var mgmt_isa_list = routes[8]
+  var mgmt_isa_get_one = routes[9]
+  var mgmt_isa_delete = routes[10]
+  var resource_create = require('../../src/routes/resource')[2]
+  var mgmt_isa_update = routes[12]
+  var mgmt_isa_pull_from = routes[13]
+  var mgmt_isa_push_to = routes[14]
+  var mgmt_thanks_balance_get = routes[15]
+  var mgmt_key_create = routes[16]
+  var mgmt_key_get = routes[17]
+  var mgmt_action_create = routes[18]
+  var mgmt_action_user_get_all = routes[27]
+  var mgmt_action_get_all = routes[19]
+  var mgmt_action_get_one = routes[20]
+  var mgmt_isa_by_action = routes[21]
+  var mgmt_isa_receipt = routes[22]
+  var mgmt_action_delete = routes[23]
+  var mgmt_face_verify_create = routes[24]
+  var mgmt_face_verify_get = routes[25]
+  var mgmt_face_verify_respond = routes[26]
+
+  var mgmt_send_thanks = routes[28]
+
+  var mgmt_message = routes[29]
 
   describe(`${mgmt_register.method.toUpperCase()} ${mgmt_register.uri}`, function() {
 
@@ -187,37 +323,130 @@ describe('management endpoints', function() {
       mgmt_register.callback.call(mock.express, {
         body: test_users[1]
       }, mock.res(function(res) {
-        
-        if (!res.body.id) return done(new Error('should not be called'))
+        if (res.status !== 201) {
+          return done(new Error('should not be called'))
+        }
         test_users[1].id = res.body.id
-        
+
         mgmt_register.callback.call(mock.express, {
           body: test_users[2]
         }, mock.res(function(res) {
-          if (!res.body.id) return done(new Error('should not be called'))
+          if (res.status !== 201) {
+            return done(new Error('should not be called'))
+          }
           test_users[2].id = res.body.id
-          
+
           mgmt_register.callback.call(mock.express, {
             body: test_users[3]
           }, mock.res(function(res) {
-            if (!res.body.id) return done(new Error('should not be called'))
+            if (res.status !== 201) {
+              return done(new Error('should not be called'))
+            }
             test_users[3].id = res.body.id
-            
-            // DONE!
-            done()
+
+            var user = mock.express.get('models').user
+            Promise.all([
+              test_users[0].id,
+              test_users[1].id,
+              test_users[2].id,
+              test_users[3].id,
+              test_users[4].id
+            ].map(function(id) {
+              return user.update({did: id}, {where: {id: id}})
+            })).then(done.bind(done, null)).catch(done)
           }))
         }))
       }))
     })
-    
-    it('should fail if required parameters are missing', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: {}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing request body parameters')
-        done()
-      }))
+
+    describe('-- failure cases --', function() {
+
+      it('should fail if required parameters are missing', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: {}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing request body parameters')
+          done()
+        }))
+      })
+
+      it('should fail if an attempt to create a user with a duplicate signature is used', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users[0]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('known signature detected')
+          done()
+        }))
+      })
+
+      it('should fail if an attempt to create a duplicate user is made', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[0]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('user already exists')
+          done()
+        }))
+      })
+
+      it('should fail if non-signature key parameters are given', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[1]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('non-signature value given')
+          done()
+        }))
+      })
+
+      it('should fail if an unsupported algorithm is used', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[2]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('unsupported key algorithm')
+          done()
+        }))
+      })
+
+      it('should fail if an attempting to create a user without an email address', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[3]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('validation error')
+          done()
+        }))
+      })
+
+      it('should fail if attempting to create a user without a device id and an invalid webhook address', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[4]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected string type for webhook_url')
+
+          mgmt_register.callback.call(mock.express, {
+            body: test_users_fail_cases[5]
+          }, mock.res(function(res) {
+            expect(res.status).to.equal(400)
+            expect(res.message).to.equal('url not given for webhook_url')
+            done()
+          }))
+        }))
+      })
+
+      it('should fail if missing required fingerprint args', function(done) {
+        mgmt_register.callback.call(mock.express, {
+          body: test_users_fail_cases[6]
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing required fingerprint arguments')
+          done()
+        }))
+      })
     })
 
     it('should insert a new user record if required arguments are given and respond with basic identifier', function(done) {
@@ -232,51 +461,35 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should fail if an attempt to create a user with a duplicate signature is used', function(done) {
+    it('should allow duplicate usernames', function(done) {
       mgmt_register.callback.call(mock.express, {
-        body: test_users[0]
+        body: test_users[5]
       }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('known signature detected')
+        expect(res.status).to.equal(201)
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+        test_users[5].id = res.body.id
         done()
       }))
     })
 
-    it('should fail if an attempt to create a duplicate user is made', function(done) {
+    it('should insert a new user record if using fingerprint signing parameters and respond with a basic identifier', function(done) {
       mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[0]
+        body: test_users[4]
       }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('user already exists')
-        done()
-      }))
-    })
-
-    it('should fail if non-hexadecimal key parameters are given', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[1]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('hexadecimal parsing error in any of: public_key, signable_proof, signed_proof')
-        done()
-      }))
-    })
-
-    it('should fail if an unsupported algorithm is used', function(done) {
-      mgmt_register.callback.call(mock.express, {
-        body: test_users_fail_cases[2]
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('unsupported key algorithm')
+        expect(res.status).to.equal(201)
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+        test_users[4].id = res.body.id
         done()
       }))
     })
   })
 
-  describe(`${mgmt_device.method.toUpperCase()} ${mgmt_device.uri}`, function() {
-    
-    it('should not allow the upsertion of a user_device record if required arguments are missing', function(done) {
-      mgmt_device.callback.call(mock.express, {
+  describe(`${mgmt_update_device.method.toUpperCase()} ${mgmt_update_device.uri}`, function() {
+
+    it('should not allow the update of a hook record if required arguments are missing', function(done) {
+      mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {}
       }, mock.res(function(res) {
@@ -286,8 +499,19 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should allow the upsertion of a user_device record if all required arguments are given', function(done) {
-      mgmt_device.callback.call(mock.express, {
+    it('should allow the update of a webhook url if all required arguments are given', function(done) {
+      mgmt_update_device.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {webhook_url: 'http://example.com/myhook' + Date.now()}
+      }, mock.res(function(res) {
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('updated')
+        done()
+      }))
+    })
+
+    it('should allow the update of a user_device record if all required arguments are given', function(done) {
+      mgmt_update_device.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
           device_id: Date.now() + 'abc1232342asd',
@@ -295,17 +519,38 @@ describe('management endpoints', function() {
         }
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
-        expect(res.message).to.equal('device_id saved')
+        expect(res.message).to.equal('updated')
         done()
       }))
     })
   })
 
-  describe(`${mgmt_connection_create.method.toUpperCase()} ${mgmt_connection_create.uri}`, function() {
-    
+  describe(`${mgmt_cxn_req_create.method.toUpperCase()} ${mgmt_cxn_req_create.uri}`, function() {
+
+    before(function(done) {
+      // set up for final case in suite
+      mock.express.get(
+        'models'
+      ).user_connection.create({
+        to_did: test_users[3].id,
+        from_did: test_users[2].id,
+        enabled: true
+      }).then(done.bind(done, null)).catch(done)
+    })
+
+    after(function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        body: {target: test_users[3].id}
+      }, mock.res(function(res) {
+        respondid3 = res.body.id
+        done(res.error && true || null)
+      }))
+    })
+
     it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[0].id},
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
         body: {}
       }, mock.res(function(res) {
         expect(res.status).to.equal(400)
@@ -314,20 +559,9 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should fail for unparsable document', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[0].id},
-        body: {document: 'lasjfdljasdfljksdfj'}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
-        done()
-      }))
-    })
-    
     it('should disallow self-association', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[0].id},
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
         body: {target: test_users[0].id}
       }, mock.res(function(res) {
         expect(res.status).to.equal(400)
@@ -336,9 +570,9 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should create a user connection request (NOT using jsonld)', function(done) {
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[0].id},
+    it('should create a user connection request', function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
         body: {target: test_users[1].id}
       }, mock.res(function(res) {
         expect(res.status).to.equal(201)
@@ -350,64 +584,76 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should create a user connection request (using jsonld)', function(done) {
-      var document = {
-        "@context": "http://schema.cnsnt.io/connection_request",
-        "@type": "ConnectionRequest",
-        "from": test_users[2].id,
-        "to": test_users[3].id,
-        "resolution": null,
-        "dateAcknowledged": null,
-        "dateResolved": null,
-        "resolverSignature": null
-      }
-
-      mgmt_connection_create.callback.call(mock.express, {
-        user: {id: test_users[2].id},
-        body: {document: JSON.stringify(document)}
+    it('should disallow the creation of duplicate connection requests', function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
+        body: {target: test_users[1].id}
       }, mock.res(function(res) {
-        expect(res.status).to.equal(201)
-        expect(res.message).to.equal('user_connection_request record created')
-        respondid2 = res.body.id
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_connection_request record already exists')
+        expect(res.body).to.equal(null)
         done()
       }))
     })
-    
+
+    it('should disallow the creation of a connection request when an established connection already exists', function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {target: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_connection record already exists')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
   })
 
   describe(`${mgmt_connection_list.method.toUpperCase()} ${mgmt_connection_list.uri}`, function() {
     it('should return arrays of unacknowledged connection requests and enabled connections', function(done) {
       mgmt_connection_list.callback.call(mock.express, {
-        user: {id: test_users[1].id}
+        user: {did: test_users[1].id}
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
         expect(Array.isArray(res.body.unacked)).to.be.ok
         expect(res.body.unacked.length).to.equal(1)
-        expect(res.body.unacked[0].id).to.equal(respondid)
+        expect(res.body.unacked[0].ucr_id).to.equal(respondid)
         expect(Array.isArray(res.body.enabled)).to.be.ok
         expect(res.body.enabled.length).to.equal(0)
-        
+
         mgmt_connection_list.callback.call(mock.express, {
-          user: {id: test_users[3].id}
+          user: {did: test_users[3].id}
         }, mock.res(function(res) {
           expect(res.status).to.equal(200)
-          expect(Array(res.body.unacked)).to.be.ok
+          expect(Array.isArray(res.body.unacked)).to.be.ok
           expect(res.body.unacked.length).to.equal(1)
-          expect(res.body.unacked[0].id).to.equal(respondid2)
+          expect(res.body.unacked[0].ucr_id).to.equal(respondid3)
           expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(0)
-
+          expect(res.body.enabled.length).to.equal(1)
           done()
         }))
       }))
     })
   })
 
-  describe(`${mgmt_connection_respond.method.toUpperCase()} ${mgmt_connection_respond.uri}`, function() {
+  describe(`${mgmt_cxn_req_res.method.toUpperCase()} ${mgmt_cxn_req_res.uri}`, function() {
+
+    before(function(done) {
+      // add action urls for these two
+      var now = Date.now()
+      mock.express.models.user.update({
+        actions_url: 'http://example.com/foo' + now
+      }, {
+        where: {id: test_users[1].id}
+      }).then(done.bind(done, null)).catch(done)
+    })
+
     it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_respond.callback.call(mock.express, {
+      mgmt_cxn_req_res.callback.call(mock.express, {
         params: {user_connection_request_id: respondid},
-        user: {id: test_users[1].id},
+        user: {did: test_users[1].id},
         body: {}
       }, mock.res(function(res) {
         expect(res.status).to.equal(400)
@@ -416,93 +662,86 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should accept the user connection request without error (NOT using jsonld)', function(done) {
-      mgmt_connection_respond.callback.call(mock.express, {
-        params: {user_connection_request_id: respondid},
-        user: {id: test_users[1].id},
+    it('should return 201 if the connection was created and return sharing isa id if both users are not programmatic', function(done) {
+      mgmt_cxn_req_res.callback.call(mock.express, {
+        params: {user_connection_request_id: respondid3},
+        user: {
+          did: test_users[3].id
+        },
         body: {accepted: true}
       }, mock.res(function(res) {
-
         // assert that the acceptance was successful
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('user_connection created')
         expect(typeof res.body).to.equal('object')
         expect(typeof res.body.id).to.equal('number')
+
+        var call_data = process.get_last_call_data()
+        expect(
+          !!call_data.notification_request.data.sharing_isa_id
+        ).to.equal(true)
+
+        sharing_isa_id = call_data.notification_request.data.sharing_isa_id
+
+        // enumerate list of connections again to assert correct
+        mgmt_connection_list.callback.call(mock.express, {
+          user: {did: test_users[3].id}
+        }, mock.res(function(res) {
+          expect(res.status).to.equal(200)
+          expect(Array.isArray(res.body.unacked)).to.be.ok
+          expect(res.body.unacked.length).to.equal(0)
+          expect(Array.isArray(res.body.enabled)).to.be.ok
+          expect(res.body.enabled.length).to.equal(2)
+          done()
+        }))
+      }))
+    })
+
+    it('should return 201 if the connection was created and return actions url for connection with programmatic user', function(done) {
+      mgmt_cxn_req_res.callback.call(mock.express, {
+        params: {user_connection_request_id: respondid},
+        user: {
+          did: test_users[1].id
+        },
+        body: {accepted: true}
+      }, mock.res(function(res) {
+        // assert that the acceptance was successful
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('user_connection created')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.id).to.equal('number')
+
+        var call_data = process.get_last_call_data()
+        expect(
+          !!call_data.notification_request.data.actions_url
+        ).to.equal(true)
+
+        var actions_url = call_data.notification_request.data.actions_url
+
         update_uc = res.body.id
 
         // enumerate list of connections again to assert correct
         mgmt_connection_list.callback.call(mock.express, {
-          user: {id: test_users[1].id}
+          user: {did: test_users[1].id}
         }, mock.res(function(res) {
           expect(res.status).to.equal(200)
           expect(Array.isArray(res.body.unacked)).to.be.ok
           expect(res.body.unacked.length).to.equal(0)
           expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(1)
+          expect(res.body.enabled.length).to.equal(2)
           done()
         }))
       }))
     })
 
-    it('should accept the user connection request without error (using jsonld)', function(done) {
-      var now = new Date().toISOString()
-      var resolved_document = {
-        "@context": "http://schema.cnsnt.io/connection_request",
-        "@type": "ConnectionRequest",
-        from: test_users[2].id,
-        to: test_users[3].id,
-        resolution: true,
-        dateAcknowledged: now,
-        dateResolved: now
-      }
-
-      mgmt_connection_respond.callback.call(mock.express, {
-        params: {user_connection_request_id: respondid2},
-        user: {id: test_users[3].id},
-        body: {document: JSON.stringify(resolved_document)}
-      }, mock.res(function(res) {
-
-        // assert that the acceptance was successful
-        expect(res.status).to.equal(201)
-        expect(res.message).to.equal('user_connection created')
-        expect(typeof res.body).to.equal('object')
-        expect(typeof res.body.id).to.equal('number')
-        update_uc2 = res.body.id
-
-        // enumerate list of connections again to assert correct
-        mgmt_connection_list.callback.call(mock.express, {
-          user: {id: test_users[3].id}
-        }, mock.res(function(res) {
-          expect(res.status).to.equal(200)
-          expect(Array.isArray(res.body.unacked)).to.be.ok
-          expect(res.body.unacked.length).to.equal(0)
-          expect(Array.isArray(res.body.enabled)).to.be.ok
-          expect(res.body.enabled.length).to.equal(1)
-
-          done()
-        }))
-      }))
-    })
+    // TODO test case: should return not found if the user is not associated to the record
   })
 
-  describe(`${mgmt_connection_update.method.toUpperCase()} ${mgmt_connection_update.uri}`, function() {
-    it('should fail if required arguments are missing', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
-        params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing request body parameters')
-        done()
-      }))
-    })
-
+  describe(`${mgmt_cxn_delete.method.toUpperCase()} ${mgmt_cxn_delete.uri}`, function() {
     it('should return not found if the user is not associated to the record', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
+      mgmt_cxn_delete.callback.call(mock.express, {
         params: {user_connection_id: update_uc},
-        user: {id: Number.MAX_VALUE},
-        body: {enabled: false}
+        user: {did: Number.MAX_VALUE}
       }, mock.res(function(res) {
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('user_connection record not found')
@@ -510,43 +749,20 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should return no-op if the request would not change the record', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
+    it('should delete the connection record if the caller is associated with the record', function(done) {
+      mgmt_cxn_delete.callback.call(mock.express, {
         params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {enabled: true}
-      }, mock.res(function(res) {
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('no-op')
-        done()
-      }))
-    })
-    
-    it('should update the user_connection record enabled bit to the given value', function(done) {
-      mgmt_connection_update.callback.call(mock.express, {
-        params: {user_connection_id: update_uc},
-        user: {id: test_users[0].id},
-        body: {enabled: false}
+        user: {did: test_users[1].id}
       }, mock.res(function(res) {
         expect(res.status).to.equal(200)
-        expect(res.message).to.equal('user_connection record updated')
-        
-        // reset the value for subsequent tests
-        mgmt_connection_update.callback.call(mock.express, {
-          params: {user_connection_id: update_uc},
-          user: {id: test_users[0].id},
-          body: {enabled: true}
-        }, mock.res(function(res) {
-          expect(res.status).to.equal(200)
-          expect(res.message).to.equal('user_connection record updated')
-          done()
-        }))
+        expect(res.message).to.equal('user_connection record deleted')
+        done()
       }))
     })
   })
 
   describe(`${mgmt_app_activate.method.toUpperCase()} ${mgmt_app_activate.uri}`, function() {
-    
+
     var activation_code
     before(function(done) {
       mock.express.models.user.findOne({
@@ -560,10 +776,13 @@ describe('management endpoints', function() {
       }).catch(done)
     })
 
-    it('should update the app_activation_link_clicked bit to enabled if not yet enabled and respond with html string', function(done) {
+    it('should update the app_activation_link_clicked bit to enabled if not yet enabled, send a signal to generate a vc for email address and respond with html string', function(done) {
       mgmt_app_activate.callback.call(mock.express, {
         params: {activation_code: activation_code}
       }, mock.res(function(res) {
+        var call_data = process.get_last_call_data()
+        expect('vc_generation_request' in call_data).to.equal(true)
+        expect(call_data.vc_generation_request.field).to.equal('email')
         expect(typeof res).to.equal('string')
         done()
       }))
@@ -590,26 +809,29 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isar_create.method.toUpperCase()} ${mgmt_isar_create.uri}`, function(done) {
+  describe(`${mgmt_isa_req_create.method.toUpperCase()} ${mgmt_isa_req_create.uri}`, function() {
 
-    var blank_isar_document = {
-      "@context": "http://schema.cnsnt.io/information_sharing_agreement",
-      "@type": "InformationSharingAgreement",
-      from: null,
-      to: null,
-      requestedResourceUris: [],
-      permittedResourceUris: [],
-      resolution: null,
-      purpose: null,
-      license: null,
-      resolverSignature: null,
-      dateAcknowledged: null,
-      dateResolved: null,
-      dateExpires: null
-    }
+    before(function(done) {
+      mgmt_cxn_req_create.callback.call(mock.express, {
+        user: {did: test_users[0].id},
+        body: {target: test_users[1].id}
+      }, mock.res(function(res) {
+        if (res.status !== 201) return done(`should not have been called ${res.status}`)
+
+        mgmt_cxn_req_res.callback.call(mock.express, {
+          params: {user_connection_request_id: res.body.id},
+          user: {did: test_users[1].id},
+          body: {accepted: true}
+        }, mock.res(function(res) {
+          if (res.status !== 201) return done(`should not have been called ${res.status}`)
+
+          done()
+        }))
+      }))
+    })
 
     it('should respond with error if missing arguments', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
+      mgmt_isa_req_create.callback.call(mock.express, {
         body: {},
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
@@ -619,132 +841,45 @@ describe('management endpoints', function() {
         done()
       }))
     })
-    
-    it('should respond with error if json is not given', function(done) {
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: 'foo'},
+
+    it('should respond with error if required_entities field is not arrayish or lengthy', function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        body: {
+          to: 'bar',
+          purpose:'lolz',
+          license: 'none'
+        },
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
-        done()
-      }))
-    })
+        expect(res.message).to.equal('expected lengthy arrayish type for required_entities field')
 
-    it('should respond with error if from field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for from field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if the from field doesnt match the calling agents identifier', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'baz'
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('the from field does not match the calling agents identifier')
-        done()
-      }))
-    })
-
-    it('should respond with error if to field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if purpose field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if license field is falsy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.purpose = 'lolz'
-
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected truthy type for to field but got undefined')
-        done()
-      }))
-    })
-
-    it('should respond with error if requestedResourceUris field is not arrayish or lengthy', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.to = 'bar'
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: 'foo', did: 'bar'}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
-        
-        broken_doc.requestedResourceUris = []
-        
-        mgmt_isar_create.callback.call(mock.express, {
-          body: {document: JSON.stringify(broken_doc)},
+        mgmt_isa_req_create.callback.call(mock.express, {
+          body: {
+            to: 'bar',
+            purpose:'lolz',
+            license: 'none',
+            required_entities: []
+          },
           user: {id: 'foo', did: 'bar'}
         }, mock.res(function(res) {
           expect(res.error).to.equal(true)
           expect(res.status).to.equal(400)
-          expect(res.message).to.equal('expected lenghty arrayish type for requestedResourceUris field')
+          expect(res.message).to.equal('expected lengthy arrayish type for required_entities field')
           done()
         }))
       }))
     })
 
     it('should respond with error if the to user is not found', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = 'foo'
-      broken_doc.to = 'baz'
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      broken_doc.requestedResourceUris = ['/resource/foo/bar']
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
+      mgmt_isa_req_create.callback.call(mock.express, {
+        body: {
+          to: 'baz',
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        },
         user: {id: 'foo', did: 'bar'}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -754,35 +889,32 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should respond with error if from and to fields do not represent users with an active connection', function(done) {
-      var broken_doc = blank_isar_document
-      broken_doc.from = test_users[0].id
-      broken_doc.to = test_users[3].id
-      broken_doc.purpose = 'lolz'
-      broken_doc.license = 'none'
-      broken_doc.requestedResourceUris = ['/resource/foo/bar']
-      
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(broken_doc)},
-        user: {id: test_users[0].id, did: test_users[0].id}
+    it('should respond with error if the calling agent and the to-user do not have an active connection', function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        },
+        user: {did: test_users[4].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected an association to exist between the specified users but found none')
+        expect(res.message).to.equal('user_connection record not found')
         done()
       }))
     })
 
     it('should create isar record if all arguments check out', function(done) {
-      var working_doc = blank_isar_document
-      working_doc.from = test_users[2].id
-      working_doc.to = test_users[3].id
-      working_doc.purpose = 'lolz'
-      working_doc.license = 'none'
-      working_doc.requestedResourceUris = ['/resource/foo/bar']
-      mgmt_isar_create.callback.call(mock.express, {
-        body: {document: JSON.stringify(working_doc)},
-        user: {id: test_users[2].id, did: test_users[2].id}
+      mgmt_isa_req_create.callback.call(mock.express, {
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        },
+        user: {did: test_users[2].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(201)
@@ -791,14 +923,16 @@ describe('management endpoints', function() {
         expect(typeof res.body.id).to.equal('number')
 
         isar_respond1 = res.body.id
-        
-        working_doc.from = test_users[0].id
-        working_doc.to = test_users[1].id
-        mgmt_isar_create.callback.call(mock.express, {
-          body: {document: JSON.stringify(working_doc)},
-          user: {id: test_users[0].id, did: test_users[0].id}
+
+        mgmt_isa_req_create.callback.call(mock.express, {
+          body: {
+            to: test_users[1].id,
+            purpose: 'lolz',
+            license: 'none',
+            required_entities: ['/resource/foo/bar']
+          },
+          user: {did: test_users[0].id}
         }, mock.res(function(res) {
-          
           expect(res.error).to.equal(false)
           expect(res.status).to.equal(201)
           expect(res.message).to.equal('information_sharing_agreement_request record created')
@@ -815,15 +949,15 @@ describe('management endpoints', function() {
   describe(`${mgmt_isa_list.method.toUpperCase()} ${mgmt_isa_list.uri}`, function(done) {
     it('should respond with arrays of unacknowledged isar records, enabled isa records and disbaled isa records', function(done) {
       mgmt_isa_list.callback.call(mock.express, {
-        user: {id: test_users[3].id, did: test_users[3].id}
+        user: {did: test_users[3].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
         expect(typeof res.body).to.equal('object')
         expect(
-          Array.isArray(res.body.unacked) && 
-          Array.isArray(res.body.enabled) && 
+          Array.isArray(res.body.unacked) &&
+          Array.isArray(res.body.enabled) &&
           Array.isArray(res.body.disabled)
         ).to.equal(true)
         expect(res.body.unacked.length).to.equal(1)
@@ -835,164 +969,65 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isar_respond.method.toUpperCase()} ${mgmt_isar_respond.uri}`, function(done) {
-    
-    var document, document2
+  describe(`${mgmt_isa_req_res.method.toUpperCase()} ${mgmt_isa_req_res.uri}`, function() {
+
+    var requested1, requested2
     before(function(done) {
       mgmt_isa_list.callback.call(mock.express, {
-        user: {id: test_users[3].id, did: test_users[3].id}
+        user: {did: test_users[3].id}
       }, mock.res(function(res) {
         if (res.error) return done(new Error('should not have been called'))
-        document = JSON.parse(res.body.unacked[0].document)
-        
+        requested1 = res.body.unacked[0].required_entities
+
         mgmt_isa_list.callback.call(mock.express, {
-          user: {id: test_users[1].id, did: test_users[1].id}
+          user: {did: test_users[1].id}
         }, mock.res(function(res) {
           if (res.error) return done(new Error('should not have been called'))
-          document2 = JSON.parse(res.body.unacked[0].document)
+          requested2 = res.body.unacked[0].required_entities
           done()
         }))
       }))
     })
 
-    it('should respond with an error if missing required arguments', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should respond with an error if a boolean is not given for the accepted field', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {},
-        user: {id: test_users[3].id, did: test_users[3].id}
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('missing required arguments')
-        done()
-      }))
-    })
-
-    it('should respond with an error if the specified signing key does not exist', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {
-          document: 'foo',
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {accepted: 'foo'},
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'bar'}
-        }
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(404)
-        expect(res.message).to.equal('crypto_key record not found')
-        done()
-      }))
-    })
-
-    it('should respond with an error if json is not given', function(done) {
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {
-          document: 'foo',
-          signature: true,
-          signing_key_alias: 'foo'
-        },
-        user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {
-            alias: 'foo'
-          }
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected well-formed and validatable json string')
+        expect(res.message).to.equal('expected boolean type for accepted field')
         done()
       }))
     })
 
-    it('should respond with an error if a boolean is not given for the resolution field', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = 'foo'
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should respond with an error if a truthy accepted is given but a non lengthy and/or non arrayish type is given for the permitted_resources field', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
         body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
+          accepted: true,
+          permitted_resources: []
         },
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(400)
-        expect(res.message).to.equal(`expected boolean type for field resolution but got ${typeof resolved_document.resolution}`)
+        expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
         done()
-      }))
-    })
-
-    it('should respond with an error if a truthy resolution is given but a non lengthy and/or non arrayish type is given for the permittedresourceuris field', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
-      mgmt_isar_respond.callback.call(mock.express, {
-        params: {isar_id: 'foo'},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
-        user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
-        }
-      }, mock.res(function(res) {
-        expect(res.error).to.equal(true)
-        expect(res.status).to.equal(400)
-        expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
-        
-        resolved_document.permittedResourceUris = []
-        mgmt_isar_respond.callback.call(mock.express, {
-          params: {isar_id: 'foo'},
-          body: {
-            document: JSON.stringify(resolved_document),
-            signature: true,
-            signing_key_alias: 'foo'
-          },
-          user: {
-            id: test_users[3].id, 
-            did: test_users[3].id,
-            crypto: {alias: 'foo'}
-          }
-        }, mock.res(function(res) {
-          expect(res.error).to.equal(true)
-          expect(res.status).to.equal(400)
-          expect(res.message).to.equal('expected lenghty arrayish type for permittedResourceUris field')
-          
-          done()
-        }))
       }))
     })
 
     it('should respond with an error if the isar record is not found', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
-      resolved_document.permittedResourceUris = ['/resource/foo/bar']
-      mgmt_isar_respond.callback.call(mock.express, {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: 'foo'},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {accepted: false},
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
@@ -1002,20 +1037,12 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should not create an isa and isp records if resolution is falsy', function(done) {
-      var resolved_document = document2
-      resolved_document.resolution = false
-      mgmt_isar_respond.callback.call(mock.express, {
+    it('should not create an isa and isp records if accepted is falsy', function(done) {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: isar_respond2},
-        body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
-        },
+        body: {accepted: false},
         user: {
-          id: test_users[1].id, 
-          did: test_users[1].id,
-          crypto: {alias: 'foo'}
+          did: test_users[1].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
@@ -1026,58 +1053,48 @@ describe('management endpoints', function() {
     })
 
     it('should create an isa and isp records if all checks out', function(done) {
-      var resolved_document = document
-      resolved_document.resolution = true
-      resolved_document.permittedResourceUris = ['/resource/foo/bar']
-      mgmt_isar_respond.callback.call(mock.express, {
+      mgmt_isa_req_res.callback.call(mock.express, {
         params: {isar_id: isar_respond1},
         body: {
-          document: JSON.stringify(resolved_document),
-          signature: true,
-          signing_key_alias: 'foo'
+          accepted: true,
+          permitted_resources: [
+            {id: 10e2, schema: 'foo'}
+          ]
         },
         user: {
-          id: test_users[3].id, 
-          did: test_users[3].id,
-          crypto: {alias: 'foo'}
+          did: test_users[3].id
         }
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(201)
         expect(res.message).to.equal('created information_sharing_agreement record')
         created_isa_id = res.body.id
+        var call_data = process.get_nth_call_data(-2)
+        expect(call_data.isa_ledger_request.isa_id).to.equal(created_isa_id)
         done()
       }))
     })
   })
 
-  describe(`${mgmt_isa_getone.method.toUpperCase()} ${mgmt_isa_getone.uri}`, function() {
+  describe(`${mgmt_isa_get_one.method.toUpperCase()} ${mgmt_isa_get_one.uri}`, function() {
 
     it('should respond with an error if the isa record does not exist or does not belong to the calling agent', function(done) {
-      mgmt_isa_getone.callback.call(mock.express, {
-        params: {isa_id: 'foo'},
-        user: {id: test_users[3].id, did: test_users[3].id}
+
+      mgmt_isa_get_one.callback.call(mock.express, {
+        params: {isa_id: created_isa_id},
+        user: {did: test_users[0].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
         expect(res.message).to.equal('information_sharing_agreement record not found')
-        
-        mgmt_isa_getone.callback.call(mock.express, {
-          params: {isa_id: created_isa_id},
-          user: {id: test_users[0].id, did: test_users[0].id}
-        }, mock.res(function(res) {
-          expect(res.error).to.equal(true)
-          expect(res.status).to.equal(404)
-          expect(res.message).to.equal('information_sharing_agreement record not found')
-          done()
-        }))
+        done()
       }))
     })
 
     it('should respond with an object describing the isa, isp and isar', function(done) {
-      mgmt_isa_getone.callback.call(mock.express, {
+      mgmt_isa_get_one.callback.call(mock.express, {
         params: {isa_id: created_isa_id},
-        user: {id: test_users[3].id, did: test_users[3].id}
+        user: {did: test_users[3].id}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
@@ -1093,12 +1110,89 @@ describe('management endpoints', function() {
     })
   })
 
-  describe(`${mgmt_isa_remove.method.toUpperCase()} ${mgmt_isa_remove.uri}`, function() {
+  describe(`${mgmt_isa_delete.method.toUpperCase()} ${mgmt_isa_delete.uri}`, function() {
+
+    // TODO cover error branches
 
     it('should respond with an error if the isa record does not exist', function(done) {
-      mgmt_isa_remove.callback.call(mock.express, {
+      mgmt_isa_delete.callback.call(mock.express, {
+        params: {isa_id: created_isa_id},
+        user: {did: test_users[3].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_update.method.toUpperCase()} ${mgmt_isa_update.uri}`, function() {
+
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        expect(typeof res.body.id).to.equal('number')
+
+        mgmt_isa_req_res.callback.call(mock.express, {
+          user: {did: test_users[3].id},
+          params: {isar_id: res.body.id},
+          body: {
+            accepted: true,
+            permitted_resources: [
+              {id: 10e2, schema: 'bar'}
+            ]
+          }
+        }, mock.res(function(res) {
+          expect(typeof res.body.id).to.equal('number')
+
+          created_isa = res.body.id
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if permitted_resources array is not given', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {did: test_users[3].id},
         params: {isa_id: 'foo'},
-        user: {id: test_users[3].id, did: test_users[3].id}
+        body: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
+
+        mgmt_isa_update.callback.call(mock.express, {
+          user: {did: test_users[3].id},
+          params: {isa_id: 'foo'},
+          body: {permitted_resources: []}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('expected lengthy arrayish type for permitted_resources field')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {
+          permitted_resources: [
+            {id: 10e2, schema: 'bar'}
+          ]
+        }
       }, mock.res(function(res) {
         expect(res.error).to.equal(true)
         expect(res.status).to.equal(404)
@@ -1107,14 +1201,979 @@ describe('management endpoints', function() {
       }))
     })
 
-    it('should set the expired bit to true if given an id that corresponds to an existing record', function(done) {
-      mgmt_isa_remove.callback.call(mock.express, {
-        params: {isa_id: created_isa_id},
-        user: {id: test_users[3].id, did: test_users[3].id}
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_update.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa},
+    //     body: {
+    //       permitted_resources: [
+    //         {id: 10e2, schema: 'bar'}
+    //       ]
+    //     }
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement record has expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should destroy and recreated the isp records associated with the specified isa record', function(done) {
+      mgmt_isa_update.callback.call(mock.express, {
+        user: {did: ''+test_users[3].id},
+        params: {isa_id: created_isa},
+        body: {
+          permitted_resources: [
+            {id: 10e2, schema: 'bar'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('information_sharing_permission records updated')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_pull_from.method.toUpperCase()} ${mgmt_isa_pull_from.uri}`, function() {
+
+    var created_resource
+    var expired_isa_2
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        expect(typeof res.body.id).to.equal('number')
+
+        var isar_id = res.body.id
+        resource_create.callback.call(mock.express, {
+          user: {id: test_users[3].id},
+          body: {
+            entity: 'foo',
+            attribute: 'bar',
+            alias: 'bazqux',
+            value: 'foo bar'
+          }
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(false)
+
+          created_resource = res.body.id
+
+          mgmt_isa_req_res.callback.call(mock.express, {
+            user: {did: test_users[3].id},
+            params: {isar_id: isar_id},
+            body: {
+              accepted: true,
+              permitted_resources: [
+                {id: created_resource, schema: 'bar'}
+              ]
+            }
+          }, mock.res(function(res) {
+            expect(typeof res.body.id).to.equal('number')
+
+            created_isa = res.body.id
+
+            mgmt_isa_req_create.callback.call(mock.express, {
+              user: {did: test_users[2].id},
+              body: {
+                to: test_users[3].id,
+                purpose: 'lolz',
+                license: 'none',
+                required_entities: ['/resource/foo/bar']
+              }
+            }, mock.res(function(res) {
+              expect(typeof res.body.id).to.equal('number')
+
+              mgmt_isa_req_res.callback.call(mock.express, {
+                user: {did: test_users[3].id},
+                params: {isar_id: res.body.id},
+                body: {
+                  accepted: true,
+                  permitted_resources: [
+                    {id: created_resource, schema: 'bar'}
+                  ]
+                }
+              }, mock.res(function(res) {
+                expect(typeof res.body.id).to.equal('number')
+
+                expired_isa_2 = res.body.id
+                mgmt_isa_delete.callback.call(mock.express, {
+                  params: {isa_id: res.body.id},
+                  user: {did: test_users[3].id}
+                }, mock.res(function(res) {
+                  expect(res.error).to.equal(false)
+                  expect(res.status).to.equal(200)
+                  expect(res.message).to.equal('ok')
+                  done()
+                }))
+              }))
+            }))
+          }))
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_pull_from.callback.call(mock.express, {
+        user: {did: test_users[0].id},
+        params: {isa_id: 10e2}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_pull_from.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa_2}
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should respond with an object containing records referenced by isp records associated with the specified isa record', function(done) {
+      mgmt_isa_pull_from.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        params: {isa_id: created_isa}
       }, mock.res(function(res) {
         expect(res.error).to.equal(false)
         expect(res.status).to.equal(200)
         expect(res.message).to.equal('ok')
+        expect('user_data' in res.body).to.equal(true)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_push_to.method.toUpperCase()} ${mgmt_isa_push_to.uri}`, function() {
+
+    var expired_isa = created_isa_id
+    var created_isa
+    before(function(done) {
+      mgmt_isa_req_create.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {
+          to: test_users[3].id,
+          purpose: 'lolz',
+          license: 'none',
+          required_entities: ['/resource/foo/bar']
+        }
+      }, mock.res(function(res) {
+        expect(typeof res.body.id).to.equal('number')
+
+        mgmt_isa_req_res.callback.call(mock.express, {
+          user: {did: test_users[3].id},
+          params: {isar_id: res.body.id},
+          body: {
+            accepted: true,
+            permitted_resources: [
+              {id: 10e2, schema: 'bar'}
+            ]
+          }
+        }, mock.res(function(res) {
+          expect(typeof res.body.id).to.equal('number')
+
+          created_isa = res.body.id
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if required arguments are missing', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+
+        mgmt_isa_push_to.callback.call(mock.express, {
+          user: {did: test_users[1].id},
+          params: {isa_id: Number.MAX_VALUE},
+          body: {resources: []}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing required arguments')
+          done()
+        }))
+      }))
+    })
+
+    it('should respond with an error if the specified isa record is not found or the calling user is not associated with the record', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        params: {isa_id: Number.MAX_VALUE},
+        body: {
+          resources: [
+            {value: 'foobar'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        done()
+      }))
+    })
+
+    // it('should respond with an error if the specified isa record has expired', function(done) {
+    //   mgmt_isa_push_to.callback.call(mock.express, {
+    //     user: {id: test_users[3].id},
+    //     params: {isa_id: expired_isa_2},
+    //     body: {
+    //       resources: [
+    //         {value: 'foo'}
+    //       ]
+    //     }
+    //   }, mock.res(function(res) {
+    //     expect(res.error).to.equal(true)
+    //     expect(res.status).to.equal(400)
+    //     expect(res.message).to.equal('information_sharing_agreement expired')
+    //     done()
+    //   }))
+    // })
+
+    it('should respond affirmatively if all given new resources are shared to push target', function(done) {
+      mgmt_isa_push_to.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        params: {isa_id: created_isa},
+        body: {
+          resources: [
+            {name: 'foo', description: 'baz', value: 'foo bar', is_verifiable_claim: true},
+            {name: 'bar', description: 'qux', value: 'baz qux'}
+          ]
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
+        done()
+      }))
+    })
+
+    it('should respond affirmatively if all given existing resources are shared to push target', function(done) {
+      // TODO refactor this to somewhere outside the test case
+      var {user_datum, user} = mock.express.get('models')
+      var push_res_1 = 'foo'
+      var push_res_2 = 'bar'
+      Promise.all([
+        test_users[1].did ? null : user.update({did: ''+test_users[1].id}, {where: {id: test_users[1].id}}),
+        test_users[3].did ? null : user.update({did: ''+test_users[3].id}, {where: {id: test_users[3].id}})
+      ]).then(function(updated) {
+        test_users[1].did = test_users[1].id
+        test_users[3].did = test_users[3].id
+        return Promise.all([
+          user_datum.create({
+            owner_id: test_users[3].id,
+            value: push_res_1,
+            entity: 'foo',
+            attribute: 'foo',
+            alias: 'foo'
+          }),
+          user_datum.create({
+            owner_id: test_users[3].id,
+            value: push_res_2,
+            entity: 'bar',
+            attribute: 'bar',
+            alias: 'bar'
+          })
+        ])
+      }).then(function(res) {
+        return new Promise(function(resolve, reject) {
+          var [found, created] = res
+          mgmt_isa_push_to.callback.call(mock.express, {
+            user: {
+              nickname: 'baz',
+              id: test_users[3].id,
+              did: ''+test_users[3].did
+            },
+            params: {isa_id: sharing_isa_id},
+            body: {
+              resources: [found.id, created.id]
+            }
+          }, mock.res(function(res) {
+            expect(res.error).to.equal(false)
+            expect(res.status).to.equal(201)
+            expect(res.message).to.equal('created')
+            return resolve()
+          }))
+        })
+      }).then(function() {
+        var resource_index = require('../../src/routes/resource')[0]
+        resource_index.callback.call(mock.express, {
+          user: {id: test_users[1].id, did: ''+test_users[1].did},
+          query: {pushed: 1, pushed_by: test_users[3].did}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(false)
+          expect(res.status).to.equal(200)
+          expect(res.message).to.equal('ok')
+          expect(res.body.length === 2).to.equal(true)
+          var found_res_1 = false
+          var found_res_2 = false
+          res.body.forEach(function(resource) {
+            expect(resource.from_user_did).to.equal(''+test_users[3].did)
+            if (resource.entity === push_res_1) {
+              found_res_1 = true
+              return
+            }
+            if (resource.entity === push_res_2) {
+              found_res_2 = true
+              return
+            }
+          })
+          if (!(found_res_1 && found_res_2)) {
+            return done(new Error('didnt receive all new pushed resources'))
+          }
+          done()
+        }))
+      }).catch(done)
+    })
+  })
+
+  describe(`${mgmt_key_create.method.toUpperCase()} ${mgmt_key_create.uri}`, function() {
+
+    var known_signature
+
+    it('should fail if missing required arguments', function(done) {
+      mgmt_key_create.callback.call(mock.express, {
+        body: {
+          // plaintext_proof: '',
+          // signed_proof: '',
+          // public_key: '',
+          // public_key_algorithm: '',
+          // alias: '',
+          // purpose: ''
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        done()
+      }))
+    })
+
+    it('should fail if an unsupported key algo is specified', function(done) {
+      mgmt_key_create.callback.call(mock.express, {
+        body: {
+          plaintext_proof: 'foo',
+          signed_proof: 'foo',
+          public_key: 'foo',
+          public_key_algorithm: 'unsupported',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('unsupported key algorithm')
+        done()
+      }))
+    })
+
+    it.skip('should fail if unparsable signature parameters are given', function(done) {})
+
+    it('should create a new crypto key record if all arguments check-out', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u10_${now}`
+      var private_key = rsa.generatePrivateKey()
+      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      known_signature = signed_proof
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: signed_proof,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        done()
+      }))
+    })
+
+    it('should fail if a known signature is given', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u11_${now}`
+      var private_key = rsa.generatePrivateKey()
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: known_signature,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('detected known signature')
+        done()
+      }))
+    })
+
+    it('should fail if a duplicate alias is given', function(done) {
+      var now = Date.now()
+      var plaintext_proof = `u10_${now}`
+      var private_key = rsa.generatePrivateKey()
+      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      mgmt_key_create.callback.call(mock.express, {
+        user: {id: test_users[0].id},
+        body: {
+          plaintext_proof: plaintext_proof,
+          signed_proof: signed_proof,
+          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key_algorithm: 'rsa',
+          alias: 'foo',
+          purpose: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('duplicate key alias')
+        done()
+      }))
+    })
+
+  })
+
+  describe(`${mgmt_key_get.method.toUpperCase()} ${mgmt_key_get.uri}`, function() {
+
+    it('should respond with an error if the specified user has no key', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_did: Date.now()},
+        query: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with an error if the specified user has no key aliased with given alias', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_did: test_users[0].id},
+        query: {alias: 'foobar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with key data if the specified user has a key', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_did: test_users[0].id},
+        query: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(typeof res.body).to.equal('object')
+        expect(!!res.body.public_key).to.equal(true)
+        done()
+      }))
+    })
+
+    it('should respond with key data if the specified user has a key aliased with the given alias', function(done) {
+      mgmt_key_get.callback.call(mock.express, {
+        params: {user_did: test_users[4].id},
+        query: {alias: 'fingerprint'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(typeof res.body).to.equal('object')
+        expect(!!res.body.public_key).to.equal(true)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_create.method.toUpperCase()} ${mgmt_action_create.uri}`, function() {
+
+    it('should respond with an error if required arguments are missing', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: '',
+          purpose: '',
+          license: '',
+          entities: [],
+          duration_days: null
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        done()
+      }))
+    })
+
+    it('should respond with an error if name contains whitespace', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: ' ',
+          purpose: 'foo',
+          license: 'bar',
+          entities: ['baz'],
+          duration_days: 1
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('name cannot contain whitespace')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with the id of the action that is created', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: 'foo',
+          purpose: 'foo',
+          license: 'bar',
+          entities: ['baz'],
+          duration_days: 1
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(201)
+        expect(res.message).to.equal('created')
+        expect(res.body).to.equal(null)
+        action_delete_id = 'foo'
+        done()
+      }))
+    })
+
+    it('should respond with an error if attempting to use a name that already exists', function(done) {
+      mgmt_action_create.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        body: {
+          name: 'foo',
+          purpose: 'foo',
+          license: 'bar',
+          entities: ['baz'],
+          duration_days: 1
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('user_action record already exists')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_user_get_all.method.toUpperCase()} ${mgmt_action_user_get_all.uri}`, function() {
+    it('should respond with an array of the calling user\'s actions', function(done) {
+      mgmt_action_user_get_all.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(Array.isArray(res.body)).to.equal(true)
+        expect(res.body.length).to.equal(1)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_get_all.method.toUpperCase()} ${mgmt_action_get_all.uri}`, function() {
+
+    it('should respond with an array of actions', function(done) {
+      mgmt_action_get_all.callback.call(mock.express, {
+        params: {user_did: test_users[4].id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(Array.isArray(res.body)).to.equal(true)
+        expect(res.body.length).to.equal(1)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_get_one.method.toUpperCase()} ${mgmt_action_get_one.uri}`, function() {
+
+    it('should respond with not found if the action does not exist', function(done) {
+      mgmt_action_get_one.callback.call(mock.express, {
+        params: {
+          user_did: test_users[4].id,
+          action_name: 'bar'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user_action record not found')
+        done()
+      }))
+    })
+
+    it('should respond with the requested action and have a signature appended to the body', function(done) {
+      mgmt_action_get_all.callback.call(mock.express, {
+        params: {user_did: test_users[4].id}
+      }, mock.res(function(res) {
+        var action_name = res.body[0].name
+
+        mgmt_action_get_one.callback.call(mock.express, {
+          params: {
+            user_did: test_users[4].id,
+            action_name: action_name
+          }
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(false)
+          expect(res.status).to.equal(200)
+          expect(res.message).to.equal('ok')
+          expect(typeof res.body).to.equal('object')
+          expect(!!res.body).to.equal(true)
+          done()
+        }))
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_by_action.method.toUpperCase()} ${mgmt_isa_by_action.uri}`, function() {
+
+    it('should respond with an error if missing required arguments', function(done) {
+      mgmt_isa_by_action.callback.call(mock.express, {
+        params: {action_name: 'foo', user_did: 'foo'},
+        body: {}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+
+        mgmt_isa_by_action.callback.call(mock.express, {
+          params: {action_name: 'foo', user_did: 'foo'},
+          body: {entities: []}
+        }, mock.res(function(res) {
+          expect(res.error).to.equal(true)
+          expect(res.status).to.equal(400)
+          expect(res.message).to.equal('missing required arguments')
+          done()
+        }))
+      }))
+    })
+
+    it.skip('should respond with an error if it cannot find the specified action', function(done) {})
+
+    it('should establish a new isa', function(done) {
+
+      mgmt_action_get_all.callback.call(mock.express, {
+        params: {user_did: test_users[4].id}
+      }, mock.res(function(res) {
+
+        var action_name = res.body[0].name
+
+        mgmt_action_get_one.callback.call(mock.express, {
+          params: {
+            user_did: test_users[4].id,
+            action_name: action_name
+          }
+        }, mock.res(function(res) {
+
+          mgmt_isa_by_action.callback.call(mock.express, {
+            user: {did: test_users[0].id},
+            params: {user_did: test_users[4].id, action_name: action_name},
+            body: {entities: [1, 2, 3, 4]}
+          }, mock.res(function(res) {
+            expect(res.error).to.equal(false)
+            expect(res.status).to.equal(201)
+            expect(res.message).to.equal('created information_sharing_agreement record')
+            expect(typeof res.body).to.equal('object')
+            expect(typeof res.body.id).to.equal('number')
+            actions_receipts_isa_id = res.body.id
+            done()
+          }))
+        }))
+      }))
+    })
+  })
+
+  describe(`${mgmt_isa_receipt.method.toUpperCase()} ${mgmt_isa_receipt.uri}`, function() {
+
+    it('should respond with an error if the caller is not related to the isa record', function(done) {
+      mgmt_isa_receipt.callback.call(mock.express, {
+        user: {did: ''+test_users[2].id},
+        params: {isa_id: actions_receipts_isa_id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with an error if the isa record does not exist', function(done) {
+      mgmt_isa_receipt.callback.call(mock.express, {
+        user: {did: ''+test_users[2].id},
+        params: {isa_id: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('information_sharing_agreement record not found')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with a receipt object that has signatures attached', function(done) {
+      mgmt_isa_receipt.callback.call(mock.express, {
+        user: {did: ''+test_users[4].id},
+        params: {isa_id: actions_receipts_isa_id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.isaSignatureValue).to.equal('string')
+        expect(typeof res.body.isa.requestSignatureValue).to.equal('string')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_action_delete.method.toUpperCase()} ${mgmt_action_delete.uri}`, function() {
+
+    it('should respond with an error if the action was not found', function(done) {
+      mgmt_action_delete.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        params: {action_name: 'bar'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user_action record not found')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with a number if the record was deleted', function(done) {
+      mgmt_action_delete.callback.call(mock.express, {
+        user: {id: test_users[4].id},
+        params: {action_name: action_delete_id}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(typeof res.body.user_action).to.equal('number')
+        expect(res.body.user_action).to.equal(1)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_create.method.toUpperCase()} ${mgmt_face_verify_create.uri}`, function() {
+    it('should create a token record and respond', function(done) {
+      mgmt_face_verify_create.callback.call(mock.express, {
+        query: {user_did: test_users[1].id}
+      }, mock.res(function() {
+        mock.express.models.facial_verification.findOne({
+          where: {subject_did: test_users[1].id}
+        }).then(function(found) {
+          expect(typeof found.token).to.equal('string')
+          expect(!!found.token).to.equal(true)
+          done()
+        }).catch(done)
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_get.method.toUpperCase()} ${mgmt_face_verify_get.uri}`, function() {
+
+    before(function(done) {
+      mock.express.models.user_datum.create({
+        owner_id: test_users[1].id,
+        schema: 'schema.cnsnt.io/person',
+        entity: 'person',
+        attribute: 'face',
+        value: 'foo',
+        mime: 'application/ld+json',
+        encoding: 'utf8',
+        alias: 'my picture'
+      }).then(function(created) {
+        face_verify_token = 'foo_' + Date.now()
+        return mock.express.models.facial_verification.create({
+          subject_did: test_users[1].id,
+          token: face_verify_token
+        })
+      }).then(
+        done.bind(done, null)
+      ).catch(done)
+    })
+
+    it('should respond with a person schema instance', function(done) {
+      mgmt_face_verify_get.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(typeof res.body).to.equal('object')
+        expect(res.body).to.not.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_face_verify_respond.method.toUpperCase()} ${mgmt_face_verify_respond.uri}`, function() {
+    it('should respond with error if required arguments are missing', function(done) {
+      mgmt_face_verify_respond.callback.call(mock.express, {
+        user: {did: test_users[2].id},
+        body: {},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(400)
+        expect(res.message).to.equal('missing required arguments')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+
+    it('should respond with success if verfication was responded to', function(done) {
+      mgmt_face_verify_respond.callback.call(mock.express, {
+        user: {id: test_users[2].id, did: test_users[2].id},
+        body: {result: 'yes'},
+        params: {
+          user_did: test_users[1].id,
+          token: face_verify_token
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_message.method.toUpperCase()} ${mgmt_message.uri}`, function() {
+
+    before(function(done) {
+      mock.express.models.user_connection.create({
+        from_did: test_users[3].id,
+        to_did: test_users[2].id,
+        enabled: true
+      }).then(
+        done.bind(done, null)
+      ).catch(done)
+    })
+
+    it('should return an error if message is too large', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: {length: 4097},
+          recipient: test_users[2].id
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.message).to.equal('4096 byte limit exceeded')
+        expect(res.status).to.equal(400)
+        done()
+      }))
+    })
+
+    it('should return an error if the user is not connected with the recipient', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: 'foo',
+          recipient: 'foo'
+        }
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.message).to.equal('user_connection record not found')
+        expect(res.status).to.equal(404)
+        done()
+      }))
+    })
+
+    it('should respond with 200 if the message was sent', function(done) {
+      mgmt_message.callback.call(mock.express, {
+        user: {did: test_users[3].id},
+        body: {
+          msg: 'foo',
+          recipient: test_users[2].id
+        }
+      }, mock.res(function(res) {
+        var call_data = process.get_last_call_data()
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(call_data.notification_request.data.type).to.equal('user_message_received')
+        done()
+      }))
+    })
+  })
+
+  describe(`${mgmt_send_thanks.method.toUpperCase()} ${mgmt_send_thanks.uri}`, function() {
+
+    it('should trigger a call to notifier service if user is found', function(done) {
+      mgmt_send_thanks.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        body: {amount: 10, recipient: test_users[2].id, reason: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(false)
+        expect(res.status).to.equal(200)
+        expect(res.message).to.equal('ok')
+        expect(res.body).to.equal(null)
+        var call_data = process.get_last_call_data()
+        expect(call_data.notification_request.user_id).to.equal(test_users[2].id)
+        done()
+      }))
+    })
+
+    it('should respond with error if user not found', function(done) {
+      mgmt_send_thanks.callback.call(mock.express, {
+        user: {did: test_users[1].id},
+        body: {amount: 10, recipient: 'foo', reason: 'foo'}
+      }, mock.res(function(res) {
+        expect(res.error).to.equal(true)
+        expect(res.status).to.equal(404)
+        expect(res.message).to.equal('user record not found')
+        expect(res.body).to.equal(null)
         done()
       }))
     })

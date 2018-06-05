@@ -9,21 +9,13 @@ var subject = require('../../src/middlewares/replay-attack')
 var now = Date.now()
 
 describe('middleware replay-attack', function() {
-  
-  it('should invoke the success callback if the request is skippable', function(done) {
-    subject.call(mock.express, {
-      skip_secure_checks: true
-    }, done.bind(
-      done, new Error('should not have been called')
-    ), done)
-  })
 
   it('should invoke the success callback if the signature was logged to database', function(done) {
     subject.call(mock.express, {
       skip_secure_checks: false,
       headers: {
-        'x-cnsnt-signable': now,
-        'x-cnsnt-signed': now
+        'x-cnsnt-signed': now,
+        'x-cnsnt-plain': now
       },
       user: {
         crypto: {
@@ -40,8 +32,8 @@ describe('middleware replay-attack', function() {
     subject.call(mock.express, {
       skip_secure_checks: false,
       headers: {
-        'x-cnsnt-signable': now,
-        'x-cnsnt-signed': now
+        'x-cnsnt-signed': now,
+        'x-cnsnt-plain': now
       },
       user: {
         crypto: {

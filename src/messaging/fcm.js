@@ -3,15 +3,7 @@
 
 var http = require('https')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
-
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
+var env = require('../init/env')()
 
 function message(recipient, notification, data) {
   // TODO expand with more options (platforms, design, topics)
@@ -33,17 +25,17 @@ function message(recipient, notification, data) {
   }
   
   if (data) msg.data = data
-  if (notification) msg.notification = notification
+  // if (notification) msg.notification = notification
   
   return msg
 }
 
-module.exports = function(recipient, notification, data, sent) {
+module.exports = function(recipient, notification, data, onsent) {
   // serialise the given message parameters
   try {
     var envelope = message(recipient, notification, data)
   } catch (e) {
-    return sent(e)
+    return onsent(e)
   }
   // construct the fcm request
   var request = http.request({
@@ -60,9 +52,9 @@ module.exports = function(recipient, notification, data, sent) {
   // attach listeners
   request.on('response', function(res) {
     if (res.statusCode !== 200) {
-      return sent(new Error(res.statusCode))
+      return onsent(new Error(res.statusCode))
     }
-    
+
     var response = ''
     res.on('data', function(d) {
       response += d
@@ -70,13 +62,18 @@ module.exports = function(recipient, notification, data, sent) {
       try {
         response = JSON.parse(response)
       } catch (e) {
-        return sent(e)
+        console.log('json parse failed', response)
+        return onsent(e)
       }
       
       if (response.failure === 0 || response.canonical_ids === 0) {
         // success, message sent
-        return sent(null, response)
+        return onsent()
       }
+
+      // failed to send message
+      console.log('error reaching user via fcm', recipient)
+      onsent(response)
       
       // FIXME see below
       // otherwise, inspect message further
@@ -90,7 +87,7 @@ module.exports = function(recipient, notification, data, sent) {
         // If it is `NotRegistered`, you should remove the `registration ID` from your server database because the application was uninstalled from the device, or the client app isn't configured to receive messages.
         // Otherwise, there is something wrong in the registration token passed in the request; it is probably a non-recoverable error that will also require removing the registration from the server database.
     })
-  }).on('error', sent)
+  }).on('error', onsent)
 
   // and send
   request.end(JSON.stringify(envelope))

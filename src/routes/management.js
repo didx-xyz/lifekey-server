@@ -1,343 +1,57 @@
 
+'use strict'
+
 // TODO check server.get('did_service_ready') before posting a message to the service
 // TODO add retries if did service is unavailable
-// TODO resolve this data structure dynamically (over the network)
+// TODO some of the procedures (like registration) are not atomic - if they fail at any point, the state of the database might be partially corrupt
+// TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
-var send_is_undefined = !process.send
-if (send_is_undefined) process.send = function() {}
+var TESTING = process.env._.indexOf('istanbul') >= 0
 
-var CNSNT_SERVER_HOSTNAME = 'pdr.cnsnt.io'
-var CNSNT_SCHEMA_HOST = 'http://schema.cnsnt.io/'
-var CONNECTION_REQUEST_CTX = {
-  '@context': {
-    id: '@id',
-    type: '@type',
-    cn: 'http://schema.cnsnt.io/',
-    from: 'cn:from',
-    to: 'cn:to',
-    resolution: 'cn:resolution',
-    resolverSignature: 'cn:resolverSignature',
-    dateAcknowledged: 'cn:dateAcknowledged',
-    dateResolved: 'cn:dateResolved'
-  }
-}, INFORMATION_SHARING_AGREEMENT_CTX = {
-  '@context': {
-    id: '@id',
-    type: '@type',
-    cn: 'http://schema.cnsnt.io/',
-    from: 'cn:from',
-    to: 'cn:to',
-    resolution: 'cn:resolution',
-    dateAcknowledged: 'cn:dateAcknowledged',
-    dateResolved: 'cn:dateResolved',
-    dateExpires: 'cn:dateExpires',
-    requestedResourceUris: 'cn:requestedResourceUris',
-    permittedResourceUris: 'cn:permittedResourceUris',
-    purpose: 'cn:purpose',
-    license: 'cn:license'
-  }
+if (TESTING) {
+  // running from inside test suite
+  // monkey-patch process so we can spy on its method calls
+  Object.assign(process, require('../../test/spies/process'))
 }
 
+var url = require('url')
 var crypto = require('crypto')
 
+var web3 = require('web3')
+var qr = require('qrcode')
 var cuid = require('cuid')
-var secp = require('eccrypto')
-var ursa = require('ursa')
-var sendmail = require('sendmail')({/* TODO sendmail cfg */})
-var jsonld = require('jsonld')
-var query = require('ld-query')
 
-function sendActivationEmail(nickname, address, identifier) {
-  if (send_is_undefined) return
-  // TODO mail configuration
-  sendmail({
-    from: 'no-reply@consent.global',
-    to: address,
-    subject: 'Consent account activation',
-    html: `<p>Hi ${nickname}!</p><p>Please <a href="http://${CNSNT_SERVER_HOSTNAME}/management/activation/${identifier}">click here</a> to verify your email address and activate your account.</p>`,
-  }, function(err, reply) {
-    // TODO handle email send retries
-    if (err) return console.log('sendmail failure', err)
-  })
+var env = require('../init/env')()
+
+var our_crypto = require('../crypto')
+
+var thanks_balance_check_available = true
+
+var w3, thanks
+
+if (!TESTING) {
+  var THANKS_TOKEN_CONTRACT_ABI = require('../../etc/eth/abi/thanks.json')
+  try {
+    w3 = new web3(new web3.providers.HttpProvider(env.EIS_HOST))
+  } catch (e) {
+    thanks_balance_check_available = false
+    console.log('unable to initialise connection to eis host', e)
+  }
+  try {
+    thanks = w3.eth.contract(
+      THANKS_TOKEN_CONTRACT_ABI
+    ).at(
+      env.THANKS_TOKEN_CONTRACT_ADDRESS
+    )
+  } catch (e) {
+    thanks_balance_check_available = false
+    console.log('unable to initialise thanks token contract instance', e)
+  }
 }
 
 module.exports = [
-  
-  // 0 POST /management/register
-  {
-    uri: '/management/register',
-    method: 'post',
-    secure: false,
-    active: false,
-    callback: function(req, res) {
 
-      var {
-        email,
-        nickname,
-        device_id,
-        device_platform,
-        public_key_algorithm,
-        public_key,
-        plaintext_proof,
-        signable_proof,
-        signed_proof
-      } = req.body
-
-      var activation_code, created_user_id, key_buffers
-
-      // ensure all required args are present
-      if (!(email &&
-            nickname &&
-            device_id &&
-            device_platform &&
-            public_key_algorithm &&
-            public_key &&
-            plaintext_proof &&
-            signable_proof &&
-            signed_proof)) {
-        res.status(400)
-        return res.json({
-          error: true,
-          status: 400,
-          message: 'missing request body parameters',
-          body: null
-        })
-      }
-
-      var supported_algo = !!~['secp256k1', 'rsa'].indexOf(public_key_algorithm)
-      if (!supported_algo) {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'unsupported key algorithm',
-          body: null
-        })
-      }
-
-      var {
-        user,
-        user_device,
-        crypto_key,
-        http_request_verification
-      } = this.get('models')
-      
-      // first, make sure the given sig and
-      // pubkey haven't been used before
-      http_request_verification.findOne({
-        where: {
-          public_key: public_key,
-          signable: signable_proof,
-          signature: signed_proof
-        }
-      }).then(function(found) {
-        if (found) { // get outta here, guy
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'known signature detected',
-            body: null
-          })
-        }
-        // then make sure the user does not yet exist
-        return user.findOne({where: {email: email}})
-      }).then(function(found) {
-        if (found) { // get outta here, guy
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'user already exists',
-            body: null
-          })
-        }
-        return Promise.resolve()
-      }).then(function() {
-        try { // turn the given crypto args into buffers
-          var b_public_key = Buffer.from(public_key, 'hex')
-          var b_signable_proof = Buffer.from(signable_proof, 'hex')
-          var b_signed_proof = Buffer.from(signed_proof, 'hex')
-          if (!(b_public_key.length &&
-                b_signable_proof.length &&
-                b_signed_proof.length)) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'hexadecimal parsing error in any of: public_key, signable_proof, signed_proof',
-              body: null
-            })
-          }
-          return Promise.resolve([
-            b_public_key,
-            b_signable_proof,
-            b_signed_proof
-          ])
-        } catch (e) { // get outta here, guy
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'hexadecimal parsing error in any of: public_key, signable_proof, signed_proof',
-            body: null
-          })
-        }
-      }).then(function(keys) {
-        // optimistically make them available in outer function context
-        key_buffers = keys
-
-        // and then verify ownership of given public key
-        var lower_public_key_algorithm = public_key_algorithm.toLowerCase()
-        if (lower_public_key_algorithm === 'secp256k1') {
-          return secp.verify(...keys)
-        } else if (lower_public_key_algorithm === 'rsa') {
-          try {
-            var rsa_public_key = ursa.createPublicKey(keys[0])
-            var rsa_verifier = ursa.createVerifier('base64')
-            rsa_verifier.update(Buffer.from(plaintext_proof, 'utf8'))
-            var verified = rsa_verifier.verify(rsa_public_key, keys[1])
-            return verified ? (
-              Promise.resolve()
-            ) : (
-              Promise.reject({
-                error: true,
-                status: 400,
-                message: 'signature verification failed',
-                body: null
-              })
-            )
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: e.toString(),
-              body: null
-            })
-          }
-        } else {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'unsupported key algorithm',
-            body: null
-          })
-        }
-      }).then(function() {
-        
-        // now store the key and sig for posterity
-        return http_request_verification.create({
-          public_key: public_key,
-          algorithm: public_key_algorithm,
-          plaintext: plaintext_proof,
-          signable: signable_proof,
-          signature: signed_proof
-        })
-      }).then(function(created) {
-        if (created) {
-          activation_code = cuid()
-          // add the user if we stored
-          // the verification successfully
-          return user.create({
-            email: email,
-            nickname: nickname,
-            app_activation_code: activation_code
-          })
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create http_request_verification record',
-          body: null
-        })
-      }).then(function(created) {
-        if (created) {
-          created_user_id = created.id
-          // now add the user's device so
-          // we can communicate via firebase
-          return user_device.create({
-            owner_id: created.id,
-            platform: device_platform,
-            device_id: device_id
-          })
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create user record',
-          body: null
-        })
-      }).then(function(created) {
-        if (created) {
-          // send a task to the did service
-          // to allocate a did to the new user
-          
-          // NOTE - we cannot guarantee message delivery
-          // by returning from process#send's callback parameter
-          // due to the promise pipeline we're sitting inside
-          return Promise.resolve(
-            process.send({
-              webhook_request: {},
-              did_allocation_request: {
-                user_id: created_user_id,
-                device_id: created.device_id
-                // TODO add more message parameters
-              }
-            })
-          )
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create user_device record',
-          body: null
-        })
-      }).then(function() {
-        // next, create a crypto_key record
-        // for the user's given signing key
-        return crypto_key.create({
-          algorithm: public_key_algorithm,
-          purpose: 'sign',
-          alias: 'client-server-http',
-          public_key: key_buffers[0],
-          owner_id: created_user_id
-        })
-      }).then(function(created) {
-        if (created) {
-          return Promise.resolve(
-            // send an activation email
-            // concurrently to the promise pipeline
-            sendActivationEmail(nickname, email, activation_code)
-          )
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'unable to create crypto_key record',
-          body: null
-        })
-      }).then(function() {
-        // and finally respond affirmatively
-        // to the calling agent
-        return Promise.resolve(
-          res.status(201).json({
-            error: false,
-            status: 201,
-            message: 'created user record',
-            body: {id: created_user_id}
-            // until the user's DID has been allocated
-            // this is all we can give back to the calling agent
-          })
-        )
-      }).catch(function(err) {
-        return res.status(
-          err.status || 500
-        ).json({
-          error: err.error || true,
-          status: err.status || 500,
-          message: err.message || 'internal server error',
-          body: err.body || null
-        })
-      })
-    }
-  },
-  
-  // 1 POST /management/device
+  // 0 POST /management/device
   {
     uri: '/management/device',
     method: 'post',
@@ -345,30 +59,50 @@ module.exports = [
     active: true,
     callback: function(req, res) {
       var {user, user_device} = this.get('models')
-      var {device_id, device_platform} = req.body
+      var {webhook_url, device_id, device_platform} = req.body
+      var errors = this.get('db_errors')
 
-      if (!(device_id && device_platform)) {
-        res.status(400)
-        return res.json({
-          error: true,
-          status: 400,
-          message: 'missing request body parameters',
-          body: null
-        })
+      function dispatch() {
+        if (webhook_url) {
+          return user.update({
+            webhook_url: webhook_url
+          }, {
+            where: {id: req.user.id}
+          })
+        } else if (device_id && device_platform) {
+          return user_device.update({
+            device_id: device_id,
+            platform: device_platform
+          }, {
+            where: {owner_id: req.user.id}
+          })
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'missing request body parameters',
+            body: null
+          })
+        }
       }
 
-      user_device.upsert({
-        owner_id: req.user.id,
-        device_id: device_id,
-        platform: device_platform
-      }).then(function(created) {
-        return res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'device_id saved',
+      dispatch().then(function(updated) {
+        if (updated) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'updated',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update record',
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -380,90 +114,119 @@ module.exports = [
       })
     }
   },
-  
-  // 2 POST /management/connection
+
+  // 1 POST /management/connection
   {
     uri: '/management/connection',
     method: 'post',
     secure: true,
     active: true,
     callback: function(req, res) {
-      
+
       // send a connection request
-      var {document, target} = req.body
-      var {user, user_device, user_connection_request} = this.get('models')
-      var ucr
+      var {target} = req.body
+      var {
+        user,
+        user_device,
+        user_connection,
+        user_connection_request
+      } = this.get('models')
+      var errors = this.get('db_errors')
+      var ucr, target_user
 
-      var parse_json_doc = (function(document) {
-        if (!(document || target)) {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'missing request body parameters',
-            body: null
-          })
-        } else if (document) {
-          // jsonld takes precedence over regular ids/dids
-          try {
-            document = JSON.parse(document)
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'expected well-formed and validatable json string',
-              body: null
-            })
-          }
-          return jsonld.promises.compact(
-            document, CONNECTION_REQUEST_CTX
-          ).then(function(compacted) {
-            return jsonld.promises.expand(compacted)
-          }).then(function(expanded) {
-            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
-            target = q.query('cn:to @value')
-            var vartype = typeof target
-            if (vartype === 'undefined') {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: `expected truthy type for 'to' field but got '${vartype}'`,
-                body: null
-              })
+      if (!target) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing request body parameters',
+          body: null
+        })
+      }
+
+      if (req.user.did === target ||
+          req.user.id === target ||
+          (''+req.user.id) === target ||
+          (''+req.user.did === target)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'you cannot connect to yourself',
+          body: null
+        })
+      }
+
+      // find any existing user_connection
+      user_connection.findOne({
+        where: {
+          enabled: true,
+          $and: [
+            {
+              $or: [
+                {
+                  from_did: req.user.did,
+                  to_did: target
+                },
+                {
+                  from_did: target,
+                  to_did: req.user.did
+                }
+              ]
             }
-            return Promise.resolve()
-          })
-        } else {
-          return Promise.resolve()
+          ]
         }
-      })(document)
-
-      // intersperse the OPTIONAL jsonld document
-      // querying with the existing promise pipeline
-      parse_json_doc.then(function() {
-        if (req.user.did === target ||
-            req.user.id === target) {
+      }).then(function(found) {
+        if (found) {
+          // cannot send connection request
+          // if a connection already exists
           return Promise.reject({
             error: true,
             status: 400,
-            message: 'you cannot connect to yourself',
+            message: 'user_connection record already exists',
             body: null
           })
         }
-        return user.findOne({where: {
-          $or: [
-            {did: target},
-            {id: target}
-          ]
-        }})
+
+        // find any existing unresponded-to connection request
+        return user_connection_request.findOne({
+          where: {
+            acknowledged: null,
+            accepted: null,
+            $and: [
+              {
+                $or: [
+                  {
+                    from_did: req.user.did,
+                    to_did: target
+                  },
+                  {
+                    from_did: target,
+                    to_did: req.user.did
+                  }
+                ]
+              }
+            ]
+          }
+        })
+      }).then(function(found) {
+        if (found) {
+          // cannot send connection request
+          // if a connection request already exists
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'user_connection_request record already exists',
+            body: null
+          })
+        }
+
+        return user.findOne({where: {did: target}})
       }).then(function(found) {
         // ensure target of ucr exists
         if (found) {
+          target_user = found
           return user_connection_request.create({
-            to_id: found.id,
-            from_id: req.user.id,
             to_did: found.did,
-            from_did: req.user.did,
-            document: req.body.document
+            from_did: req.user.did
           })
         }
         return Promise.reject({
@@ -474,9 +237,31 @@ module.exports = [
         })
       }).then(function(created) {
         if (created) {
-          // TODO webhook for programmatic user
           ucr = created
-          return user_device.findOne({where: {owner_id: req.user.id}})
+          process.send({
+            notification_request: {
+              user_id: created.to_did,
+              notification: {
+                title: 'New Connection Request',
+                body: `You have received a connection request from ${req.user.nickname}!`
+              },
+              data: {
+                type: 'user_connection_request',
+                is_user_connection_request: true,
+                user_connection_request_id: created.id,
+                ucr_id: created.id,
+                // from_id: req.user.id,
+                from_did: req.user.did,
+                from_nickname: req.user.nickname
+              }
+            }
+          })
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'user_connection_request record created',
+            body: {id: ucr.id}
+          })
         }
         return Promise.reject({
           error: true,
@@ -484,29 +269,8 @@ module.exports = [
           message: 'unable to create user_connection_request record',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          return Promise.resolve(
-            process.send({
-              webhook_request: {
-                // TODO webhook url
-              },
-              push_notification_request: {
-                device_id: found.device_id,
-                // TODO notification/data envelope
-              }
-            })
-          )
-        }
-      }).then(function() {
-        res.status(201)
-        return res.json({
-          error: false,
-          status: 201,
-          message: 'user_connection_request record created',
-          body: {id: ucr.id}
-        })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -518,8 +282,8 @@ module.exports = [
       })
     }
   },
-  
-  // 3 GET /management/connection
+
+  // 2 GET /management/connection
   {
     uri: '/management/connection',
     method: 'get',
@@ -528,10 +292,16 @@ module.exports = [
     callback: function(req, res) {
 
       // load models
-      var {user_connection, user_connection_request} = this.get('models')
+      var {
+        user_connection,
+        user_connection_request,
+        information_sharing_agreement_request,
+        information_sharing_agreement
+      } = this.get('models')
 
       // response body data structure
       var body = {unacked: [], enabled: []}
+      var gp_share_table = {}, all_isas, isa_table = {}
 
       // enumerate all enabled user_connections
       user_connection.findAll({
@@ -541,9 +311,7 @@ module.exports = [
             {
               $or: [
                 {from_did: req.user.did},
-                {to_did: req.user.did},
-                {from_id: req.user.id},
-                {to_id: req.user.id}
+                {to_did: req.user.did}
               ]
             }
           ]
@@ -551,30 +319,81 @@ module.exports = [
       }).then(function(user_connections) {
         if (user_connections) {
           // append to data structure
-          body.enabled = user_connections.map(uc => uc.id)
+          body.enabled = user_connections.map(uc => {
+            return {
+              uc_id: uc.id,
+              user_connection_id: uc.id,
+              from_did: uc.from_did,
+              to_did: uc.to_did,
+              other_user_did: req.user.did === uc.from_did ? uc.to_did : uc.from_did
+            }
+          })
         }
         // enumerate all unacknowledged user_connection_requests
         return user_connection_request.findAll({
           where: {
             acknowledged: null,
-            $and: [
-              {
-                $or: [
-                  {to_id: req.user.id},
-                  {to_did: req.user.did}
-                ]
-              }
-            ]
+            to_did: req.user.did
           }
         })
       }).then(function(user_connection_requests) {
         if (user_connection_requests) {
           // append to data structure
           body.unacked = user_connection_requests.map(ucr => {
-            return {id: ucr.id, document: ucr.document}
+            return {
+              user_connection_request_id: ucr.id,
+              ucr_id: ucr.id,
+              from_did: ucr.from_did,
+              other_user_did: req.user.did === ucr.from_did ? ucr.to_did : ucr.from_did
+            }
           })
         }
-
+        return information_sharing_agreement.findAll({
+          where: {
+            $or: [
+              {from_did: req.user.did},
+              {to_did: req.user.did}
+            ]
+          }
+        })
+      }).then(function(isas) {
+        all_isas = isas.map(function(isa) {
+          return isa.toJSON()
+        })
+        return Promise.all(
+          isas.map(function(isa) {
+            return information_sharing_agreement_request.findOne({
+              where: {id: isa.isar_id}
+            })
+          })
+        )
+      }).then(function(isars) {
+        isars.filter(function(isar) {
+          return (
+            isar.purpose === 'general purpose sharing' &&
+            isar.license === 'unlicensed' &&
+            isar.optional_entities === '[]' &&
+            isar.required_entities === '[]'
+          )
+        }).map(function(isar) {
+          return isar.toJSON()
+        }).forEach(function(isar) {
+          var other_user_did = isar.to_did === req.user.did ? isar.from_did : isar.to_did
+          gp_share_table[other_user_did] = isar
+        })
+        all_isas.forEach(function(isa) {
+          isa_table[isa.isar_id] = isa.id
+        })
+        return Promise.resolve()
+      }).then(function() {
+        body.enabled = body.enabled.map(function(uc) {
+          var other_user_did = uc.to_did === req.user.did ? uc.from_did : uc.to_did
+          return (
+            gp_share_table[other_user_did] ?
+            Object.assign(uc, {sharing_isa_id: isa_table[gp_share_table[other_user_did].id]}) :
+            uc
+          )
+        })
         // respond!
         return Promise.resolve(
           res.status(200).json({
@@ -596,8 +415,8 @@ module.exports = [
       })
     }
   },
-  
-  // 4 POST /management/connection/:user_connection_request_id
+
+  // 3 POST /management/connection/:user_connection_request_id
   {
     uri: '/management/connection/:user_connection_request_id',
     method: 'post',
@@ -605,13 +424,21 @@ module.exports = [
     active: true,
     callback: function(req, res) {
 
-      var {user_connection_request_id} = req.params
-      var {accepted, document} = req.body
+      var {user, user_connection_request_id} = req.params
+      var {accepted} = req.body
       var uc, ucr, requested_id // user id of target
-      
-      var {user, user_device, user_connection, user_connection_request} = this.get('models')
+      var from, to
+      var {
+        user,
+        user_device,
+        user_connection,
+        user_connection_request,
+        information_sharing_agreement_request,
+        information_sharing_agreement
+      } = this.get('models')
+      var errors = this.get('db_errors')
 
-      if (typeof accepted !== 'boolean' && !document) {
+      if (typeof accepted !== 'boolean') {
         return res.status(400).json({
           error: true,
           status: 400,
@@ -620,68 +447,21 @@ module.exports = [
         })
       }
 
-      var parse_json_doc = (function(document) {
-        if (document) {
-          try {
-            document = JSON.parse(document)
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'expected well-formed and validatable json string',
-              body: null
-            })
-          }
-          return jsonld.promises.compact(
-            document, CONNECTION_REQUEST_CTX
-          ).then(function(compacted) {
-            return jsonld.promises.expand(compacted)
-          }).then(function(expanded) {
-            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
-            requested_id = q.query('cn:from @value')
-            accepted = q.query('cn:resolution @value') || false
-            var vartype = typeof requested_id
-            if (vartype === 'undefined') {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: `expected truthy type for 'from' field but got '${vartype}'`,
-                body: null
-              })
-            }
-            return Promise.resolve()
-          })
+      user_connection_request.findOne({
+        where: {
+          id: user_connection_request_id,
+          acknowledged: null,
+          accepted: null,
+          to_did: req.user.did
         }
-        return Promise.resolve()
-      })(document)
-      
-      parse_json_doc.then(function() {
-        // TODO ensure the calling agent is responding to a connection request targeted at them
-        return user_connection_request.findOne({
-          where: {
-            id: user_connection_request_id,
-            acknowledged: null,
-            accepted: null,
-            $and: [
-              {
-                $or: [
-                  {to_did: req.user.did},
-                  {to_id: req.user.id}
-                ]
-              }
-            ]
-          }
-        })
       }).then(function(found) {
         if (found) {
-          // accept/reject the ucr
-
-          ucr = found
-
-          return found.update({
-            acknowledged: true,
-            accepted: accepted
-          })
+          ucr = {
+            id: found.id,
+            to_did: req.user.did,
+            from_did: found.from_did
+          }
+          return found.destroy()
         }
         return Promise.reject({
           error: true,
@@ -689,87 +469,137 @@ module.exports = [
           message: 'user_connection_request record not found',
           body: null
         })
-      }).then(function(updated) {
-        if (updated) {
-          // update the associated uc record
-          return user_connection.create({
-            to_id: updated.to_id,
-            from_id: updated.from_id,
-            to_did: updated.to_did,
-            from_did: updated.from_did,
-            enabled: accepted
-          })
-        }
-        return Promise.reject({
-          error: true,
-          status: 500,
-          message: 'update failed',
-          body: null
-        })
-      }).then(function(created) {
-        if (created) {
-          uc = created
-          return user.findOne({
-            where: {
-              $or: [
-                {did: created.from_did},
-                {id: created.from_id}
-              ]
+      }).then(function(destroyed) {
+        if (!destroyed) {
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'user_connection_request response failed',
+            body: {
+              code: 'e_retry'
             }
           })
         }
+        if (accepted === false) {
+          return Promise.reject({
+            error: false,
+            status: 200,
+            message: 'user_connection rejected',
+            body: null
+          })
+        }
+        if (accepted) {
+          // update the associated uc record
+          return Promise.all([
+            user_connection.create({
+              to_did: ucr.to_did,
+              from_did: ucr.from_did,
+              enabled: accepted
+            }),
+            user.findOne({where: {did: ucr.from_did}}),
+            user.findOne({where: {did: ucr.to_did}})
+          ])
+        }
         return Promise.reject({
           error: true,
           status: 500,
-          message: 'unable to create user_connection record',
+          message: 'internal server error',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          return user_device.findOne({where: {owner_id: found.id}})
+      }).then(function(res) {
+        // establish an implicit sharing isa if both users are humans
+        uc = res[0]
+        from = res[1]
+        to = res[2]
+        var humans = !(from.webhook_url || to.webhook_url)
+        if (humans) {
+          return information_sharing_agreement_request.create({
+            from_did: ucr.from_did,
+            to_did: ucr.to_did,
+            acknowledged: true,
+            optional_entities: '[]',
+            required_entities: '[]',
+            purpose: 'general purpose sharing',
+            license: 'unlicensed',
+            accepted: true,
+            acknowledged_at: new Date,
+            resolved_at: new Date
+          })
         }
-        return res.status(404).json({
-          error: true,
-          status: 404,
-          message: 'user record not found',
-          body: null
+        return Promise.resolve()
+      }).then(function(created) {
+        if (created) {
+          return information_sharing_agreement.create({
+            isar_id: created.id,
+            from_did: ucr.from_did,
+            to_did: ucr.to_did
+          })
+        }
+        return Promise.resolve()
+      }).then(function(created) {
+        var pnr_notif = {
+          title: 'User Connection',
+          body: 'User connection successfully created!'
+        }
+        var pnr_data = {
+          type: 'user_connection_created',
+          is_user_connection_created: true,
+          user_connection_id: uc.id,
+          uc_id: uc.id,
+          to_did: ucr.to_did,
+          from_did: ucr.from_did
+        }
+
+        // inform the users of the sharing isa id if exists
+        if (created) pnr_data.sharing_isa_id = created.id
+
+        var to_pnr_data = Object.assign({}, pnr_data)
+        to_pnr_data.actions_url = from.actions_url
+        to_pnr_data.other_user_did = ucr.from_did
+
+        var from_pnr_data = Object.assign({}, pnr_data)
+        from_pnr_data.actions_url = to.actions_url
+        from_pnr_data.other_user_did = ucr.to_did
+
+        process.send({
+          notification_request: {
+            user_id: ucr.to_did,
+            notification: pnr_notif,
+            data: to_pnr_data
+          }
         })
-      }).then(function(found) {
-        if (found) {
-          return Promise.resolve(
-            process.send({
-              webhook_request: {
-                // TODO webhook url
-              },
-              push_notification_request: {
-                recipient: found.device_id,
-                // TODO message args (notification/data)
-              }
+        process.send({
+          notification_request: {
+            user_id: ucr.from_did,
+            notification: pnr_notif,
+            data: from_pnr_data
+          }
+        })
+        return Promise.resolve()
+      }).then(function() {
+        return Promise.resolve(
+          accepted ? (
+            res.status(201).json({
+              error: false,
+              status: 201,
+              message: 'user_connection created',
+              body: {id: uc.id}
+            })
+          ) : (
+            res.status(200).json({
+              error: false,
+              status: 200,
+              message: 'user_connection rejected',
+              body: null
             })
           )
-        }
-        return res.status(404).json({
-          error: true,
-          status: 404,
-          message: 'user_device record not found',
-          body: null
-        })
-      }).then(function() {
-        // node generates a warning if this res.json
-        // call is NOT wrapped in a promise O_o
-        return Promise.resolve(
-          res.status(200).json({
-            error: false,
-            status: 201,
-            message: 'user_connection created',
-            body: {id: uc.id}
-          })
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
-          error: err.error || true,
+          error: typeof err.error === 'boolean' ? err.error : true,
           status: err.status || 500,
           message: err.message || 'internal server error',
           body: err.body || null
@@ -778,26 +608,17 @@ module.exports = [
     }
   },
 
-  // 5 PUT /management/connection/:user_connection_id
+  // 4 DELETE /management/connection/:user_connection_id
   {
     uri: '/management/connection/:user_connection_id',
-    method: 'put',
+    method: 'delete',
     secure: true,
     active: true,
     callback: function(req, res) {
       var {user_connection_id} = req.params
-      var {enabled} = req.body
-      var old_value, other_party
-      var {user, user_device, user_connection} = this.get('models')
-
-      if (typeof enabled !== 'boolean') {
-        return res.status(400).json({
-          error: true,
-          status: 400,
-          message: 'missing request body parameters',
-          body: null
-        })
-      }
+      var {user, user_connection} = this.get('models')
+      var errors = this.get('db_errors')
+      var uc
 
       user_connection.findOne({
         where: {
@@ -805,8 +626,6 @@ module.exports = [
           $and: [
             {
               $or: [
-                {to_id: req.user.id},
-                {from_id: req.user.id},
                 {to_did: req.user.did},
                 {from_did: req.user.did}
               ]
@@ -815,25 +634,9 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
-          if (found.enabled !== enabled) {
-            old_value = found.enabled
-            // figure out who the other party in the connection is
-            // DIDs take prescedence
-            other_party = ((
-              req.user.did === found.to_did ||
-              req.user.id === found.to_id
-            ) ? (
-              found.from_did || found.from_id
-            ) : (
-              found.to_did || found.to_id
-            ))
-            return found.update({enabled: enabled})
-          }
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'no-op',
-            body: null
+          uc = found
+          return user_connection.destroy({
+            where: {id: user_connection_id}
           })
         }
         return Promise.reject({
@@ -842,17 +645,37 @@ module.exports = [
           message: 'user_connection record not found',
           body: null
         })
-      }).then(function() {
-        return user.findOne({where: {
-          $or: [
-            {did: other_party},
-            {id: other_party}
-          ]
-        }})
+      }).then(function(destroyed) {
+        if (destroyed) {
+          return user.findOne({
+            where: {
+              did: req.user.did === uc.from_did ? uc.to_did : uc.from_did
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_connection record not found',
+          body: null
+        })
       }).then(function(found) {
         if (found) {
-          process.send({webhook_request: {url: found.webhook_url}})
-          return user_device.findOne({where: {owner_id: found.id}})
+          process.send({
+            notification_request: {
+              user_id: found.id,
+              notification: {
+                title: 'User Connection Deleted',
+                body: 'Your connection has been deleted'
+              },
+              data: {
+                type: 'user_connection_deleted',
+                user_connection_id: uc.id,
+                uc_id: uc.id
+              }
+            }
+          })
+          return Promise.resolve()
         }
         return Promise.reject({
           error: true,
@@ -860,29 +683,17 @@ module.exports = [
           message: 'user record not found',
           body: null
         })
-      }).then(function(found) {
-        if (found) {
-          // send notifications to other party
-          return Promise.resolve(
-            process.send({
-              push_notification_request: {
-                device_id: found.device_id
-              }
-            })
-          )
-        }
-        // this case is permitted as the user may be programmitic
-        return Promise.resolve()
       }).then(function() {
         return Promise.resolve(
           res.status(200).json({
             error: false,
             status: 200,
-            message: 'user_connection record updated',
+            message: 'user_connection record deleted',
             body: null
           })
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -895,7 +706,7 @@ module.exports = [
     }
   },
 
-  // 6 GET /management/activation/:activation_code
+  // 5 GET /management/activation/:activation_code
   {
     uri: '/management/activation/:activation_code',
     method: 'get',
@@ -903,8 +714,9 @@ module.exports = [
     active: false,
     callback: function(req, res) {
       var {activation_code} = req.params
-      var {user} = this.get('models')
-      
+      var {user, user_datum} = this.get('models')
+      var errors = this.get('db_errors')
+      var user_id
       user.findOne({
         where: {app_activation_code: activation_code}
       }).then(function(found) {
@@ -916,12 +728,32 @@ module.exports = [
             body: null
           })
         }
+        user_id = found.id
         // update the record
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
+        process.send({
+          vc_generation_request: {
+            user_id: user_id,
+            field: 'email'
+          },
+          notification_request: {
+            user_id: user_id,
+            notification: {
+              title: 'LifeKey is now activated!',
+              body: 'Thank you for activating!'
+            },
+            data: {
+              type: 'app_activation_link_clicked'
+            }
+          }
+        })
         res.set('Content-Type', 'text/html')
-        res.status(200).end(`<p>LifeKey is now activated!</p><p><a href="cnsnt:main-menu">Click here</a> to begin!</p>`)
+        res.status(200).end(
+          '<p>Thanks for activating!</p>'
+        )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -934,117 +766,59 @@ module.exports = [
     }
   },
 
-  // 7 POST /management/isa
+  // 6 POST /management/isa/request
   {
     uri: '/management/isa',
     method: 'post',
     secure: true,
     active: true,
     callback: function(req, res) {
-      
-      var {document, to} = req.body
+
+      var {
+        to,
+        optional_entities,
+        required_entities,
+        purpose,
+        license
+      } = req.body
+
+      if (!(to && purpose && license)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing request body parameters',
+          body: null
+        })
+      }
+
+      if (!(Array.isArray(required_entities) && required_entities.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected lengthy arrayish type for required_entities field',
+          body: null
+        })
+      }
+
+      // required_entities
+      // [
+      //   {schema: 'Person', description: '...'},
+      //   {schema: 'PostalAddress', description: 'work'}
+      // ]
+
       var {
         user,
         user_connection,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
 
-      var to_user, purpose, license, original = document
+      var to_user
 
-      var parse_json_doc = (function() {
-        if (!(document || to)) {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'missing request body parameters',
-            body: null
-          })
-        } else if (document) {
-          // jsonld takes precedence over regular ids/dids
-          try {
-            document = JSON.parse(document)
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'expected well-formed and validatable json string',
-              body: null
-            })
-          }
-          return jsonld.promises.compact(
-            document, INFORMATION_SHARING_AGREEMENT_CTX
-          ).then(function(compacted) {
-            return jsonld.promises.expand(compacted)
-          }).then(function(expanded) {
-            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
-            to = q.query('cn:to @value')
-            var from = q.query('cn:from @value')
-            var requested_resources = q.queryAll('cn:requestedResourceUris @value')
-            purpose = q.query('cn:purpose @value')
-            license = q.query('cn:license @value')
-            var from_vartype = typeof from
-            var to_vartype = typeof to
-            var purpose_vartype = typeof purpose
-            var license_vartype = typeof license
-            if (from_vartype === 'undefined' || !from) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected truthy type for from field but got undefined',
-                body: null
-              })
-            } else if (from !== req.user.id && ('' + from) !== req.user.did) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'the from field does not match the calling agents identifier',
-                body: null
-              })
-            } else if (to_vartype === 'undefined' || !to) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected truthy type for to field but got undefined',
-                body: null
-              })
-            } else if (!(Array.isArray(requested_resources) && requested_resources.length)) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected lenghty arrayish type for requestedResourceUris field',
-                body: null
-              })
-            } else if (purpose_vartype === 'undefined' || !purpose) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected truthy type for purpose field but got undefined',
-                body: null
-              })
-            } else if (license_vartype === 'undefined' || !license) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected truthy type license to field but got undefined',
-                body: null
-              })
-            }
-            return Promise.resolve()
-          })
-        } else {
-          return Promise.resolve()
+      user.findOne({
+        where: {
+          did: to
         }
-      })(document)
-
-      parse_json_doc.then(function(found) {
-        return user.findOne({
-          where: {
-            $or: [
-              {did: to},
-              {id: to}
-            ]
-          }
-        })
       }).then(function(found) {
         if (found) {
           to_user = found
@@ -1056,31 +830,11 @@ module.exports = [
                   $or: [
                     {
                       to_did: req.user.did,
-                      from_id: to
-                    },
-                    {
-                      to_did: req.user.did,
                       from_did: to
                     },
                     {
                       from_did: req.user.did,
                       to_did: to
-                    },
-                    {
-                      from_did: req.user.did,
-                      to_id: to
-                    },
-                    {
-                      to_id: req.user.id,
-                      from_id: to
-                    },
-                    {
-                      from_id: req.user.id,
-                      to_id: to
-                    },
-                    {
-                      to_id: req.user.id,
-                      from_did: to
                     }
                   ]
                 }
@@ -1098,35 +852,43 @@ module.exports = [
         if (found) {
           return information_sharing_agreement_request.create({
             from_did: req.user.did,
-            from_id: req.user.id,
             to_did: to_user.did,
-            to_id: to_user.id,
-            document: original,
             license: license,
+            optional_entities: JSON.stringify(optional_entities),
+            required_entities: JSON.stringify(required_entities),
             purpose: purpose
           })
         }
         return Promise.reject({
           error: true,
           status: 400,
-          message: 'expected an association to exist between the specified users but found none',
+          message: 'user_connection record not found',
           body: null
         })
       }).then(function(created) {
         if (created) {
           process.send({
-            // TODO webhook
-            push_notification_request: {
-              user_id: to_user.id,
-              new_isa_request: true
+            notification_request: {
+              user_id: to_user.did,
+              notification: {
+                title: 'New Information Sharing Agreement',
+                body: 'New information sharing agreement'
+              },
+              data: {
+                type: 'information_sharing_agreement_request',
+                from_did: req.user.did,
+                isar_id: created.id
+              }
             }
           })
-          return res.status(201).json({
-            error: false,
-            status: 201,
-            message: 'information_sharing_agreement_request record created',
-            body: {id: created.id}
-          })
+          return Promise.resolve(
+            res.status(201).json({
+              error: false,
+              status: 201,
+              message: 'information_sharing_agreement_request record created',
+              body: {id: created.id}
+            })
+          )
         }
         // probably unreachable
         return Promise.reject({
@@ -1136,6 +898,7 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1148,7 +911,7 @@ module.exports = [
     }
   },
 
-  // 8 POST /management/isa/:isar_id
+  // 7 POST /management/isa/respond/:isar_id
   {
     uri: '/management/isa/:isar_id',
     method: 'post',
@@ -1158,133 +921,54 @@ module.exports = [
       // TO only
       // this is the ISA reply endpoint
 
-      // NOTE
-      // technically, this request has already been authorised
-      // and authenticated because of the http signing key
-      // 
-      // the signature and verification of this document could
-      // be made to be directly associated with the http request
-      // verification
-
       var {isar_id} = req.params
-      
-      var {
-        document,
-        signature,
-        signing_key_alias
-      } = req.body
+      var {accepted, permitted_resources} = req.body
+
+      if (typeof accepted !== 'boolean') {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected boolean type for accepted field',
+          body: null
+        })
+      }
+
+      if (accepted &&
+          !(Array.isArray(permitted_resources) &&
+            permitted_resources.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected lengthy arrayish type for permitted_resources field',
+          body: null
+        })
+      }
 
       var {
-        crypto_key,
         information_sharing_permission,
         information_sharing_agreement,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
 
-      var requested_resources, resolution, sk, isar, isa
+      var isar, isa, from_did
 
-      var parse_json_doc_and_verify_doc_signature = (function(document, signature, signing_key_alias) {
-        if (!(document && signature && signing_key_alias)) {
-          return Promise.reject({
-            error: true,
-            status: 400,
-            message: 'missing required arguments',
-            body: null
-          })
+      information_sharing_agreement_request.findOne({
+        where: {
+          id: isar_id,
+          acknowledged: null,
+          to_did: req.user.did
         }
-        return (signing_key_alias !== req.user.crypto.alias ? (
-          crypto_key.findOne({
-            where: {
-              owner_id: req.user.id,
-              alias: signing_key_alias
-            }
-          })
-        ) : (
-          Promise.resolve(req.user.crypto)
-        )).then(function(found) {
-          if (found) {
-            sk = found
-            return Promise.resolve()
-          }
-          return Promise.reject({
-            error: true,
-            status: 404,
-            message: 'crypto_key record not found',
-            body: null
-          })
-        }).then(function() {
-          // jsonld takes precedence over regular ids/dids
-          try {
-            document = JSON.parse(document)
-          } catch (e) {
-            return Promise.reject({
-              error: true,
-              status: 400,
-              message: 'expected well-formed and validatable json string',
-              body: null
-            })
-          }
-          return jsonld.promises.compact(
-            document, INFORMATION_SHARING_AGREEMENT_CTX
-          ).then(function(compacted) {
-            return jsonld.promises.expand(compacted)
-          }).then(function(expanded) {
-            var q = query(expanded, {cn: CNSNT_SCHEMA_HOST})
-            // ensure doc is the same as original from request
-            resolution = q.query('cn:resolution @value')
-            permitted_resources = q.queryAll('cn:permittedResourceUris @value')
-            var resolution_vartype = typeof resolution
-            
-            if (resolution_vartype !== 'boolean') {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: `expected boolean type for field resolution but got ${resolution_vartype}`,
-                body: null
-              })
-            } else if (resolution &&
-                       !(Array.isArray(permitted_resources) &&
-                         permitted_resources.length)) {
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'expected lenghty arrayish type for permittedResourceUris field',
-                body: null
-              })
-            }
-
-            // TODO verify singature with specified signing key
-            
-            return Promise.resolve()
-          })
-        })
-      })(document, signature, signing_key_alias)
-      
-      parse_json_doc_and_verify_doc_signature.then(function() {
-        return information_sharing_agreement_request.findOne({
-          where: {
-            id: isar_id,
-            acknowledged: null,
-            $and: [
-              {
-                $or: [
-                  {to_id: req.user.id},
-                  {to_did: req.user.did}
-                ]
-              }
-            ]
-          }
-        })
       }).then(function(found) {
         if (found) {
           isar = found
+          from_did = found.from_did
           var now = new Date
           return found.update({
             acknowledged: true,
             acknowledged_at: now,
-            resolution: resolution,
-            resolved_at: now,
-            resolver_signature: signature
+            accepted: accepted,
+            resolved_at: now
           })
         }
         return Promise.reject({
@@ -1294,37 +978,63 @@ module.exports = [
           body: null
         })
       }).then(function(updated) {
-        if (updated && resolution) {
-          return information_sharing_agreement.create({
-            isar_id: updated.id,
-            from_id: updated.from_id,
-            from_did: updated.from_did,
-            from_url: updated.from_url,
-            to_id: updated.to_id,
-            to_did: updated.to_did,
-            to_url: updated.to_url
-          })
-        } else if (!updated) {
+        if (!updated) {
           return Promise.reject({
             error: true,
             status: 500,
             message: 'unable to update information_sharing_agreement_request record',
             body: null
           })
+        } else if (!accepted) {
+          process.send({
+            notification_request: {
+              user_id: from_did,
+              notification: {
+                title: 'Information Sharing Agreement Request Rejected',
+                body: 'Your ISA request was rejected'
+              },
+              data: {
+                type: 'information_sharing_agreement_request_rejected',
+                isar_id: isar_id
+              }
+            }
+          })
+          return Promise.reject({
+            error: false,
+            status: 200,
+            message: 'information_sharing_agreement_request rejected',
+            body: null
+          })
         } else {
-          return Promise.resolve()
+          return information_sharing_agreement.create({
+            isar_id: updated.id,
+            from_did: updated.from_did,
+            to_did: updated.to_did
+          })
         }
       }).then(function(created) {
-        if (!resolution) {
-          return Promise.resolve({rejected: true})
-        } else if (created) {
-          // TODO webhook to notify `from` party that the resources they requested are available
+        if (created) {
+          process.send({isa_ledger_request: {isa_id: created.id}})
+          process.send({
+            notification_request: {
+              user_id: from_did,
+              notification: {
+                title: 'Information Sharing Agreement Request Accepted',
+                body: 'Your ISA request was accepted'
+              },
+              data: {
+                type: 'information_sharing_agreement_request_accepted',
+                isar_id: isar_id,
+                isa_id: created.id
+              }
+            }
+          })
           isa = created
           return Promise.all(
-            permitted_resources.map(function(uri) {
+            permitted_resources.map(function(resource) {
               return information_sharing_permission.create({
                 isa_id: created.id,
-                resource_uri: uri
+                user_datum_id: resource.id
               })
             })
           )
@@ -1337,14 +1047,7 @@ module.exports = [
           })
         }
       }).then(function(created) {
-        if (created.rejected) {
-          return res.status(200).json({
-            error: false,
-            status: 200,
-            message: 'information_sharing_agreement_request rejected',
-            body: null
-          })
-        } else if (created) {
+        if (created) {
           return res.status(201).json({
             error: false,
             status: 201,
@@ -1359,10 +1062,11 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
-          error: err.error || true,
+          error: typeof err.error === 'boolean' ? err.error : true,
           status: err.status || 500,
           message: err.message || 'internal server error',
           body: err.body || null
@@ -1371,7 +1075,7 @@ module.exports = [
     }
   },
 
-  // 9 GET /management/isa
+  // 8 GET /management/isa/get
   {
     uri: '/management/isa',
     method: 'get',
@@ -1382,51 +1086,41 @@ module.exports = [
         information_sharing_agreement_request,
         information_sharing_agreement
       } = this.get('models')
-      
+      var errors = this.get('db_errors')
+
       var body = {
         unacked: [],
         enabled: [],
         disabled: []
       }
-      
-      return information_sharing_agreement_request.findAll({
+
+      information_sharing_agreement_request.findAll({
         where: {
           acknowledged: null,
-          $and: [
-            {
-              $or: [
-                {to_id: req.user.id},
-                {to_did: req.user.did}
-              ]
-            }
-          ]
+          to_did: req.user.did
         }
       }).then(function(isars) {
         if (isars) {
           body.unacked = isars.map(isar => {
-            return {id: isar.id, document: isar.document}
+            return {
+              id: isar.id,
+              from_did: isar.from_did,
+              purpose: isar.purpose,
+              license: isar.license,
+              required_entities: JSON.parse(isar.required_entities)
+            }
           })
         }
         return information_sharing_agreement.findAll({
           where: {
-            $or: [
-              {to_id: req.user.id},
-              {to_did: req.user.did}
-            ]
+            to_did: req.user.did,
+            from_did: req.user.did
           }
         })
       }).then(function(isas) {
         if (isas) {
-          body.enabled = isas.filter(
-            isa => !isa.expired
-          ).map(
-            isa => isa.id
-          )
-          body.disabled = isas.filter(
-            isa => isa.expired
-          ).map(
-            isa => isa.id
-          )
+          body.enabled = isas.filter(isa => !isa.expired).map(isa => isa.id)
+          body.disabled = isas.filter(isa => isa.expired).map(isa => isa.id)
         }
         return Promise.resolve()
       }).then(function() {
@@ -1439,6 +1133,7 @@ module.exports = [
           })
         )
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1451,7 +1146,7 @@ module.exports = [
     }
   },
 
-  // 10 GET /management/isa/:isa_id
+  // 9 GET /management/isa/get/:isa_id
   {
     uri: '/management/isa/:isa_id',
     method: 'get',
@@ -1467,15 +1162,14 @@ module.exports = [
         information_sharing_permission,
         information_sharing_agreement_request
       } = this.get('models')
+      var errors = this.get('db_errors')
       var isa, isar, isps
 
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
           $or: [
-            {to_id: req.user.id},
             {to_did: req.user.did},
-            {from_id: req.user.id},
             {from_did: req.user.did}
           ]
         }
@@ -1528,6 +1222,7 @@ module.exports = [
           }
         })
       }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1540,7 +1235,7 @@ module.exports = [
     }
   },
 
-  // 11 DELETE /management/isa/:isa_id
+  // 10 DELETE /management/isa/delete/:isa_id
   {
     uri: '/management/isa/:isa_id',
     method: 'delete',
@@ -1550,23 +1245,53 @@ module.exports = [
       // FROM and TO only
       // deactivate isa record
 
-      // TODO check for noop
       var {isa_id} = req.params
       var {information_sharing_agreement} = this.get('models')
+      var errors = this.get('db_errors')
 
       information_sharing_agreement.findOne({
         where: {
           id: isa_id,
           expired: false,
-          $or: [
-            {to_id: req.user.id},
-            {to_did: req.user.did},
-            {from_id: req.user.id},
-            {from_did: req.user.did}
+          $and: [
+            {
+              $or: [
+                {to_did: req.user.did},
+                {from_did: req.user.did}
+              ]
+            }
           ]
         }
       }).then(function(found) {
-        if (found) return found.update({expired: true})
+        if (found) {
+          process.send({
+            notification_request: {
+              user_id: found.to_did,
+              notification: {
+                title: 'Information Sharing Agreement Deleted',
+                body: 'Your ISA has been deleted'
+              },
+              data: {
+                type: 'information_sharing_agreement_deleted',
+                isa_id: found.id
+              }
+            }
+          })
+          process.send({
+            notification_request: {
+              user_id: found.from_did,
+              notification: {
+                title: 'Information Sharing Agreement Deleted',
+                body: 'Your ISA has been deleted'
+              },
+              data: {
+                type: 'information_sharing_agreement_deleted',
+                isa_id: found.id
+              }
+            }
+          })
+          return found.update({expired: true})
+        }
         return Promise.reject({
           error: true,
           status: 404,
@@ -1575,7 +1300,6 @@ module.exports = [
         })
       }).then(function(updated) {
         if (updated) {
-          // TODO webhooks to notify concerned parties
           return res.status(200).json({
             error: false,
             status: 200,
@@ -1590,6 +1314,2137 @@ module.exports = [
           body: null
         })
       }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 11 GET /qr/:user_id
+  {
+    uri: '/qr/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          var {SERVER_HOSTNAME} = this.get('env')
+          return qr.toFileStream(
+            res,
+            `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
+            {
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                throw {
+                  error: true,
+                  status: 500,
+                  message: 'qr code generation error',
+                  body: null
+                }
+              }
+            }
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }.bind(this)).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+
+    }
+  },
+
+  // 12 PUT /management/isa/update/:isa_id
+  {
+    uri: '/management/isa/:isa_id',
+    method: 'put',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {permitted_resources} = req.body
+
+      // permitted_resources
+      // [
+      //    {id: 5},
+      //    ...
+      // ]
+      if (!(Array.isArray(permitted_resources) && permitted_resources.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'expected lengthy arrayish type for permitted_resources field',
+          body: null
+        })
+      }
+
+      var {
+        information_sharing_agreement,
+        information_sharing_agreement_request,
+        information_sharing_permission
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var from_user
+
+      information_sharing_agreement.findOne({
+        where: {
+          id: isa_id,
+          $and: [
+            {
+              $or: [
+                {from_did: req.user.did},
+                {to_did: req.user.did}
+              ]
+            }
+          ]
+        }
+      }).then(function(found) {
+        if (found && (
+          // found.to_id === req.user.id ||
+          found.to_did === req.user.did
+        )) {
+          from_user = found.from_did
+          return Promise.resolve(found)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (!found.expired) {
+          return information_sharing_permission.destroy({
+            where: {isa_id: isa_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 400,
+          message: 'information_sharing_agreement record has expired',
+          body: null
+        })
+      }).then(function() {
+        return Promise.all(
+          permitted_resources.map(function(resource) {
+            return information_sharing_permission.create({
+              isa_id: isa_id,
+              user_datum_id: resource.id
+            })
+          })
+        )
+      }).then(function(created) {
+        process.send({
+          notification_request: {
+            user_id: from_user,
+            notification: {
+              title: 'Information Sharing Agreement Updated',
+              body: 'See the changes to your ISA'
+            },
+            data: {
+              type: 'information_sharing_agreement_updated',
+              isa_id: isa_id
+            }
+          }
+        })
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'information_sharing_permission records updated',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 13 GET /management/isa/pull/:isa_id
+  {
+    uri: '/management/pull/:isa_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {
+        user,
+        information_sharing_agreement,
+        information_sharing_permission,
+        user_datum
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var isa, to_user, body = {}
+
+      information_sharing_agreement.findOne({
+        where: {
+          id: isa_id,
+          from_did: req.user.did
+        }
+      }).then(function(found) {
+        if (found) {
+          isa = found
+          return user.findOne({where: {did: found.to_did}})
+          // to_user = found.to_did
+          // return Promise.resolve(found)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          to_user = found
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function() {
+        if (!isa.expired) {
+          return information_sharing_permission.findAll({
+            where: {isa_id: isa_id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 400,
+          message: 'information_sharing_agreement record has expired',
+          body: null
+        })
+      }).then(function(found) {
+        if (found && found.length) {
+          return Promise.all(
+            found.map(function(isp) {
+              return user_datum.findOne({
+                where: {
+                  owner_id: to_user.id,
+                  id: isp.user_datum_id
+                }
+              })
+            })
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_permission records not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found && found.length) {
+          // TODO change this key name!!!
+          body.user_data = found.map(function(ud) {
+            ud.value = (
+              ud.value && ud.encoding ?
+              ud.value.toString(ud.encoding) :
+              ud.value
+            )
+            return ud.toJSON()
+          })
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_datum records not found',
+          body: null
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: body
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 14 POST /management/isa/push/:isa_id
+  {
+    uri: '/management/push/:isa_id',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+
+      var {isa_id} = req.params
+      var {resources} = req.body
+      var other_user_did
+
+      if (!(Array.isArray(resources) && resources.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var {
+        user,
+        information_sharing_agreement,
+        user_datum
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      information_sharing_agreement.findOne({
+        where: {
+          id: isa_id,
+          $and: [
+            {
+              $or: [
+                {from_did: req.user.did},
+                {to_did: req.user.did}
+              ]
+            }
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          if (found.expired) {
+            return Promise.reject({
+              error: true,
+              status: 403,
+              message: 'information_sharing_agreement expired',
+              body: null
+            })
+          }
+          other_user_did = (
+            req.user.did === found.to_did ?
+            found.from_did :
+            found.to_did
+          )
+          return user.findOne({
+            where: {did: other_user_did}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          var push_target_id = found.id
+          // NOTE you can only send entirely new or existing resources
+          var existing_resources = typeof resources[0] === 'number'
+          // creating copies of existing resources for push target
+          if (existing_resources) {
+            return new Promise(function(resolve, reject) {
+              Promise.all(
+                resources.map(function(resource_id, idx) {
+                  return user_datum.findOne({
+                    where: {
+                      id: resource_id,
+                      owner_id: req.user.id
+                    }
+                  })
+                })
+              ).then(function(found) {
+                return Promise.all(
+                  found.map(function(resource, idx) {
+                    return user_datum.create({
+                      owner_id: push_target_id,
+                      entity: resource.entity,
+                      attribute: 'from ' + req.user.nickname,
+                      alias: 'from ' + req.user.nickname,
+                      mime: resource.mime,
+                      value: resource.value,
+                      uri: resource.uri,
+                      from_user_did: req.user.did,
+                      from_resource_name: null,
+                      from_resource_description: null,
+                      is_verifiable_claim: resource.is_verifiable_claim,
+                      encoding: resource.encoding,
+                      schema: resource.schema
+                    })
+                  })
+                )
+              }).then(resolve).catch(reject)
+            })
+          }
+          // creating new resources for push target
+          return Promise.all(
+            resources.map(function(resource, idx) {
+              return user_datum.create({
+                owner_id: push_target_id,
+                entity: resource.name,
+                attribute: 'from ' + req.user.nickname,
+                alias: idx + 1,
+                mime: resource.mime,
+                value: resource.value,
+                uri: resource.uri,
+                from_user_did: req.user.did,
+                from_resource_name: resource.name,
+                from_resource_description: resource.description,
+                is_verifiable_claim: resource.is_verifiable_claim,
+                encoding: resource.encoding,
+                schema: resource.schema
+              })
+            })
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(created) {
+        if (created) {
+          process.send({
+            notification_request: {
+              user_id: other_user_did,
+              notification: {
+                title: 'ISA Resources Pushed',
+                body: 'One or more resources were pushed to you'
+              },
+              data: {
+                type: 'resource_pushed',
+                isa_id: isa_id,
+                from_did: req.user.did,
+                resource_ids: created.map(function(c) {
+                  return c.id
+                })
+              }
+            }
+          })
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'created',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 15 GET /management/thanks/balance
+  {
+    uri: '/management/thanks/balance',
+    method: 'get',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      if (!thanks_balance_check_available) {
+        return res.status(500).json({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
+      }
+      if (!req.user.did_address) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'your user record does not yet have a DID',
+          body: null
+        })
+      }
+      thanks.balanceOf(req.user.did_address, function(err, balance) {
+        if (err) {
+          console.log('unable to query balance of user', req.user.id, err)
+          return res.status(500).json({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {balance: balance}
+        })
+      })
+    }
+  },
+
+  // 16 POST /management/key
+  {
+    uri: '/management/key',
+    method: 'post',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+
+      var {
+        plaintext_proof,
+        signed_proof,
+        public_key,
+        public_key_algorithm,
+        alias,
+        purpose
+      } = req.body
+
+      if (!(plaintext_proof &&
+            signed_proof &&
+            public_key &&
+            public_key_algorithm &&
+            alias &&
+            purpose)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      var {
+        crypto_key,
+        http_request_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      if (!our_crypto.asymmetric.is_supported_algorithm(public_key_algorithm)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'unsupported key algorithm',
+          body: null
+        })
+      }
+
+      var lower_algo = public_key_algorithm.toLowerCase()
+      var key_buffers
+
+      http_request_verification.findOne({
+        where: {
+          algorithm: lower_algo,
+          signature: signed_proof
+        }
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'detected known signature',
+            body: null
+          })
+        }
+        return crypto_key.findOne({
+          where: {
+            owner_id: req.user.id,
+            alias: alias
+          }
+        })
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'duplicate key alias',
+            body: null
+          })
+        }
+        return our_crypto.asymmetric.get_buffers(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
+      }).then(function(keys) {
+        key_buffers = keys
+        return our_crypto.asymmetric.verify(
+          lower_algo,
+          public_key,
+          plaintext_proof,
+          signed_proof
+        )
+      }).then(function() {
+        // now store the key and sig for posterity
+        return http_request_verification.create({
+          public_key: public_key,
+          algorithm: public_key_algorithm,
+          plaintext: plaintext_proof,
+          signature: signed_proof
+        })
+      }).then(function(created) {
+        if (created) {
+          return crypto_key.create({
+            algorithm: public_key_algorithm,
+            purpose: purpose || 'sign',
+            alias: alias,
+            public_key: lower_algo === 'rsa' ? public_key : key_buffers[0],
+            owner_id: req.user.id
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create http_request_verification record',
+          body: null
+        })
+      }).then(function(created) {
+        if (created) {
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'crypto_key record created',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create crypto_key record',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+
+    }
+  },
+
+  // 17 GET /management/key/:id?alias
+  {
+    uri: '/management/key/:user_did',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did} = req.params
+      var {alias} = req.query
+      var {user, crypto_key} = this.get('models')
+      var errors = this.get('db_errors')
+
+      if (user_did === 'lifekey-server' || alias === 'lifekey-server') {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: {
+            public_key_algorithm: 'secp256k1',
+            public_key: our_crypto.asymmetric.get_public(
+              'secp256k1',
+              Buffer.from(env.EIS_ADMIN_KEY, 'hex')
+            ).toString('base64')
+          }
+        })
+      }
+
+      user.findOne({
+        where: {
+          $or: [
+            {did: user_did},
+            {id: user_did}
+          ]
+        }
+      }).then(function(found) {
+        if (found) {
+          var query = {
+            where: {
+              owner_id: found.id,
+              alias: 'client-server-http'
+            }
+          }
+          if (alias) query.where.alias = alias
+          return crypto_key.findOne(query)
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              public_key_algorithm: found.algorithm,
+              public_key: found.public_key.toString(
+                found.algorithm === 'rsa' ?
+                'utf8' :
+                'base64'
+              )
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 18 POST /management/action
+  {
+    uri: '/management/action',
+    method: 'post',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {
+        name, purpose, license, entities,
+        optional_entities, duration_days
+      } = req.body
+
+      var has_optional = false
+
+      if (!(name &&
+            purpose &&
+            license &&
+            Array.isArray(entities) &&
+            entities.length &&
+            duration_days)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      if (/\s+/i.test(name)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'name cannot contain whitespace',
+          body: null
+        })
+      }
+
+      if (Array.isArray(optional_entities) &&
+          optional_entities.length) {
+        has_optional = true
+      }
+
+      var errors = this.get('db_errors')
+      var {user_action} = this.get('models')
+
+      user_action.findOne({
+        where: {
+          name: name,
+          owner_id: req.user.id
+        }
+      }).then(function(found) {
+        if (found) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'user_action record already exists',
+            body: null
+          })
+        }
+        return user_action.create({
+          owner_id: req.user.id,
+          name: name,
+          purpose: purpose,
+          license: license,
+          entities: JSON.stringify(entities),
+          duration_days: duration_days,
+          optional_entities: (
+            has_optional ?
+            JSON.stringify(optional_entities) :
+            null
+          )
+        })
+      }).then(function(created) {
+        if (created) {
+          return res.status(201).json({
+            error: false,
+            status: 201,
+            message: 'created',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to create user_action record',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 19 GET /management/action/:user_did
+  {
+    uri: '/management/action/:user_did',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did} = req.params
+      var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findAll({
+            where: {owner_id: found.id}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.map(function(action) {
+              return {
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
+              }
+            })
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to query user_action records',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 20 GET /management/action/:user_did/:action_name
+  {
+    uri: '/management/action/:user_did/:action_name',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did, action_name} = req.params
+      var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      var action_owner_id
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findOne({
+            where: {
+              owner_id: found.id,
+              name: action_name
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              purpose: found.purpose,
+              license: found.license,
+              entities: JSON.parse(found.entities),
+              optionalEntities: JSON.parse(found.optional_entities),
+              durationDays: found.duration_days,
+              requestedBy: user_did,
+              name: found.name
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 21 POST /management/isa/:user_did/:action_name
+  {
+    uri: '/management/isa/:user_did/:action_name',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+
+      // NOTE
+      // the client shouldn't have to post the action document that they're accepting
+      // they should only have to reference the user and action id
+
+      var {user_did, action_name} = req.params
+      var {
+        user,
+        crypto_key,
+        user_action,
+        user_connection,
+        information_sharing_agreement_request,
+        information_sharing_agreement,
+        information_sharing_permission
+      } = this.get('models')
+
+      var errors = this.get('db_errors')
+      var isar_id, isa_id, {entities, optional_entities} = req.body
+
+      if (!(Array.isArray(entities) && entities.length)) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      user.findOne({
+        where: {did: user_did}
+      }).then(function(found) {
+        if (found) {
+          return user_action.findOne({
+            where: {
+              owner_id: found.id,
+              name: action_name
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          var expires_at = new Date
+          expires_at.setDate(expires_at.getDate() + found.duration_days)
+          return information_sharing_agreement_request.create({
+            from_did: user_did,
+            to_did: req.user.did,
+            action_id: found.id,
+            acknowledged: true,
+            optional_entities: JSON.stringify(found.optional_entities || []),
+            required_entities: JSON.stringify(found.entities),
+            duration_days: found.duration_days,
+            purpose: found.purpose,
+            license: found.license,
+            accepted: true,
+            expires_at: expires_at,
+            acknowledged_at: new Date,
+            resolved_at: new Date
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
+      }).then(function(created) {
+        isar_id = created.id
+        return information_sharing_agreement.create({
+          isar_id: created.id,
+          from_did: user_did,
+          to_did: req.user.did
+        })
+      }).then(function(created) {
+        isa_id = created.id
+        return Promise.all(
+          entities.map(function(resource_id) {
+            return information_sharing_permission.create({
+              isa_id: created.id,
+              user_datum_id: resource_id
+            })
+          })
+        )
+      }).then(function(created) {
+        process.send({isa_ledger_request: {isa_id: isa_id}})
+        process.send({
+          notification_request: {
+            user_id: user_did,
+            notification: {
+              title: 'Information Sharing Agreement Request Accepted',
+              body: 'Your ISA request was accepted'
+            },
+            data: {
+              type: 'information_sharing_agreement_request_accepted',
+              via_action: true,
+              isar_id: isar_id,
+              isa_id: isa_id
+            }
+          }
+        })
+        return Promise.resolve()
+      }).then(function() {
+        return res.status(201).json({
+          error: false,
+          status: 201,
+          message: 'created information_sharing_agreement record',
+          body: {id: isa_id}
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 22 GET /management/receipt/:isa_id
+  {
+    uri: '/management/receipt/:isa_id',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {isa_id} = req.params
+      var {
+        user,
+        user_action,
+        crypto_key,
+        information_sharing_agreement,
+        information_sharing_agreement_request
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var isar, receipt
+
+      information_sharing_agreement.findOne({
+        where: {id: isa_id}
+      }).then(function(found) {
+        if (found) {
+          if (req.skip_relation_check ||
+              found.to_did === req.user.did ||
+              found.from_did === req.user.did) {
+            return information_sharing_agreement_request.findOne({
+              where: {id: found.isar_id}
+            })
+          }
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'information_sharing_agreement record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          isar = found
+          return user_action.findOne({
+            where: {id: isar.action_id}
+          })
+        } else {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'information_sharing_agreement_request record not found',
+            body: null
+          })
+        }
+      }).then(function(found) {
+        receipt = {
+          '@context': 'http://schema.cnsnt.io/information_sharing_agreement',
+          isaSignatureValue: null,
+          isa: {
+            requestSignatureValue: null,
+            request: {
+              purpose: isar.purpose,
+              license: isar.license,
+              entities: JSON.parse(isar.required_entities),
+              optionalEntities: JSON.parse(isar.optional_entities),
+
+              // TODO requires data model change
+              // durationDays: isar.duration_days,
+              requestedBy: isar.from_did,
+              action: ((found || {}).name) || null
+            },
+            response: {
+              respondedBy: isar.to_did
+            }
+          }
+        }
+        return user.findOne({
+          where: {did: isar.from_did}
+        })
+      }).then(function(found) {
+        if (found) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: found.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(receipt.isa.request)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        receipt.isa.requestSignatureValue = signature.toString('base64')
+        return user.findOne({
+          where: {did: isar.from_did}
+        })
+      }).then(function(found) {
+        if (found) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: found.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return our_crypto.asymmetric.sign(
+            'secp256k1',
+            found.private_key,
+            JSON.stringify(receipt.isa)
+          )
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(signature) {
+        receipt.isaSignatureValue = signature.toString('base64')
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: receipt
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 23 DELETE /management/action/:action_name
+  {
+    uri: '/management/action/:action_name',
+    method: 'delete',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {action_name} = req.params
+      var {user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      user_action.destroy({
+        where: {
+          owner_id: req.user.id,
+          name: action_name
+        }
+      }).then(function(deleted) {
+        if (deleted) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {user_action: deleted}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_action record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 24 get /facial-verification
+  {
+    uri: '/facial-verification',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+
+      var {user_did} = req.query
+
+      var {
+        user,
+        facial_verification
+      } = this.get('models')
+
+      var {SERVER_HOSTNAME} = this.get('env')
+
+      var errors = this.get('db_errors')
+
+      facial_verification.findOne({
+        where: {
+          subject_did: user_did,
+          verifier_did: null,
+          result: null
+        }
+      }).then(function(found) {
+        if (found) return Promise.resolve(found)
+        return facial_verification.create({
+          subject_did: user_did,
+          token: user_did + crypto.rng(32).toString('hex')
+        })
+      }).then(function(fv) {
+        qr.toFileStream(
+          res,
+          `${SERVER_HOSTNAME}/facial-verification/${fv.subject_did}/${fv.token}`,
+          {
+            margin: env.QR_MARGIN,
+            color: {
+              light: env.QR_COLOUR_LIGHT,
+              dark: env.QR_COLOUR_DARK
+            }
+          },
+          function(err) {
+            if (err) {
+              throw {
+                error: true,
+                status: 500,
+                message: 'qr code generation error',
+                body: null
+              }
+            }
+          }
+        )
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 25 GET /facial-verification/:user_did/:token
+  {
+    uri: '/facial-verification/:user_did/:token',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_did, token} = req.params
+      var {
+        user,
+        user_datum,
+        facial_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      facial_verification.findOne({
+        where: {
+          token: token,
+          subject_did: user_did
+        }
+      }).then(function(found) {
+        if (found) {
+          return user.findOne({
+            where: {did: user_did}
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'facial_verification record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          return user_datum.findOne({
+            where: {
+              owner_id: found.id,
+              $or: [
+                {schema: 'schema.cnsnt.io/person'},
+                {schema: 'http://schema.cnsnt.io/person'}
+              ]
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          found.value = (
+            found.value && found.encoding ?
+            found.value.toString(found.encoding) :
+            found.value
+          )
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: {
+              entity: found.entity,
+              attribute: found.attribute,
+              alias: found.alias,
+              schema: found.schema,
+              value: found.value,
+              encoding: found.encoding,
+              mime: found.mime
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user_datum record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 26 POST /facial-verification/:user_did/:facial_verification_token
+  {
+    uri: '/facial-verification/:user_did/:token',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {user_did, token} = req.params
+      var {
+        user,
+        crypto_key,
+        user_datum,
+        facial_verification
+      } = this.get('models')
+      var errors = this.get('db_errors')
+
+      var {result} = req.body
+
+      if (!(typeof result === 'string' &&
+            result.length &&
+            !!~['yes', 'no', 'not sure'].indexOf(result))) {
+        return res.status(400).json({
+          error: true,
+          status: 400,
+          message: 'missing required arguments',
+          body: null
+        })
+      }
+
+      facial_verification.update({
+        verifier_did: req.user.did,
+        result: result
+      }, {
+        where: {
+          token: token,
+          subject_did: user_did,
+          verifier_did: null,
+          result: null
+        }
+      }).then(function(updated) {
+        if (updated[0]) {
+          return crypto_key.findOne({
+            where: {
+              owner_id: req.user.id,
+              alias: 'eis'
+            }
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to update facial_verification record',
+          body: null
+        })
+      }).then(function(found) {
+        if (found) {
+          var claim_instance = {
+            '@context': [
+              'http://schema.cnsnt.io/verifiable_claim'
+            ].concat('http://schema.cnsnt.io/facial_verification'),
+            claim: {
+              facialVerificationResult: result,
+              isCredential: false,
+              issuedFor: user_did,
+              creator: req.user.did,
+              createdAt: Date.now()
+            },
+            signatureValue: ''
+          }
+          return Promise.all([
+            claim_instance,
+            our_crypto.asymmetric.sign(
+              'secp256k1',
+              found.private_key,
+              JSON.stringify(claim_instance.claim)
+            )
+          ])
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'crypto_key record not found',
+          body: null
+        })
+      }).then(function(res) {
+        res[0].signatureValue = res[1].toString('base64')
+        return Promise.all([
+          user.findOne({where: {did: user_did}}),
+          res[0]
+        ])
+      }).then(function(res) {
+        return user_datum.create({
+          owner_id: res[0].id,
+          value: JSON.stringify(res[1]),
+          entity: 'Claim',
+          attribute: 'Verifiable',
+          schema: 'schema.cnsnt.io/facial_verification',
+          alias: Date.now(),
+          from_user_did: req.user.did,
+          from_resource_name: 'Facial recognition verifiable claim',
+          from_resource_description: 'Facial recognition with ' + req.user.did,
+          is_verifiable_claim: true,
+          mime: 'application/ld+json'
+        })
+      }).then(function(created) {
+        if (created) {
+          process.send({
+            notification_request: {
+              user_id: user_did,
+              notification: {
+                title: 'Resources Pushed',
+                body: 'One or more resources were pushed to you'
+              },
+              data: {
+                type: 'resource_pushed',
+                resource_ids: [created.id]
+              }
+            }
+          })
+          return Promise.resolve()
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'internal server error',
+          body: null
+        })
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 27 GET /management/action
+  {
+    uri: '/management/action',
+    method: 'get',
+    secure: true,
+    active: false,
+    callback: function(req, res) {
+      var {user, user_action} = this.get('models')
+      var errors = this.get('db_errors')
+
+      user_action.findAll({
+        where: {owner_id: req.user.id}
+      }).then(function(found) {
+        if (found) {
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: found.map(function(action) {
+              return {
+                purpose: action.purpose,
+                license: action.license,
+                entities: JSON.parse(action.entities),
+                optionalEntities: JSON.parse(action.optional_entities),
+                durationDays: action.duration_days,
+                name: action.name
+              }
+            })
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 500,
+          message: 'unable to query user_action records',
+          body: null
+        })
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 28 POST /management/thanks
+  {
+    uri: '/management/thanks',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {recipient, amount, reason} = req.body
+      var {user} = this.get('models')
+      user.findOne({
+        where: {did: recipient}
+      }).then(function(found) {
+        if (found) {
+          // TODO call ethereum to transfer tokens
+          process.send({
+            notification_request: {
+              user_id: recipient,
+              notification: {
+                title: 'You have been awarded Thanks!',
+                body: 'Press here to see more'
+              },
+              data: {
+                type: 'received_thanks',
+                amount: amount,
+                reason: reason,
+                from_did: req.user.did
+              }
+            }
+          })
+          return res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: null
+          })
+        }
+        return Promise.reject({
+          error: true,
+          status: 404,
+          message: 'user record not found',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 29 POST /management/message
+  {
+    uri: '/management/message',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {msg, recipient} = req.body
+      var {user_connection} = this.get('models')
+      Promise.resolve().then(function() {
+        if (msg.length > 4096) {
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: '4096 byte limit exceeded',
+            body: null
+          })
+        }
+        return user_connection.findOne({
+          where: {
+            $or: [
+              {to_did: recipient, from_did: req.user.did},
+              {to_did: req.user.did, from_did: recipient}
+            ]
+          }
+        })
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user_connection record not found',
+            body: null
+          })
+        }
+        return Promise.resolve()
+      }).then(function() {
+        process.send({
+          notification_request: {
+            user_id: recipient,
+            notification: {
+              title: 'Connection message',
+              body: 'One of your connections sent you a message'
+            },
+            data: {
+              type: 'user_message_received',
+              from_did: req.user.did,
+              message: msg
+            }
+          }
+        })
+        return Promise.resolve()
+      }).then(function() {
+        return res.status(200).json({
+          error: false,
+          status: 200,
+          message: 'ok',
+          body: null
+        })
+      }).catch(function(err) {
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 30 GET /qr-2/:user_id
+  {
+    uri: '/qr-2/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 31 GET /qr-scale1/:user_id
+  {
+    uri: '/qr-scale1/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 1,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 32 GET /qr-scale2/:user_id
+  {
+    uri: '/qr-scale2/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 2,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
+      })
+    }
+  },
+
+  // 33 GET /qr-scale3/:user_id
+  {
+    uri: '/qr-scale3/:user_id',
+    method: 'get',
+    secure: false,
+    active: false,
+    callback: function(req, res) {
+      var {user_id} = req.params
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          $or: [
+            {id: user_id},
+            {did: user_id}
+          ]
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'user record not found',
+            body: null
+          })
+        }
+        try {
+          qr.toFileStream(
+            res,
+            JSON.stringify({
+              colour: found.branding_colour_code,
+              image_uri: found.branding_image_uri.length <= 255 ? found.branding_image_uri : null,
+              actions_url: found.actions_url,
+              display_name: found.display_name,
+              address: found.contact_address,
+              tel: found.contact_tel,
+              email: found.contact_email,
+              did: found.did
+            }),
+            {
+              scale: 3,
+              margin: env.QR_MARGIN,
+              color: {
+                light: env.QR_COLOUR_LIGHT,
+                dark: env.QR_COLOUR_DARK
+              }
+            },
+            function(err) {
+              if (err) {
+                console.log('qr code generation error', err)
+                throw {
+                  error: true,
+                  status: 500,
+                  message: null,
+                  body: null
+                }
+              }
+            }
+          )
+        } catch (err) {
+          console.log('qr code generation error', err)
+          return Promise.reject({
+            error: true,
+            status: 500,
+            message: 'internal server error',
+            body: null
+          })
+        }
+      }).catch(function(err) {
+        err = errors(err)
         return res.status(
           err.status || 500
         ).json({
@@ -1601,4 +3456,15 @@ module.exports = [
       })
     }
   }
+
+  // example
+  //
+  // N METHOD /:VERSION/:URI
+  // {
+  //   uri: '/:VERSION/:URI',
+  //   method: 'METHOD',
+  //   secure: true, // authenticated?
+  //   active: true, // activated?
+  //   callback: function(req, res) {}
+  // }
 ]

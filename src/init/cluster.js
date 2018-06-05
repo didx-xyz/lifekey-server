@@ -7,35 +7,27 @@ var cp = require('child_process')
 
 var cluster = require('fluster')
 
-var NODE_ENV = process.env.NODE_ENV || 'development'
-var env
+var env = require('./env')()
 
-try {
-  env = require(`../../etc/env/${NODE_ENV}.env.json`)
-} catch (e) {
-  // ENOENT
-  throw new Error(`unable to find matching env file for ${NODE_ENV}`)
-}
-
-// keep a reference to the outermost context
-// to avoid typeerrors when respawning the service
 var OUTER = this
 
-// we can only initialiase the DID service
-// once everyone's accounted for
-var worker_count = os.cpus().length, worker_ready = 0
+process.on('SIGUSR2', function() {
+  cluster_send({shutdown: true})
+})
+
+var worker_count = os.cpus().length, worker_shutdown_ready = 0
 
 var services = {}
 
 function cluster_send(msg) {
   Object.keys(
-    services.lifekey.cluster.workers
+    http_cluster.cluster.workers
   ).forEach(function(id) {
-    services.lifekey.cluster.workers[id].send(msg)
+    http_cluster.cluster.workers[id].send(msg)
   })
 }
 
-function init_service(name, onmessage, then) {
+function service_init(name, onmessage, then) {
   services[name] = cp.fork(
     `./src/init/${name}.js`
   ).on('error', function(err) {
@@ -45,21 +37,35 @@ function init_service(name, onmessage, then) {
     var msg = {}
     msg[`${name}_service_ready`] = false
     cluster_send(msg)
-    init_service.apply(OUTER, arguments)
+    service_init.call(OUTER, name, onmessage, then)
   }).on('message', function(msg) {
     if (msg.ready) {
       msg = {}
       msg[`${name}_service_ready`] = true
       cluster_send(msg)
-    } else {
-      // nothin' doing...
     }
   })
   if (onmessage) services[name].on('message', onmessage)
   if (typeof then === 'function') then()
 }
 
-services.lifekey = cluster({
+function services_send(msg) {
+  Object.keys(
+    services
+  ).forEach(function(name) {
+    services[name].send(msg)
+  })
+}
+
+service_init.call(OUTER, 'notifier', services_send)
+service_init.call(OUTER, 'sendgrid', services_send)
+service_init.call(OUTER, 'sms_otp', services_send)
+service_init.call(OUTER, 'web_auth_signer', services_send)
+service_init.call(OUTER, 'vc_generator', services_send)
+service_init.call(OUTER, 'isa_ledger', services_send)
+service_init.call(OUTER, 'did', services_send)
+
+var http_cluster = cluster({
   workers: {
     exec: 'src/init/worker.js',
     respawn: true,
@@ -68,26 +74,17 @@ services.lifekey = cluster({
         console.log(`SLAVE#${this.id} error`, err)
       },
       message: function(msg) {
-        // TODO it would be nice to allow the services (http workers included) to boot in any order
-        if (msg.ready) {
-          worker_ready += 1
-          if (worker_ready === worker_count) {
-            init_service.call(OUTER, 'did', function(msg) {
-              if (msg.push_notification_request || msg.webhook_notification_request) {
-                services.notifier_service.send(msg)
-              }
-            })
-            init_service.call(OUTER, 'notifier', function(msg) {})
+        // TODO measure message volume and ensure it will not bottleneck any services
+
+        if (msg.shutdown) {
+          worker_shutdown_ready += 1
+          if (worker_shutdown_ready === worker_count) {
+            process.exit(0)
           }
-        } else if (msg.did_allocation_request) {
-          // proxy the message to the DID service
-          services.did.send(msg)
-        } else if (msg.push_notification_request || msg.webhook_notification_request) {
-          // proxy the message to the notifier service
-          notifier_service.send(msg)
-        } else {
-          // nothing doing, otherwise
+          return
         }
+
+        services_send(msg)
       }
     }
   }

@@ -1,26 +1,32 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# what are we building?
+ENVIRONMENT=staging
 
 # ensure we're up to date and have the bare minimum
-apt-get update && apt-get install -y build-essential libssl-dev nginx git mysql-client jq
+apt-get update && apt-get install -y \
+    build-essential libssl-dev nginx git jq
 
 # workspaces
-mkdir -p /srv /opt/cloud_sql_proxy /etc/lifekey
+mkdir -p /root/lifekey /srv /usr/local/opt /etc/lifekey
+
+echo -n $ENVIRONMENT > /etc/lifekey/environment
 
 # install or update nvm
-if [[ -d /opt/nvm ]]; then
+if [[ -d /usr/local/opt/nvm ]]; then
+  cd /usr/local/opt/nvm
   git fetch origin
   git checkout "$(git describe --abbrev=0 --tags --match "v[0-9]*" origin)"
 else
-  git clone https://github.com/creationix/nvm.git /opt/nvm
-  cd /opt/nvm
+  git clone https://github.com/creationix/nvm.git /usr/local/opt/nvm
+  cd /usr/local/opt/nvm
   git checkout "$(git describe --abbrev=0 --tags --match "v[0-9]*" origin)"
 fi
 
-# install cloud_sql_proxy
-cd /opt/cloud_sql_proxy
-wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64
-mv cloud_sql_proxy.linux.amd64 cloud_sql_proxy
-chmod +x cloud_sql_proxy
-
-# TODO change per host
-echo -n "staging" > /etc/lifekey/environment
+if [[ ! -f /usr/bin/cloud_sql_proxy ]]; then
+  cd /var/tmp
+  wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64
+  mv cloud_sql_proxy.linux.amd64 /usr/bin/cloud_sql_proxy
+  chmod +x /usr/bin/cloud_sql_proxy
+  rm cloud_sql_proxy.linux.amd64
+fi

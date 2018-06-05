@@ -14,13 +14,38 @@ module.exports = function(instance, sqlize) {
       allowNull: false
     },
     value: {
-      type: sqlize.BLOB,
+      type: sqlize.BLOB({length: 'medium'}),
       allowNull: false
+    },
+    schema: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    uri: {
+      type: sqlize.STRING,
+      allowNull: true
     },
     mime: {
       type: sqlize.STRING,
       allowNull: false,
-      defaultValue: 'application/json+ld'
+      defaultValue: 'text/plain'
+    },
+    from_user_did: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    from_resource_name: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    from_resource_description: {
+      type: sqlize.STRING,
+      allowNull: true
+    },
+    is_verifiable_claim: {
+      type: sqlize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false
     },
     encoding: {
       type: sqlize.STRING,
@@ -43,7 +68,7 @@ module.exports = function(instance, sqlize) {
     }
   }, {
     timestamps: true,
-    paranoid: true,
+    paranoid: false,
     underscored: true,
     comment: 'data associated with end users'
   })

@@ -1,21 +1,28 @@
 
 'use strict'
 
+var verifySignature = (
+  !!~process.env._.indexOf('istanbul') ?
+  ((req, res, next) => next()) :
+  require('./verify-signature')
+)
+
 module.exports = function(req, res, next) {
 
-  // if the current route and method are not a secured route, skip the middleware
-  if (req.skip_secure_checks) return next()
+  var OUTER = this
 
   // load models for querying and insertion
   var {http_request_verification} = this.get('models')
 
-  var hex_public_key = req.user.crypto.public_key.toString('hex')
+  var public_key = (
+    req.user.crypto.algorithm === 'rsa' ?
+    req.user.crypto.public_key.toString('utf8') : // rsa keys are pem format
+    req.user.crypto.public_key.toString('base64') // p256k1 keys are not pem format
+  )
 
   http_request_verification.findOne({
     where: {
-      public_key: hex_public_key,
       algorithm: req.user.crypto.algorithm,
-      signable: req.headers['x-cnsnt-signable'],
       signature: req.headers['x-cnsnt-signed']
     }
   }).then(function(found) {
@@ -29,13 +36,14 @@ module.exports = function(req, res, next) {
     }
     // create the record for posterity
     return http_request_verification.create({
-      public_key: hex_public_key,
+      public_key: public_key,
       algorithm: req.user.crypto.algorithm,
-      signable: req.headers['x-cnsnt-signable'],
+      plaintext: req.headers['x-cnsnt-plain'],
       signature: req.headers['x-cnsnt-signed']
     })
   }).then(function(created) {
-    if (created) return next() // we're done here!
+    // we're done here!
+    if (created) return verifySignature.call(OUTER, req, res, next)
     return Promise.reject({
       error: true,
       status: 500,

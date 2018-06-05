@@ -6,32 +6,16 @@ module.exports = function(instance, sqlize) {
       allowNull: false,
       unique: true
     },
-    from_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
-    },
     from_did: {
       type: sqlize.STRING,
-      allowNull: true
-    },
-    from_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    to_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     to_did: {
       type: sqlize.STRING,
-      allowNull: true
+      allowNull: false
     },
-    to_url: {
-      type: sqlize.TEXT,
-      allowNull: true
-    },
-    is_verifiable_claim: {
-      type: sqlize.BOOLEAN,
+    transaction_hash: {
+      type: sqlize.STRING,
       allowNull: true
     },
     expired: {

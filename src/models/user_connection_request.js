@@ -1,33 +1,13 @@
 
 module.exports = function(instance, sqlize) {
   return instance.define('user_connection_request', {
-    from_id: {
-      type: sqlize.INTEGER,
-      allowNull: true
-    },
-    to_id: {
-      type: sqlize.INTEGER, 
-      allowNull: true
-    },
     from_did: {
       type: sqlize.STRING,
-      allowNull: true
+      allowNull: false
     },
     to_did: {
       type: sqlize.STRING, 
-      allowNull: true
-    },
-    to_url: {
-      type: sqlize.STRING,
-      allowNull: true
-    },
-    from_url: {
-      type: sqlize.STRING,
-      allowNull: true
-    },
-    document: {
-      type: sqlize.TEXT,
-      allowNull: true
+      allowNull: false
     },
     acknowledged: {
       type: sqlize.BOOLEAN,
@@ -39,7 +19,7 @@ module.exports = function(instance, sqlize) {
     }
   }, {
     timestamps: true,
-    paranoid: true,
+    paranoid: false,
     underscored: true,
     comment: 'graph relation for users or agents'
   })

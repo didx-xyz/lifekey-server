@@ -7,15 +7,18 @@ var mock = require('../mock/express')
 var subject = require('../../src/middlewares/find-user')
 
 var now = Date.now()
-var test_user, test_user_key
+var test_user, test_user_key, test_user_fingerprint_key
 
 before(function(done) {
   this.timeout(20000) // it takes a while to load these models
+
   var user, crypto_key
+
   require('../../src/init/database')(
     false // disable sql logging
   ).then(function(database) {
     mock.express.models = database.models
+    mock.express.db_errors = database.errors
     user = database.models.user
     crypto_key = database.models.crypto_key
     return user.create({
@@ -42,6 +45,19 @@ before(function(done) {
   }).then(function(created) {
     if (created) {
       test_user_key = created
+      return crypto_key.create({
+        owner_id: test_user.id,
+        algorithm: 'foo',
+        purpose: 'foo',
+        alias: 'fingerprint',
+        private_key: Buffer.from('foo'),
+        public_key: Buffer.from('foo')
+      })
+    }
+    return done(new Error('should not have been called'))
+  }).then(function(created) {
+    if (created) {
+      test_user_fingerprint_key = created
       return done()
     }
     return done(new Error('should not have been called'))
@@ -49,50 +65,58 @@ before(function(done) {
 })
 
 describe('middleware find-user', function() {
-  it('should invoke the success callback if request is skippable', function(done) {
+
+  it('should respond with error if required headers are missing', function(done) {
     subject.call(mock.express, {
-      skip_active_checks: true,
-      skip_secure_checks: false
-    }, done.bind(
-      done, new Error('should not be called')
-    ), function() {
-      subject.call(mock.express, {
-        skip_active_checks: false,
-        skip_secure_checks: true
-      }, done.bind(
-        done, new Error('should not be called')
-      ), done)
-    })
+      headers: {}
+    }, mock.res(function(res) {
+      expect(res.error).to.equal(true)
+      expect(res.status).to.equal(400)
+      expect(res.message).to.equal('authentication parameters missing from request headers')
+      done()
+    }), done.bind(done, new Error('should not be called')))
   })
 
   it('should respond with error if given id corresponds to user that does not exist', function(done) {
     subject.call(mock.express, {
-      skip_active_checks: false,
-      skip_secure_checks: false,
       headers: {
         'x-cnsnt-id': 'foo',
-        'x-cnsnt-did': 'bar'
+        'x-cnsnt-did': 'bar',
+        'x-cnsnt-plain': 'foo',
+        'x-cnsnt-signed': 'foo'
       }
     }, mock.res(function(res) {
       expect(res.error).to.equal(true)
       expect(res.status).to.equal(404)
       expect(res.message).to.equal('user record not found')
       done()
-    }), done.bind(
-      done, new Error('should not be called')
-    ))
+    }), done.bind(done, new Error('should not be called')))
   })
 
-  it('should invoke the success callback if specified user exists', function(done) {
+  it('should invoke the success callback if specified user exists (no fingerprint key)', function(done) {
     subject.call(mock.express, {
-      skip_active_checks: false,
-      skip_secure_checks: false,
       headers: {
         'x-cnsnt-id': test_user.id,
-        'x-cnsnt-did': test_user.did
+        'x-cnsnt-did': test_user.did,
+        'x-cnsnt-plain': 'foo',
+        'x-cnsnt-signed': 'foo'
       }
-    }, done.bind(
-      done, new Error('should not be called')
-    ), done)
+    }, mock.res(function(res) {
+      done(new Error('should not be called'))
+    }), done)
+  })
+
+  it('should invoke the success callback if specified user exists (fingerprint key)', function(done) {
+    subject.call(mock.express, {
+      headers: {
+        'x-cnsnt-id': test_user.id,
+        'x-cnsnt-did': test_user.did,
+        'x-cnsnt-plain': 'foo',
+        'x-cnsnt-signed': 'foo',
+        'x-cnsnt-fingerprint': 'foo'
+      }
+    }, mock.res(function(res) {
+      done(new Error('should not be called'))
+    }), done)
   })
 })

@@ -1,0 +1,56 @@
+#!/usr/bin/env sh
+
+if [ "$GIT_BRANCH" = "origin/develop" ]; then
+  TARGET="130.211.78.173"
+  SERVER_ENV=staging
+  echo "building for staging environment $TARGET"
+elif [ "$GIT_BRANCH" = "origin/master" ]; then
+  TARGET=production
+  SERVER_ENV=production
+  echo "production environment does not yet exist, exiting..."
+  exit 0
+else
+  echo "no environment exists for $GIT_BRANCH, exiting..."
+  exit 0
+fi
+
+DONT_CHECK_KEYS="-oStrictHostKeyChecking=no"
+
+# build dependencies here
+eval "$(ssh-agent -s)"
+ssh-add -k /root/.ssh/ant_deploy
+. /root/.nvm/nvm.sh
+nvm use || nvm install
+rm -rf node_modules || echo "deps not yet installed"
+npm install || exit 1
+
+# stop the sevice and remove current source code
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" \
+    "stop lifekey-server || echo 'lifekey-server not running'
+    rm -rf /srv/$SERVER_ENV.api.lifekey.cnsnt.io || echo 'lifekey-server source code does not exist'"
+
+# copy new source code
+scp "$DONT_CHECK_KEYS" -r "$WORKSPACE" \
+    "root@$TARGET:/srv/$SERVER_ENV.api.lifekey.cnsnt.io"
+
+# copy service configurations to respective locations
+# ensure required keys exist
+# and restart the service
+
+# FIXME the conditional used to check for private keys is not robust
+ssh "$DONT_CHECK_KEYS" "root@$TARGET" "
+cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/cloud_sql_proxy.conf /etc/init
+cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/init/lifekey-server.conf /etc/init
+cp -R /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/nginx/$SERVER_ENV/$SERVER_ENV.api.lifekey.cnsnt.io /etc/nginx/sites-available
+
+if [ -e /root/lifekey/EIS_ADMIN_KEY.json ]; then
+  cp -R /root/lifekey/*.json /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys
+else
+  source /opt/nvm/nvm.sh
+  /srv/$SERVER_ENV.api.lifekey.cnsnt.io/bin/generate_eth_keys
+  cp /srv/$SERVER_ENV.api.lifekey.cnsnt.io/etc/keys/*.json /root/lifekey
+fi
+
+start lifekey-server
+service nginx restart
+"

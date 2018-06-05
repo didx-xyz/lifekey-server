@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+if [[ -e .containers ]]; then
+  container_ids="$(cat .containers)"
+  docker stop "$container_ids"
+  docker rm -f -v "$container_ids"
+  rm .containers
+fi
