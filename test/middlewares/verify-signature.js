@@ -5,7 +5,7 @@ var crypto = require('crypto')
 
 var {expect} = require('chai')
 var secp = require('secp256k1')
-var ursa = require('ursa')
+var rsa = require('node-rsa')
 
 var mock = require('../mock/express')
 
@@ -31,15 +31,22 @@ before(function(done) {
 
   rsa_plain = 'foobar'
   rsa_hashed = crypto.createHash('sha256').update(rsa_plain).digest('hex')
-  
-  rsa_privatekey = ursa.generatePrivateKey()
-  rsa_publickey = rsa_privatekey.toPublicPem()
 
-  rsa_privatekey2 = ursa.generatePrivateKey()
-  rsa_publickey2 = rsa_privatekey2.toPublicPem()
+  rsa_privatekey = new rsa({bits: 4096})
+  var private_key_pem = rsa_privatekey.exportKey()
+  rsa_publickey = private_key_pem.exportKey('pkcs1-public')
 
-  rsa_signed = rsa_privatekey.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', false)
-  rsa_signed2 = rsa_privatekey2.hashAndSign('sha256', Buffer(rsa_plain), 'utf8', 'base64', false)
+  rsa_privatekey2 = new rsa({bits: 4096})
+  var private_key_pem2 = rsa_privatekey2.exportKey()
+  rsa_publickey2 = private_key_pem2.exportKey('pkcs1-public')
+
+  var signer = crypto.createSign('RSA-SHA256')
+  signer.update(rsa_plain)
+  rsa_signed = signer.sign(private_key_pem, 'base64')
+
+  var signer2 = crypto.createSign('RSA-SHA256')
+  signer2.update(rsa_plain)
+  rsa_signed2 = signer2.sign(private_key_pem2, 'base64')
 
   done()
 })

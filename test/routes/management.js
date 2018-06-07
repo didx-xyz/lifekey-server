@@ -4,7 +4,7 @@
 var crypto = require('crypto')
 
 var ec = require('eccrypto')
-var rsa = require('ursa')
+var rsa = require('node-rsa')
 var {expect} = require('chai')
 
 // mock express instance
@@ -189,6 +189,13 @@ var test_users_fail_cases = [
   },
 ]
 
+function sign(rsa_plain, private_key_pem){
+  var signer = crypto.createSign('RSA-SHA256')
+  signer.update(rsa_plain)
+  return signer.sign(private_key_pem, 'base64')
+
+}
+
 before(function(done) {
   // initialising the models takes ages :/
   this.timeout(30000)
@@ -208,24 +215,24 @@ before(function(done) {
   }).then(function() {
     test_users[0].private_key = crypto.randomBytes(32)
     test_users[1].private_key = crypto.randomBytes(32)
-    test_users[2].private_key = rsa.generatePrivateKey()
-    test_users[3].private_key = rsa.generatePrivateKey()
-    test_users[4].private_key = rsa.generatePrivateKey()
-    test_users[4].fingerprint.private_key = rsa.generatePrivateKey()
-    test_users[5].private_key = rsa.generatePrivateKey()
-    test_users_fail_cases[3].private_key = rsa.generatePrivateKey()
+    test_users[2].private_key = new rsa({bits: 4096}).exportKey()
+    test_users[3].private_key = new rsa({bits: 4096}).exportKey()
+    test_users[4].private_key = new rsa({bits: 4096}).exportKey()
+    test_users[4].fingerprint.private_key = new rsa({bits: 4096}).exportKey()
+    test_users[5].private_key = new rsa({bits: 4096}).exportKey()
+    test_users_fail_cases[3].private_key = new rsa({bits: 4096}).exportKey()
     console.log('✓ generated private keys')
     return Promise.resolve()
   }).then(function() {
     return Promise.all([
       ec.getPublic(test_users[0].private_key),
       ec.getPublic(test_users[1].private_key),
-      test_users[2].private_key.toPublicPem().toString('utf8'),
-      test_users[3].private_key.toPublicPem().toString('utf8'),
-      test_users[4].private_key.toPublicPem().toString('utf8'),
-      test_users[4].fingerprint.private_key.toPublicPem().toString('utf8'),
-      test_users[5].private_key.toPublicPem().toString('utf8'),
-      test_users_fail_cases[3].private_key.toPublicPem().toString('utf8')
+      test_users[2].private_key.exportKey('pkcs1-public').toString('utf8'),
+      test_users[3].private_key.exportKey('pkcs1-public').toString('utf8'),
+      test_users[4].private_key.exportKey('pkcs1-public').toString('utf8'),
+      test_users[4].fingerprint.private_key.exportKey('pkcs1-public').toString('utf8'),
+      test_users[5].private_key.exportKey('pkcs1-public').toString('utf8'),
+      test_users_fail_cases[3].private_key.exportKey('pkcs1-public').toString('utf8')
     ])
   }).then(function(public_keys) {
     console.log('✓ calculated public keys')
@@ -243,12 +250,14 @@ before(function(done) {
     return Promise.all([
       ec.sign(test_users[0].private_key, test_users[0].signable_proof),
       ec.sign(test_users[1].private_key, test_users[1].signable_proof),
-      test_users[2].private_key.hashAndSign('sha256', test_users[2].plaintext_proof, 'utf8', 'base64', false),
-      test_users[3].private_key.hashAndSign('sha256', test_users[3].plaintext_proof, 'utf8', 'base64', false),
-      test_users[4].private_key.hashAndSign('sha256', test_users[4].plaintext_proof, 'utf8', 'base64', false),
-      test_users[4].fingerprint.private_key.hashAndSign('sha256', test_users[4].fingerprint.plaintext_proof, 'utf8', 'base64', false),
-      test_users[5].private_key.hashAndSign('sha256', test_users[5].plaintext_proof, 'utf8', 'base64', false),
-      test_users_fail_cases[3].private_key.hashAndSign('sha256', test_users_fail_cases[3].plaintext_proof, 'utf8', 'base64', false)
+      
+
+      sign(test_users[2].plaintext_proof, test_users[2].private_key),
+      sign(test_users[3].plaintext_proof, test_users[3].private_key),
+      sign(test_users[4].plaintext_proof, test_users[4].private_key),
+      sign(test_users[4].plaintext_proof, test_users[4].private_key),
+      sign(test_users[5].plaintext_proof, test_users[5].private_key),
+      sign(test_users_fail_cases[3].plaintext_proof, test_users_fail_cases[3].private_key)
     ])
   }).then(function(signatures) {
     console.log('✓ signed initial key proofs')
@@ -1594,15 +1603,15 @@ describe('management endpoints', function() {
     it('should create a new crypto key record if all arguments check-out', function(done) {
       var now = Date.now()
       var plaintext_proof = `u10_${now}`
-      var private_key = rsa.generatePrivateKey()
-      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      var private_key = new rsa({bits: 4096}).exportKey()
+      var signed_proof = sign(plaintext_proof, private_key)
       known_signature = signed_proof
       mgmt_key_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
           plaintext_proof: plaintext_proof,
           signed_proof: signed_proof,
-          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key: private_key.exportKey('pkcs1-public').toString('utf8'),
           public_key_algorithm: 'rsa',
           alias: 'foo',
           purpose: 'foo'
@@ -1617,13 +1626,13 @@ describe('management endpoints', function() {
     it('should fail if a known signature is given', function(done) {
       var now = Date.now()
       var plaintext_proof = `u11_${now}`
-      var private_key = rsa.generatePrivateKey()
+      var private_key = new rsa({bits: 4096}).exportKey()
       mgmt_key_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
           plaintext_proof: plaintext_proof,
           signed_proof: known_signature,
-          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key: private_key.exportKey('pkcs1-public').toString('utf8'),
           public_key_algorithm: 'rsa',
           alias: 'foo',
           purpose: 'foo'
@@ -1639,14 +1648,14 @@ describe('management endpoints', function() {
     it('should fail if a duplicate alias is given', function(done) {
       var now = Date.now()
       var plaintext_proof = `u10_${now}`
-      var private_key = rsa.generatePrivateKey()
-      var signed_proof = private_key.hashAndSign('sha256', plaintext_proof, 'utf8', 'base64', false)
+      var private_key = new rsa({bits: 4096}).exportKey()
+      var signed_proof = sign(plaintext_proof, private_key)
       mgmt_key_create.callback.call(mock.express, {
         user: {id: test_users[0].id},
         body: {
           plaintext_proof: plaintext_proof,
           signed_proof: signed_proof,
-          public_key: private_key.toPublicPem().toString('utf8'),
+          public_key: private_key.exportKey('pkcs1-public').toString('utf8'),
           public_key_algorithm: 'rsa',
           alias: 'foo',
           purpose: 'foo'
