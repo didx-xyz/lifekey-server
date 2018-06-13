@@ -481,6 +481,26 @@ module.exports = [
           })
         }
         if (accepted === false) {
+
+          
+
+
+          process.send({
+            notification_request: {
+              user_id: ucr.from_did,
+              notification: {
+                title: 'Connection message',
+                body: 'Connection Rejected'
+              },
+              data: {
+                type: 'User Connection Rejected',
+                from_did: ucr.from_did
+              }
+            }
+          })
+
+
+
           return Promise.reject({
             error: false,
             status: 200,
