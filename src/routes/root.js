@@ -57,6 +57,7 @@ module.exports = [
       }
       var {
         user,
+        user_connection,
         user_action,
         user_device,
         crypto_key,
@@ -64,16 +65,18 @@ module.exports = [
         active_bot
       } = this.get('models')
       var errors = this.get('db_errors')
+      var lookup = email ? ("{email: " + email + "}") : ("{did: "+did+"}")
       user.findOne({
         where: email ?
         {email: email} :
         {did: did}
+
       }).then(function(found) {
         if (!found) {
           return Promise.reject({
             error: true,
             status: 404,
-            message: 'user record not found',
+            message: 'user record not found for ' + lookup,
             body: null
           })
         }
@@ -83,7 +86,11 @@ module.exports = [
           user_device.destroy({where: {owner_id: found.id}}),
           crypto_key.destroy({where: {owner_id: found.id}}),
           user_datum.destroy({where: {owner_id: found.id}}),
-          active_bot.destroy({where: {owner_id: found.id}})
+          active_bot.destroy({where: {owner_id: found.id}}),
+          user_connection.destroy({where: {$or: [
+             {to_did: found.did},
+             {from_did: found.did}
+          ]}})
         ])
       }).then(function(deletes) {
         var [
@@ -91,7 +98,8 @@ module.exports = [
           user_action_deleted,
           user_device_deleted,
           crypto_key_deleted,
-          user_datum_deleted
+          user_datum_deleted,
+          user_connections_deleted
         ] = deletes
         return res.status(200).json({
           error: false,
@@ -99,6 +107,7 @@ module.exports = [
           message: 'delete counts enclosed',
           body: {
             user: user_deleted,
+            user_connection: user_connections_deleted,
             user_action: user_action_deleted,
             user_device: user_device_deleted,
             crypto_key: crypto_key_deleted,
