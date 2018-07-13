@@ -1,8 +1,8 @@
 
 'use strict'
 
-var verifySignature = (
-  !!~process.env._.indexOf('istanbul') ?
+var verifySignature = ((process.env._ &&
+  !!~process.env._.indexOf('istanbul')) ?
   ((req, res, next) => next()) :
   require('./verify-signature')
 )

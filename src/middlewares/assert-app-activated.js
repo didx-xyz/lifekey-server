@@ -1,8 +1,8 @@
 
 'use strict'
 
-var replayAttack = (
-  !!~process.env._.indexOf('istanbul') ?
+var replayAttack = ((process.env._ &&
+  !!~process.env._.indexOf('istanbul')) ?
   ((req, res, next) => next()) :
   require('./replay-attack')
 )

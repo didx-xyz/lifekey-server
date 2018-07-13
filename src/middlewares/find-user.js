@@ -1,8 +1,8 @@
 
 'use strict'
 
-var assertAppActivated = (
-  !!~process.env._.indexOf('istanbul') ?
+var assertAppActivated = ((process.env._ &&
+  !!~process.env._.indexOf('istanbul')) ?
   ((req, res, next) => next()) :
   require('./assert-app-activated')
 )

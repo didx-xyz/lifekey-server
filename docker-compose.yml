@@ -1,0 +1,84 @@
+version: '3.6'
+services:
+
+  db:
+    container_name: db
+    image: mysql:5.7
+    # volumes:
+    #   - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=lifekey
+      - MYSQL_DATABASE=lifekey
+      - MYSQL_USER=lifekey
+      - MYSQL_PASSWORD=lifekey
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.4
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm start
+    image: trustlab/consent
+    container_name: consent
+    working_dir: /home/indy/src/app
+    ports:
+      - "5000:5000"
+    environment:
+      - MYSQL_SERVER=db
+      - MYSQL_PORT=3306
+      - MYSQL_USER=lifekey
+      - MYSQL_PASSWORD=lifekey
+      - MYSQL_DATABASE=lifekey
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.5
+    depends_on:
+      - db
+    links:
+      - indy_pool
+      - db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+  indy_pool:
+    build:
+      context: ../indy-sdk/ci/
+      dockerfile: indy-pool.dockerfile
+      args:
+        pool_ip: '10.0.0.2'
+    image: indy_pool
+    container_name: indy_pool
+    working_dir: /home/indy
+    ports:
+      - "9701:9701"
+      - "9702:9702"
+      - "9703:9703"
+      - "9704:9704"
+      - "9705:9705"
+      - "9706:9706"
+      - "9707:9707"
+      - "9708:9708"
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.2
+    volumes:
+       - sandbox:/var/lib/indy/sandbox/
+
+
+networks:
+  pool_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        -
+          subnet: 10.0.0.0/24
+volumes:
+  # db_data:
+  sandbox:

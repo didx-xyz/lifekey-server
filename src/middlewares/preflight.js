@@ -1,8 +1,8 @@
 
 'use strict'
 
-var findUser = (
-  !!~process.env._.indexOf('istanbul') ?
+var findUser = ((process.env._ &&
+  !!~process.env._.indexOf('istanbul') )?
   ((req, res, next) => next()) :
   require('./find-user')
 )

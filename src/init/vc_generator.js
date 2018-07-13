@@ -1,12 +1,12 @@
 
 'use strict'
 
-var env = require('./env')()
+var wallet = require('./wallet').get()
 var crypto = require('../crypto')
 
 
 // TODO use lifekey-sdk's VC generator function
-function generate(resource, private_key) {
+function generate(resource) {
   if (!(typeof resource === 'object' &&
         resource !== null &&
         resource.context &&
@@ -45,20 +45,22 @@ function generate(resource, private_key) {
   return claim_instance
 }
 
-var db, models, private_key
+var models
 
 require('./database')(
   false // disable logging
 ).then(function(database) {
 
-  db = database.db
   models = database.models
-  private_key = Buffer.from(env.EIS_ADMIN_KEY, 'hex')
+  wallet.get().then(function(wallet){
+    steward_wallet = wallet
+  })
 
   process.on('message', function(msg) {
     if (!msg.vc_generation_request) return
     var {user_id, field, user_datum_id} = msg.vc_generation_request
     var user, schema
+    console.log(`[DEBUG] VC GENERATION: ${(new Date()).toJSON().slice(0, 19).replace(/[-T]/g, ':')}`);
 
     // generic vc generation
     if (user_datum_id) {
@@ -102,6 +104,7 @@ require('./database')(
       }).then(function(instance) {
         return Promise.all([
           instance,
+          steward_wallet.private_key,
           crypto.asymmetric.sign(
             'secp256k1',
             private_key,

@@ -80,7 +80,7 @@ process.on('message', function(message) {
 
 var fs = require('fs')
 
-var env = require('./env')()
+var env = require('./lifeqienv')()
 
 var cors = require('cors')
 var morgan = require('morgan')

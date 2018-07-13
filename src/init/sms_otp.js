@@ -1,7 +1,7 @@
 
 var cuid = require('cuid')
 
-var env = require('./env')()
+var env = require('./lifeqienv')()
 var sms = require('../messaging/clickatell')
 
 var process_message_backlog = []

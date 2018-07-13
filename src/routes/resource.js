@@ -3,7 +3,7 @@
 
 // TODO query string parameters (limit,offset, etc)
 
-var TESTING = process.env._.indexOf('istanbul') >= 0
+var TESTING = (process.env._ && process.env._.indexOf('istanbul')>= 0)?true:false
 
 if (TESTING) {
   // running from inside test suite

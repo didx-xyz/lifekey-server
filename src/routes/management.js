@@ -6,7 +6,7 @@
 // TODO some of the procedures (like registration) are not atomic - if they fail at any point, the state of the database might be partially corrupt
 // TODO recovery endpoint using same params as registration, send firebase event containing public key parameters so it can be matched up on client side
 
-var TESTING = process.env._.indexOf('istanbul') >= 0
+var TESTING = (process.env._ && process.env._.indexOf('istanbul')>= 0)?true:false
 
 if (TESTING) {
   // running from inside test suite
@@ -21,7 +21,7 @@ var web3 = require('web3')
 var qr = require('qrcode')
 var cuid = require('cuid')
 
-var env = require('../init/env')()
+var env = require('../init/lifeqienv')()
 
 var our_crypto = require('../crypto')
 
@@ -732,6 +732,7 @@ module.exports = [
         // update the record
         return found.update({app_activation_link_clicked: true})
       }).then(function() {
+        console.log(`[DEBUG] ACTIVATE LINK CLICKED: ${(new Date()).toJSON().slice(0, 19).replace(/[-T]/g, ':')}`);
         process.send({
           vc_generation_request: {
             user_id: user_id,
@@ -918,6 +919,8 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
+    console.log(`[DEBUG] ISA LEDGER REQUEST: ${(new Date()).toJSON().slice(0, 19).replace(/[-T]/g, ':')}`);
+
       // TO only
       // this is the ISA reply endpoint
 
@@ -1348,7 +1351,7 @@ module.exports = [
         }
       }).then(function(found) {
         if (found) {
-          var {SERVER_HOSTNAME} = this.get('env')
+          var {SERVER_HOSTNAME} = this.get('lifeqienv')
           return qr.toFileStream(
             res,
             `${SERVER_HOSTNAME}/profile/${found.did || found.id}`,
@@ -2663,7 +2666,7 @@ module.exports = [
         facial_verification
       } = this.get('models')
 
-      var {SERVER_HOSTNAME} = this.get('env')
+      var {SERVER_HOSTNAME} = this.get('lifeqienv')
 
       var errors = this.get('db_errors')
 

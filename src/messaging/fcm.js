@@ -3,7 +3,7 @@
 
 var http = require('https')
 
-var env = require('../init/env')()
+var env = require('../init/lifeqienv')()
 
 function message(recipient, notification, data) {
   // TODO expand with more options (platforms, design, topics)

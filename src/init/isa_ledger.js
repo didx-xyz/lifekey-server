@@ -7,8 +7,7 @@ var web3 = require('web3')
 var tx = require('ethereumjs-tx')
 var ut = require('ethereumjs-util')
 
-var env = require('./env')()
-
+var env = require('./lifeqienv')
 var get_receipt = require('../routes/management')[22]
 var mock = require('../../test/mock/express')
 

@@ -4,16 +4,16 @@ var crypto = require('crypto')
 
 var cuid = require('cuid')
 
-var env = require('../init/env')()
-var our_crypto = require('../crypto')
+//var env = require('../init/lifeqienv')()
+//var our_crypto = require('../crypto')
 
-var TESTING = process.env._.indexOf('istanbul') >= 0
+//var TESTING = process.env._.indexOf('istanbul') >= 0
 
-if (TESTING) {
+//if (TESTING) 
   // running from inside test suite
   // monkey-patch process so we can spy on its method calls
-  Object.assign(process, require('../../test/spies/process'))
-}
+  //Object.assign(process, require('../../test/spies/process'))
+//}
 
 // FIXME blocking crypto.rng
 
@@ -38,7 +38,7 @@ module.exports = {
       fingerprint
     } = req.body
 
-    if (!~this.get('env')._.indexOf('istanbul')) {
+    if (!~this.get('lifeqienv')._.indexOf('istanbul')) {
       console.log(req.body)
     }
 
@@ -386,6 +386,8 @@ module.exports = {
         body: null
       })
     }).then(function() {
+      console.log(`[DEBUG] DID Allocation Request: ${(new Date()).toJSON().slice(0, 19).replace(/[-T]/g, ':')}`);
+
       process.send({
         notification_request: {
           user_id: created_user_id,
@@ -403,7 +405,7 @@ module.exports = {
         send_email_request: {
           to: email,
           subject: 'LifeKey Account Activation',
-          content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('env').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
+          content: `<p>Hi ${nickname}!</p><p>Please <a href="http://${this.get('lifeqienv').SERVER_HOSTNAME}/management/activation/${activation_code}">click here</a> to verify your email address and activate your account.</p>`,
           mime: 'text/html'
         }
       })
@@ -428,7 +430,7 @@ module.exports = {
             id: created_user_id,
             activation: (is_programmatic_user ? (
               'http://' +
-              this.get('env').SERVER_HOSTNAME +
+              this.get('lifeqienv').SERVER_HOSTNAME +
               '/management/activation/' +
               activation_code
             ) : null)

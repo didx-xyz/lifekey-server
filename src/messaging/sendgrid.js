@@ -1,7 +1,7 @@
 
 'use strict'
 
-var env = require('../init/env')()
+var env = require('../init/lifeqienv')()
 
 if (!env.SENDGRID_API_KEY) {
   console.log('SENDGRID_API_KEY missing, exiting...')

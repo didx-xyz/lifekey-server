@@ -8,7 +8,7 @@ var path = require('path')
 
 var sqlize = require('sequelize')
 
-var env = require('./env')()
+var env = require('./lifeqienv')()
 
 var instance
 
@@ -19,11 +19,12 @@ module.exports = function(logging) {
     if (instance) return resolve(instance)
     instance = {
       db: new sqlize(
-        env.MYSQL_DATABASE,
-        env.MYSQL_USER,
-        env.MYSQL_PASSWORD,
+        process.env.MYSQL_DATABASE,
+        process.env.MYSQL_USER,
+        process.env.MYSQL_PASSWORD,
         {
-          host: 'localhost',
+          host: process.env.MYSQL_SERVER || 'localhost',
+          port: process.env.MYSQL_PORT || 3306,
           dialect: 'mysql',
           logging: logging === false ? false : console.log.bind(console)
         }

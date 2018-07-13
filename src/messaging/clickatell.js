@@ -3,7 +3,7 @@ var url = require('url')
 var qs = require('querystring')
 var https = require('https')
 
-var env = require('../init/env')()
+var env = require('../init/lifeqienv')()
 
 // HTTP/S://platform.clickatell.com/messages/http/send?apiKey=xxxxxxxxxxxxxxxx==&to=xxxxxxxxxxx&content=Test+message+text
 

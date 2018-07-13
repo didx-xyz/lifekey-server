@@ -6,16 +6,16 @@ var os = require('os')
 var cp = require('child_process')
 
 var cluster = require('fluster')
-
-var env = require('./env')()
+var env = require('./lifeqienv')()
 
 var OUTER = this
 
 process.on('SIGUSR2', function() {
   cluster_send({shutdown: true})
+  env.shutdown()
 })
 
-var worker_count = os.cpus().length, worker_shutdown_ready = 0
+var worker_count = 1//os.cpus().length, worker_shutdown_ready = 0
 
 var services = {}
 
@@ -57,13 +57,13 @@ function services_send(msg) {
   })
 }
 
-service_init.call(OUTER, 'notifier', services_send)
-service_init.call(OUTER, 'sendgrid', services_send)
-service_init.call(OUTER, 'sms_otp', services_send)
-service_init.call(OUTER, 'web_auth_signer', services_send)
-service_init.call(OUTER, 'vc_generator', services_send)
-service_init.call(OUTER, 'isa_ledger', services_send)
-service_init.call(OUTER, 'did', services_send)
+//  service_init.call(OUTER, 'notifier', services_send)
+//  service_init.call(OUTER, 'sendgrid', services_send)
+//  service_init.call(OUTER, 'sms_otp', services_send)
+//  service_init.call(OUTER, 'web_auth_signer', services_send)
+//  service_init.call(OUTER, 'vc_generator', services_send)
+//  service_init.call(OUTER, 'isa_ledger', services_send)
+//  service_init.call(OUTER, 'sovrin_did', services_send)
 
 var http_cluster = cluster({
   workers: {
