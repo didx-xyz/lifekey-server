@@ -1,0 +1,18 @@
+version: "2"
+
+services:
+  lifekey-mysql:
+    image: mysql
+    container_name: lifekey-mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: "lifekey"
+      MYSQL_USER: "lifekey"
+      MYSQL_PASSWORD: "lifekey"
+      MYSQL_ROOT_PASSWORD: "lifekey"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+  
+  lifekey-server:
+    build: ../.
