@@ -1113,8 +1113,10 @@ module.exports = [
         }
         return information_sharing_agreement.findAll({
           where: {
-            to_did: req.user.did,
-            from_did: req.user.did
+            $or: [
+              {to_did: req.user.did},
+              {from_did: req.user.did}
+            ]
           }
         })
       }).then(function(isas) {
@@ -3065,7 +3067,7 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {msg, recipient} = req.body
+      var {msg, recipient, type, title, message_id } = req.body;
       var {user_connection} = this.get('models')
       Promise.resolve().then(function() {
         if (msg.length > 4096) {
@@ -3105,7 +3107,10 @@ module.exports = [
             data: {
               type: 'user_message_received',
               from_did: req.user.did,
-              message: msg
+              message: msg,
+              msg_title: title,
+              msg_type: type,
+              msg_id: message_id,
             }
           }
         })
@@ -3455,8 +3460,30 @@ module.exports = [
         })
       })
     }
-  }
+  },
 
+  // 44 POST
+  {
+    uri: '/management/claimreply',
+    method: 'post',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var { id, accepted } = req.body;
+      if (accepted) {
+        // do something to accept claim
+        console.log('Claim accepted id:', id);
+      } else {
+        // do something to reject claim
+        console.log('Claim rejected id:', id);
+      }
+      return res.status(201).json({
+        error: false,
+        status: 202,
+        message: 'received'
+      })
+    }
+  }
   // example
   //
   // N METHOD /:VERSION/:URI

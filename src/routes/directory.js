@@ -5,11 +5,15 @@
     return new Promise((Resolve, Reject) => {
       if(userId){
           return user.findOne({where: {id: userId}}).then(function(foundUser){
-          user_connection.findAll({
+            if(!foundUser || !foundUser.did){
+              return Resolve(null)
+            }
+            user_connection.findAll({
             where: {
               enabled: true,
               from_did: foundUser.did
             }
+          
           }).then(connections => {
             var connectionsArr = [];
             connections.forEach(user_conn => {
