@@ -1696,6 +1696,7 @@ module.exports = [
           var existing_resources = typeof resources[0] === 'number'
           // creating copies of existing resources for push target
           if (existing_resources) {
+            console.log('Existing Resources')
             return new Promise(function(resolve, reject) {
               Promise.all(
                 resources.map(function(resource_id, idx) {
@@ -1732,6 +1733,7 @@ module.exports = [
           // creating new resources for push target
           return Promise.all(
             resources.map(function(resource, idx) {
+
               return user_datum.create({
                 owner_id: push_target_id,
                 entity: resource.name,
