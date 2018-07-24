@@ -2217,7 +2217,8 @@ module.exports = [
                 entities: JSON.parse(action.entities),
                 optionalEntities: JSON.parse(action.optional_entities),
                 durationDays: action.duration_days,
-                name: action.name
+                name: action.name,
+                image_uri: action.image_uri
               }
             })
           })
@@ -2284,7 +2285,8 @@ module.exports = [
               optionalEntities: JSON.parse(found.optional_entities),
               durationDays: found.duration_days,
               requestedBy: user_did,
-              name: found.name
+              name: found.name,
+              image_uri: found.image_uri
             }
           })
         }

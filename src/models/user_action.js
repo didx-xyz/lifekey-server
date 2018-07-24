@@ -31,6 +31,10 @@ module.exports = function(instance, sqlize) {
       type: sqlize.INTEGER,
       allowNull: true,
       defaultValue: 365
+    },
+    image_uri: {
+      type: sqlize.STRING,
+      allowNull: true
     }
   }, {
     timestamps: true,
