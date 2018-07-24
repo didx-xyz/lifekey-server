@@ -79,7 +79,8 @@ module.exports = [
               nickname: user.nickname,
               did: user.did,
               actions_url: user.actions_url,
-              host_address: user.host_address
+              host_address: user.host_address,
+              image_uri: user.branding_image_uri
             }
           })
         })
