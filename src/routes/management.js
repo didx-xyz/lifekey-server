@@ -1076,7 +1076,7 @@ module.exports = [
   },
 // 8 GET /management/isa_list/get/:other_did
 {
-  uri: '/management/isa_list',
+  uri: '/management/isa_list/:other_did',
   method: 'get',
   secure: true,
   active: true,
@@ -1086,6 +1086,7 @@ module.exports = [
       information_sharing_agreement
     } = this.get('models')
     var errors = this.get('db_errors')
+    var {other_did} = req.params
 
     var body = {
       unacked: [],
@@ -1097,8 +1098,8 @@ module.exports = [
       where: {
         acknowledged: null,
         $or: [
-          {to_did: req.user.did, from_did: req.other_did},
-          {from_did: req.user.did, to_did: req.other_did}
+          {to_did: req.user.did, from_did: other_did},
+          {from_did: req.user.did, to_did: other_did}
         ]
       }
     }).then(function(isars) {
@@ -1116,8 +1117,8 @@ module.exports = [
       return information_sharing_agreement.findAll({
         where: {
           $or: [
-            {to_did: req.user.did, from_did: req.other_did},
-            {from_did: req.user.did, to_did: req.other_did}
+            {to_did: req.user.did, from_did: other_did},
+            {from_did: req.user.did, to_did: other_did}
           ]
         }
       })
