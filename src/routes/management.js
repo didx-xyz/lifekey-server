@@ -1074,83 +1074,6 @@ module.exports = [
       })
     }
   },
-// 8 GET /management/isa_list/get/:other_did
-{
-  uri: '/management/isa_list/:other_did',
-  method: 'get',
-  secure: true,
-  active: true,
-  callback: function(req, res) {
-    var {
-      information_sharing_agreement_request,
-      information_sharing_agreement
-    } = this.get('models')
-    var errors = this.get('db_errors')
-    var {other_did} = req.params
-
-    var body = {
-      unacked: [],
-      enabled: [],
-      disabled: []
-    }
-
-    information_sharing_agreement_request.findAll({
-      where: {
-        acknowledged: null,
-        $or: [
-          {to_did: req.user.did, from_did: other_did},
-          {from_did: req.user.did, to_did: other_did}
-        ]
-      }
-    }).then(function(isars) {
-      if (isars) {
-        body.unacked = isars.map(isar => {
-          return {
-            id: isar.id,
-            from_did: isar.from_did,
-            purpose: isar.purpose,
-            license: isar.license,
-            required_entities: JSON.parse(isar.required_entities)
-          }
-        })
-      }
-      return information_sharing_agreement.findAll({
-        where: {
-          $or: [
-            {to_did: req.user.did, from_did: other_did},
-            {from_did: req.user.did, to_did: other_did}
-          ]
-        }
-      })
-    }).then(function(isas) {
-      if (isas) {
-        body.enabled = isas.filter(isa => !isa.expired).map(isa => isa.id)
-        body.disabled = isas.filter(isa => isa.expired).map(isa => isa.id)
-      }
-      return Promise.resolve()
-    }).then(function() {
-      return Promise.resolve(
-        res.status(200).json({
-          error: false,
-          status: 200,
-          message: 'ok',
-          body: body
-        })
-      )
-    }).catch(function(err) {
-      err = errors(err)
-      return res.status(
-        err.status || 500
-      ).json({
-        error: err.error || true,
-        status: err.status || 500,
-        message: err.message || 'internal server error',
-        body: err.body || null
-      })
-    })
-  }
-},
-
   // 8 GET /management/isa/get
   {
     uri: '/management/isa',
@@ -3561,6 +3484,81 @@ module.exports = [
         error: false,
         status: 202,
         message: 'received'
+      })
+    }
+  },// 8 GET /management/isa_list/get/:other_did
+  {
+    uri: '/management/isa_list/:other_did',
+    method: 'get',
+    secure: true,
+    active: true,
+    callback: function(req, res) {
+      var {
+        information_sharing_agreement_request,
+        information_sharing_agreement
+      } = this.get('models')
+      var errors = this.get('db_errors')
+      var {other_did} = req.params
+  
+      var body = {
+        unacked: [],
+        enabled: [],
+        disabled: []
+      }
+  
+      information_sharing_agreement_request.findAll({
+        where: {
+          acknowledged: null,
+          $or: [
+            {to_did: req.user.did, from_did: other_did},
+            {from_did: req.user.did, to_did: other_did}
+          ]
+        }
+      }).then(function(isars) {
+        if (isars) {
+          body.unacked = isars.map(isar => {
+            return {
+              id: isar.id,
+              from_did: isar.from_did,
+              purpose: isar.purpose,
+              license: isar.license,
+              required_entities: JSON.parse(isar.required_entities)
+            }
+          })
+        }
+        return information_sharing_agreement.findAll({
+          where: {
+            $or: [
+              {to_did: req.user.did, from_did: other_did},
+              {from_did: req.user.did, to_did: other_did}
+            ]
+          }
+        })
+      }).then(function(isas) {
+        if (isas) {
+          body.enabled = isas.filter(isa => !isa.expired).map(isa => isa.id)
+          body.disabled = isas.filter(isa => isa.expired).map(isa => isa.id)
+        }
+        return Promise.resolve()
+      }).then(function() {
+        return Promise.resolve(
+          res.status(200).json({
+            error: false,
+            status: 200,
+            message: 'ok',
+            body: body
+          })
+        )
+      }).catch(function(err) {
+        err = errors(err)
+        return res.status(
+          err.status || 500
+        ).json({
+          error: err.error || true,
+          status: err.status || 500,
+          message: err.message || 'internal server error',
+          body: err.body || null
+        })
       })
     }
   }
