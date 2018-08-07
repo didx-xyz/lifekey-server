@@ -3,6 +3,7 @@ var crypto = require('../crypto')
 var https = require('https')
 var http = require('http')
 var url = require('url')
+var fs = require('fs')
 
 var ec = require('eccrypto')
 
@@ -198,6 +199,12 @@ module.exports = [
         })
       }).then(function() {
         // TODO respond with html deeplink
+        fs.readFile(__dirname + '/../../templates/verify_sms_template.html', 'utf8', function(err, html){
+          return res.status(200).end(html)
+          res.status(200).end(
+            html
+          )
+        });
         return res.status(200).end('Thank you for verifying your mobile phone number.')
       }).catch(function(err) {
         err = errors(err)

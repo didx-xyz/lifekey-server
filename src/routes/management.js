@@ -20,6 +20,7 @@ var crypto = require('crypto')
 var web3 = require('web3')
 var qr = require('qrcode')
 var cuid = require('cuid')
+var fs = require('fs')
 
 var env = require('../init/env')()
 
@@ -748,10 +749,15 @@ module.exports = [
             }
           }
         })
-        res.set('Content-Type', 'text/html')
-        res.status(200).end(
-          '<p>Thanks for activating!</p>'
-        )
+        // res.set('Content-Type', 'text/html')
+        fs.readFile(__dirname + '/../../templates/verify_email_template.html', 'utf8', function(err, html){
+          res.status(200).end(
+            html
+          )
+        });
+        // res.status(200).end(
+        //   '<p>Thanks for activating!</p>'
+        // )
       }).catch(function(err) {
         err = errors(err)
         return res.status(
