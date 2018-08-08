@@ -6,6 +6,7 @@ var crypto = require('crypto')
 var web3 = require('web3')
 var tx = require('ethereumjs-tx')
 var ut = require('ethereumjs-util')
+var BigNumber = require('bignumber.js');
 
 var env = require('./env')()
 
@@ -112,13 +113,16 @@ require('./database')(
   return new Promise(function(resolve, reject) {
     // ensure balance is not zero
     w3.eth.getBalance(addr, function(err, balance) {
+      console.error(`err: ${err}`)
+      console.log(`balance: ${balance}`)
+
       if (err) {
         console.log('isa_ledger --- error getting balance for ISA_RECEIPT_KEY account')
         return reject(err)
       } else if (!balance) {
         console.log('isa_ledger --- error getting balance for ISA_RECEIPT_KEY account', 'balance is not defined')
         return reject()
-      } else if (balance.toNumber() <= 0) {
+      } else if (new BigNumber(balance).isLessThanOrEqualTo(BigNumber(0))) {
         console.log('isa_ledger --- ISA_RECEIPT_KEY account balance too low to continue')
         return reject()
       } else {

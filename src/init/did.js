@@ -50,7 +50,6 @@ function process_message(msg) {
       EIS_ADMIN_ADDRESS,
       user_address,
       env.EIS_SIGNER_KEY,
-      did_value,
       function(err, txhash) {
         if (err) {
           return console.log('did --- EIS spawn error', err)
@@ -132,9 +131,9 @@ function created_did(err, event) {
   }).catch(console.log.bind(console, 'did --- EIS db update error'))
 }
 
-isw = require('identity-service-wrapper')(env.EIS_HOST)
+isw = require('identity-service-wrapper')(env.EIS_HOST, env.EIS_CONTRACT_ADDRESS, env.EIS_GAS_LIMIT, env.EIS_GAS_PRICE)
 
-isw.registry.CreatedDID(created_did)
+isw.registry.events.CreatedDID(created_did)
 
 process.on('message', process_message)
 

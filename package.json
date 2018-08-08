@@ -30,7 +30,7 @@
     "ethereumjs-util": "^5.1.1",
     "express": "^4.14.0",
     "fluster": "0.0.15",
-    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git#0a2a31b55a341a88ed74cc3786d62d8cf88988ea",
+    "identity-service-wrapper": "git@github.com:consent-global/identity-service-wrapper.git",
     "jsonld": "^0.4.11",
     "ld-query": "^1.0.0",
     "morgan": "^1.7.0",
@@ -40,7 +40,7 @@
     "secp256k1": "^3.2.5",
     "sendgrid": "^4.7.1",
     "sequelize": "^3.28.0",
-    "web3": "^0.19.0"
+    "web3": "^0.20.7"
   },
   "devDependencies": {
     "chai": "^3.5.0",

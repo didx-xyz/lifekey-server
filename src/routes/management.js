@@ -38,10 +38,8 @@ if (!TESTING) {
     console.log('unable to initialise connection to eis host', e)
   }
   try {
-    thanks = w3.eth.contract(
-      THANKS_TOKEN_CONTRACT_ABI
-    ).at(
-      env.THANKS_TOKEN_CONTRACT_ADDRESS
+    thanks = new w3.eth.Contract(
+      THANKS_TOKEN_CONTRACT_ABI, env.THANKS_TOKEN_CONTRACT_ADDRESS
     )
   } catch (e) {
     thanks_balance_check_available = false
