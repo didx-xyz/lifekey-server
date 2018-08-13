@@ -205,7 +205,6 @@ module.exports = [
             html
           )
         });
-        return res.status(200).end('Thank you for verifying your mobile phone number.')
       }).catch(function(err) {
         err = errors(err)
         return res.status(
