@@ -3076,7 +3076,8 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var {msg, recipient, type, title, message_id } = req.body;
+      var {msg, recipient, type, title, message_id, action_type } = req.body;
+      console.log(`action_type : ${action_type}`)
       var {user_connection} = this.get('models')
       Promise.resolve().then(function() {
         if (msg.length > 4096) {
@@ -3120,6 +3121,7 @@ module.exports = [
               msg_title: title,
               msg_type: type,
               msg_id: message_id,
+              action_type: action_type,
             }
           }
         })
@@ -3478,19 +3480,52 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var { id, accepted } = req.body;
-      if (accepted) {
+      var { did, id, accepted, action_type } = req.body;
+      var {user} = this.get('models')
+      var errors = this.get('db_errors')
+      user.findOne({
+        where: {
+          did: did
+        }
+      }).then(function(found) {
+        if (!found) {
+          return Promise.reject({
+            error: true,
+            status: 404,
+            message: 'agent user record not found',
+            body: null
+          })
+        }
+
         // do something to accept claim
         console.log('Claim accepted id:', id);
-      } else {
-        // do something to reject claim
-        console.log('Claim rejected id:', id);
-      }
-      return res.status(201).json({
-        error: false,
-        status: 202,
-        message: 'received'
+        console.error('Claim body:', req.body);
+
+        process.send({
+          notification_request: {
+            user_id: found.id,
+            notification: {
+              title: 'New Claim Reply',
+              body: `You have received a Claim Reply from ${req.user.nickname}!`
+            },
+            data: {
+              type: 'claim_reply_response',
+              claim_reply_id: id,
+              action_type: action_type?action_type:"offer",
+              from_did: req.user.did,
+              accepted: accepted,
+              from_nickname: req.user.nickname
+            }
+          }
+        })
+        return res.status(201).json({
+          error: false,
+          status: 202,
+          message: 'received'
+        })
       })
+      
+  
     }
   },// 8 GET /management/isa_list/get/:other_did
   {
