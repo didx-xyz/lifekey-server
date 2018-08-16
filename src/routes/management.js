@@ -3480,12 +3480,14 @@ module.exports = [
     secure: true,
     active: true,
     callback: function(req, res) {
-      var { did, id, accepted, action_type } = req.body;
+      console.error('Claim body:', req.body);
+
+      var { for_did, id, accepted, action_type } = req.body;
       var {user} = this.get('models')
       var errors = this.get('db_errors')
       user.findOne({
         where: {
-          did: did
+          did: for_did
         }
       }).then(function(found) {
         if (!found) {
@@ -3499,7 +3501,6 @@ module.exports = [
 
         // do something to accept claim
         console.log('Claim accepted id:', id);
-        console.error('Claim body:', req.body);
 
         process.send({
           notification_request: {
