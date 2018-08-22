@@ -1,0 +1,91 @@
+version: "2"
+services:
+  lifqi:
+    container_name: lifqi
+    image: trustlab/lifqi:latest
+        
+    restart: always
+    build: .
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.5
+    ports:
+      - "5000:5000"
+    links:
+      - db
+      - indy_pool
+      - lifqi_cli
+    depends_on:
+      - db
+      - indy_pool
+      - lifqi_cli
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+  db:
+     image: mysql:5.7
+     volumes:
+       - db_data:/var/lib/mysql
+     restart: always
+     environment:
+       MYSQL_ROOT_PASSWORD: lifekey
+       MYSQL_DATABASE: lifekey
+       MYSQL_USER: lifekey
+       MYSQL_PASSWORD: lifekey
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.4
+   
+  lifqi_cli:
+    container_name: lifqi_cli
+    # working_dir: /home
+    # command: bash -c "indy-cli"
+    restart: always
+    build:
+      context: .
+      dockerfile: cli.dockerfile
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.3
+    depends_on:
+      - indy_pool
+    links:
+      - indy_pool
+
+  indy_pool:
+    build:
+      context: .
+      dockerfile: indy-pool.dockerfile
+      args:
+        pool_ip: 10.0.0.2
+    image: indy_pool
+    container_name: indy_pool
+    working_dir: /home/indy
+    ports:
+      - "9701:9701"
+      - "9702:9702"
+      - "9703:9703"
+      - "9704:9704"
+      - "9705:9705"
+      - "9706:9706"
+      - "9707:9707"
+      - "9708:9708"
+    networks:
+      pool_network:
+        ipv4_address: 10.0.0.2
+    volumes:
+       - sandbox:/var/lib/indy/sandbox/
+networks:
+  pool_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        -
+          subnet: 10.0.0.0/24
+volumes:
+  sandbox:
+  db_data:
