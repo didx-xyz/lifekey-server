@@ -7,6 +7,7 @@ exports.createSchema = async function (name, version, attributes) {
     let schemaRequest = await sdk.buildSchemaRequest(await indy.did.getEndpointDid(), schema);
     await sdk.signAndSubmitRequest(await indy.pool.get(), await indy.wallet.get(), await indy.did.getEndpointDid(), schemaRequest);
     await indy.did.pushEndpointDidAttribute('schemas', id);
+    return id;
 };
 
 exports.getSchemas = async function () {
@@ -25,6 +26,7 @@ exports.createCredDef = async function (schemaId, tag) {
     let credDefRequest = await sdk.buildCredDefRequest(await indy.did.getEndpointDid(), credDefJson);
     await sdk.signAndSubmitRequest(await indy.pool.get(), await indy.wallet.get(), await indy.did.getEndpointDid(), credDefRequest);
     await indy.did.pushEndpointDidAttribute('credential_definitions', credDefJson);
+    return credDefId;
 };
 
 exports.sendSchema = async function(poolHandle, walletHandle, Did, schema) {

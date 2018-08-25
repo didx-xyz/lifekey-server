@@ -185,7 +185,7 @@ module.exports = [
                 error: false,
                 status: 201,
                 message: 'user_connection already exists',
-                body: {id: ucr.id}
+                body: null
               })
             }else{
               return Promise.reject({

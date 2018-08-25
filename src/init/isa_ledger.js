@@ -1,10 +1,26 @@
 
 'use strict'
 
-var env = require('./env')()
+var config = require('./env')()
 const sdk = require('indy-sdk');
+var sovrin = require('../sovrin')
 var wallet = require('../sovrin/wallet')
-
+var schema_attribute_names = [
+  "isa", 
+  "request",
+  "response",
+  "requestSignatureValue",
+  "isaSignatureValue",
+  "purpose",
+  "license",
+  "entities",
+  "optionalEntities",
+  "durationDays",
+  "requestedBy",
+  "respondedBy",
+  "accepted",
+  "expiresAt"
+]
 // forward references
 var models = {}
 
@@ -23,55 +39,42 @@ function process_message(msg) {
 
   models.consent_schemas.findOne({
     where: (
-      { name: 'ISA' }
+      { name: 'information_sharing_agreement' }
     ).sort({id: 'desc'}).limit(1).exec(function(schema){
       if(!schema){
-        var schema_location = 'http://schema.cnsnt.io/information_sharing_agreement'
-        var schema = {
-          '@context': {
-            id: '@id',
-            type: '@type',
-            cn: 'http://schema.cnsnt.io/',
-            isa: 'cn:isa',
-            request: 'cn:isaRequest',
-            response: 'cn:isaResponse',
-            requestSignatureValue: 'cn:requestSignatureValue',
-            isaSignatureValue: 'cn:isaSignatureValue',
-            purpose: 'cn:isaPurpose',
-            license: 'cn:isaLicense',
-            entities: 'cn:isaEntities',
-            optionalEntities: 'cn:entities',
-            durationDays: 'cn:durationDays',
-            requestedBy: 'cn:decentralisedIdentifier',
-            respondedBy: 'cn:decentralisedIdentifier',
-            accepted: 'cn:accepted',
-            expiresAt: 'cn:expiresAt'
-          }
-        }
+        
+        models.consent_schemas.create({
+          name: 'information sharing agreement',
+          uri: 'http://schema.cnsnt.io/information_sharing_agreement',
+          attributes: schema_attribute_names,
+          version: '1.0'
 
+        }).then(function(schema){
+          let schema_id = await sovrin.issuer.createSchema('information sharing agreement', '1.0', schema_attribute_names)
+          let cred_def_id  = await sovrin.issuer.createCredDef(schema_id, 'ISA')
 
-        // Schema
-        req = await indy.buildSchemaRequest(myDid, schema)
-        req = await indy.signRequest(wh, myDid, req)
-        res = await indy.submitRequest(pool.handle, req)
-      }else if(!schema.credDefId){
-
-      } else {
+          return models.consent_schemas.update({
+            schemaNo: schema_id,
+            credDefId: cred_def_id
+          }, {
+          where: {id: schema.id}
+        }).then(function(updated){
+          return updated.credDefId
+        }).catch(console.error)
+      })
+     } else {
         return schema.credDefId;
       }
-      
     })
-  }).then(function(){
+  }).then(function(credDefId){
     return models.user.findOne({
       where: (
         { did: isa.from_did }
       )
     })
   }).then(function (found) {
-    var wh = wallet.openWalletForUser(found.id);
-    var [credDefId, credDef] = await sdk.issuerCreateAndStoreCredentialDef(wh, isa.from_did, schema, 'ISA', 'CL', { support_revocation: true })
-    req = await sdk.buildCredDefRequest(myDid, credDef)
-    res = await sdk.signAndSubmitRequest(pool.handle, wh, myDid, req)
+    let cred_def_id  = await sovrin.issuer.createCredDef(schema_id, 'ISA')
+    //
     return credDefId
   }).then(function (credDefId) {
     return Promise.all([
