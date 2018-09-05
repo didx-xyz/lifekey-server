@@ -179,22 +179,11 @@ module.exports = [
         if (found) {
           // cannot send connection request
           // if a connection already exists
-          user.findOne({where: {did: target}}).then((target_user) => {
-            if(target_user.webhook_url){
-              return res.status(201).json({
-                error: false,
-                status: 201,
-                message: 'user_connection already exists',
-                body: {id: ucr.id}
-              })
-            }else{
-              return Promise.reject({
-                error: true,
-                status: 400,
-                message: 'user_connection record already exists',
-                body: null
-              })
-            }
+          return Promise.reject({
+            error: true,
+            status: 400,
+            message: 'user_connection record already exists',
+            body: null
           })
         }
 
